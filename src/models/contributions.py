@@ -5,6 +5,8 @@ import re
 import numpy as np
 import pandas as pd
 
+CONTEXT_COLUMNS = ["activity_number", "activity", "window_size", "scheme_window_size"]
+
 
 def linear_contributions(
     x_test_scaled: np.ndarray,
@@ -27,15 +29,20 @@ def linear_contributions(
     return pd.DataFrame(rows)
 
 
+def _context_cols(df: pd.DataFrame) -> list[str]:
+    return [col for col in CONTEXT_COLUMNS if col in df.columns]
+
+
 def summarize_population(contrib: pd.DataFrame) -> pd.DataFrame:
     if contrib.empty:
         return pd.DataFrame(columns=["target", "feature", "mean_contribution", "mean_abs_contribution", "std_contribution", "n"])
+    group_cols = ["target"] + _context_cols(contrib) + ["feature"]
     out = (
-        contrib.groupby(["target", "feature"], dropna=False)["contribution"]
+        contrib.groupby(group_cols, dropna=False)["contribution"]
         .agg(mean_contribution="mean", mean_abs_contribution=lambda s: s.abs().mean(), std_contribution="std", n="count")
         .reset_index()
     )
-    return out.sort_values(["target", "mean_abs_contribution"], ascending=[True, False])
+    return out.sort_values(["target"] + _context_cols(out) + ["mean_abs_contribution"], ascending=[True] * (1 + len(_context_cols(out))) + [False])
 
 
 def _norm(value: object) -> str:
@@ -71,14 +78,15 @@ def add_age_group(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
 def summarize_by_column(contrib: pd.DataFrame, group_col: str | None) -> pd.DataFrame:
     if contrib.empty or group_col is None or group_col not in contrib.columns:
         return pd.DataFrame()
+    group_cols = ["target"] + _context_cols(contrib) + [group_col, "feature"]
     out = (
         contrib.dropna(subset=[group_col])
-        .groupby(["target", group_col, "feature"], dropna=False)["contribution"]
+        .groupby(group_cols, dropna=False)["contribution"]
         .agg(mean_contribution="mean", mean_abs_contribution=lambda s: s.abs().mean(), n="count")
         .reset_index()
     )
-    return out.sort_values(["target", group_col, "mean_abs_contribution"], ascending=[True, True, False])
+    return out.sort_values(["target"] + _context_cols(out) + [group_col, "mean_abs_contribution"], ascending=[True] * (1 + len(_context_cols(out)) + 1) + [False])
 
 
 def schooling_column(df: pd.DataFrame) -> str | None:
-    return find_column(df, ["School year", "Educational level", "Escolaridad", "Nivel educativo", "Grado"])
+    return find_column(df, ["Educational level", "Nivel educativo", "Escolaridad", "School year", "Grado"])

@@ -93,6 +93,7 @@ def correlations_by_activity_window(
     targets: dict[str, str],
     method: str = "spearman",
     metrics: Iterable[str] = MODEL_METRICS,
+    min_n: int = 3,
 ) -> pd.DataFrame:
     work = df.copy()
     if "valid_window" in work.columns:
@@ -100,7 +101,8 @@ def correlations_by_activity_window(
     if "_merge" in work.columns:
         work = work[work["_merge"].astype(str).eq("both")]
     if "activity_number" in work.columns:
-        work = work[pd.to_numeric(work["activity_number"], errors="coerce").notna()]
+        activity = pd.to_numeric(work["activity_number"], errors="coerce")
+        work = work[activity.between(1, 7)]
 
     group_cols = [col for col in ["scheme_window_size", "activity_number", "activity"] if col in work.columns]
     grouped = work.groupby(group_cols, dropna=False) if group_cols else [((), work)]
@@ -111,20 +113,30 @@ def correlations_by_activity_window(
         base = dict(zip(group_cols, keys))
         if "code" in sub.columns:
             sub = sub.drop_duplicates(subset=["code"])
-        for prefix in ("mean_", "global_"):
-            for metric in metrics:
-                col = f"{prefix}{metric}"
-                if col not in sub.columns:
+        for metric in metrics:
+            col = f"mean_{metric}"
+            if col not in sub.columns:
+                continue
+            for target_label, target_col in targets.items():
+                r, p, n = safe_corr(sub[col], sub[target_col], method=method)
+                if n < min_n:
                     continue
-                for target_label, target_col in targets.items():
-                    r, p, n = safe_corr(sub[col], sub[target_col], method=method)
-                    if n < 3:
-                        continue
-                    rows.append(base | {"metric": col, "metric_base": metric, "target": target_label, "target_column": target_col, "r": r, "p": p, "n": n})
+                rows.append(
+                    base
+                    | {
+                        "metric": metric,
+                        "metric_column": col,
+                        "target": target_label,
+                        "target_column": target_col,
+                        "r": r,
+                        "p": p,
+                        "n": n,
+                    }
+                )
     out = pd.DataFrame(rows)
     if not out.empty:
         out["abs_r"] = out["r"].abs()
-        out = out.sort_values(["abs_r", "target", "metric"], ascending=[False, True, True])
+        out = out.sort_values(["target", "scheme_window_size", "activity_number", "abs_r"], ascending=[True, True, True, False])
     return out
 
 
@@ -155,9 +167,12 @@ def write_analysis_outputs(
     targets = resolve_targets(combined, targets_text)
     metric_cols = canonical_metric_columns(combined, prefixes=("mean_", "std_", "global_"))
 
-    corr = correlations_by_activity_window(combined, targets=targets, method=method)
+    corr = correlations_by_activity_window(combined, targets=targets, method=method, min_n=3)
     corr_path = analysis_dir / "correlations_by_activity_window.csv"
     corr.to_csv(corr_path, index=False)
+    corr_filtered = corr[pd.to_numeric(corr.get("n", pd.Series(dtype=float)), errors="coerce") >= 100].copy() if not corr.empty else corr
+    corr_filtered_path = analysis_dir / "correlations_by_activity_window_min_n100.csv"
+    corr_filtered.to_csv(corr_filtered_path, index=False)
 
     profile = profile_by_group(combined, parse_csv_list(group_cols), metric_cols)
     profile_path = analysis_dir / "profile_by_group.csv"
@@ -167,4 +182,4 @@ def write_analysis_outputs(
     feature_summary_path = analysis_dir / "canonical_metric_columns.csv"
     feature_summary.to_csv(feature_summary_path, index=False)
 
-    return {"correlations": corr_path, "profile": profile_path, "metric_columns": feature_summary_path}
+    return {"correlations": corr_path, "correlations_min_n100": corr_filtered_path, "profile": profile_path, "metric_columns": feature_summary_path}

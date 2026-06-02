@@ -153,7 +153,7 @@ def extract_graph_metrics(
                 "window_step": int(step),
                 "token_count": int(len(tokens)),
                 "segment_count": int(len(segments)),
-                "valid_window": int(len(tokens) >= current_window_size),
+                "valid_window": int(len(windows) > 0),
             }
             row.update(aggregated)
             summary_rows.append(row)
