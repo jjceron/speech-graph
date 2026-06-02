@@ -1,0 +1,38 @@
+# Python virtual environment
+.venv/
+
+# Project folders not to version
+data/
+docs/
+
+# Ignore everything inside outputs
+outputs/**
+
+# Allow Git to traverse outputs and its subfolders
+!outputs/
+!outputs/**/
+
+# Track only Markdown files inside outputs, at any folder depth
+!outputs/**/*.md
+
+# Optional: keep the outputs folder in Git even if it has no tracked Markdown files
+!outputs/.gitkeep
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
