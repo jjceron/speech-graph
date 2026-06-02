@@ -13,7 +13,7 @@ outputs/**
 !outputs/**/
 
 # Track figures/ on folders within outputs, but ignore all other files
-!outputs/**/figures/
+!outputs/**/figures/**/*.png
 
 # Track only Markdown files inside outputs, at any folder depth
 !outputs/**/*.md
