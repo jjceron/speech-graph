@@ -1,257 +1,170 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.graphs import CANONICAL_METRICS
+from src.graphs import MODEL_METRICS
 
-BARRATT_TARGETS = ["TOTAL", "NPLAN", "MOT", "COG"]
 ID_COLUMNS = {
     "code", "file", "level", "activity", "activity_number", "activity_index", "start_time", "end_time",
-    "window_size", "window_step", "scheme_window_size", "random_times", "token_count", "segment_count",
-    "window_count", "valid_window", "_merge", "_join_code", "Cod",
+    "scheme_window_size", "window_size", "window_step", "random_times", "valid_window", "window_count",
+    "_join_code", "_merge", "Cod",
 }
+
 TARGET_ALIASES = {
-    "TOTAL": ["TOTAL", "Total", "Barratt Total", "Barratt (pre)", "BIS Total", "BIS_TOTAL"],
+    "TOTAL": ["TOTAL", "Total", "Barratt Total", "BIS Total", "BIS_TOTAL", "Barratt (pre)"],
     "NPLAN": ["NPLAN", "No plan", "No planificación", "No planeación", "Nonplanning", "NPLAN_zscore"],
     "MOT": ["MOT", "Motor", "MOT_zscore"],
     "COG": ["COG", "Cognitive", "Cognitiva", "COG_zscore"],
 }
-DEMOGRAPHIC_ALIASES = {
-    "age": ["Age", "Edad", "EDAD"],
-    "schooling": ["School year", "Escolaridad", "Educational level", "Nivel educativo", "Grado", "Curso"],
-}
+
+
+def parse_csv_list(text: str | None) -> list[str]:
+    return [part.strip() for part in str(text or "").split(",") if part.strip()]
+
+
+def parse_int_set(text: str | None, default: Iterable[int] = range(1, 8)) -> set[int]:
+    if not text:
+        return set(default)
+    return {int(item.strip()) for item in str(text).split(",") if item.strip()}
 
 
 def _norm(value: object) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
 
-def find_column(df: pd.DataFrame, aliases: Iterable[str]) -> str | None:
+def resolve_targets(df: pd.DataFrame, requested: str = "Total,NPLAN,MOT,COG") -> dict[str, str]:
     lookup = {_norm(col): col for col in df.columns}
-    for alias in aliases:
-        key = _norm(alias)
-        if key in lookup:
-            return lookup[key]
-    for alias in aliases:
-        key = _norm(alias)
-        if not key:
-            continue
-        for col in df.columns:
-            if key in _norm(col):
-                return col
-    return None
-
-
-def resolve_target_columns(df: pd.DataFrame, requested: str | Iterable[str] = BARRATT_TARGETS) -> dict[str, str]:
-    names = [x.strip() for x in str(requested).split(",") if x.strip()] if isinstance(requested, str) else list(requested)
-    resolved: dict[str, str] = {}
-    for name in names:
-        canonical = name.upper() if name.upper() in BARRATT_TARGETS else name
-        aliases = TARGET_ALIASES.get(canonical, [name])
-        col = find_column(df, aliases)
-        if col is not None and col not in resolved.values():
-            resolved[canonical] = col
-    return resolved
-
-
-def add_standard_target_columns(df: pd.DataFrame, requested: str | Iterable[str] = BARRATT_TARGETS) -> pd.DataFrame:
-    out = df.copy()
-    for canonical, col in resolve_target_columns(out, requested).items():
-        out[canonical] = pd.to_numeric(out[col], errors="coerce")
-    return out
-
-
-def demographic_columns(df: pd.DataFrame) -> dict[str, str]:
     out: dict[str, str] = {}
-    for key, aliases in DEMOGRAPHIC_ALIASES.items():
-        col = find_column(df, aliases)
-        if col is not None:
-            out[key] = col
+    for raw_name in parse_csv_list(requested):
+        label = raw_name.upper() if raw_name.lower() == "total" else raw_name.upper()
+        candidates = TARGET_ALIASES.get(label, [raw_name, label])
+        column = None
+        for candidate in candidates:
+            if candidate in df.columns:
+                column = candidate
+                break
+            normalized = _norm(candidate)
+            if normalized in lookup:
+                column = lookup[normalized]
+                break
+        if column is None:
+            normalized_raw = _norm(raw_name)
+            for col in df.columns:
+                if normalized_raw and normalized_raw == _norm(col):
+                    column = col
+                    break
+        if column is not None and label not in out:
+            out[label] = column
     return out
 
 
-def canonical_feature_columns(df: pd.DataFrame, include_global: bool = True, include_window_stats: bool = True) -> list[str]:
-    allowed: set[str] = set()
-    if include_window_stats:
-        for prefix in ("mean", "std"):
-            allowed.update(f"{prefix}_{metric}" for metric in CANONICAL_METRICS)
-    if include_global:
-        allowed.update(f"global_{metric}" for metric in CANONICAL_METRICS)
+def canonical_metric_columns(df: pd.DataFrame, prefixes: Iterable[str] = ("mean_", "std_", "global_")) -> list[str]:
     cols: list[str] = []
-    for col in df.columns:
-        if col in allowed:
-            values = pd.to_numeric(df[col], errors="coerce")
-            if values.notna().sum() >= 3 and values.nunique(dropna=True) > 1:
+    for prefix in prefixes:
+        for metric in MODEL_METRICS:
+            col = f"{prefix}{metric}"
+            if col in df.columns and pd.to_numeric(df[col], errors="coerce").notna().sum() > 0:
                 cols.append(col)
     return cols
 
 
-def _safe_corr(x: pd.Series, y: pd.Series, method: str) -> tuple[float, float, int]:
-    x_num = pd.to_numeric(x, errors="coerce")
-    y_num = pd.to_numeric(y, errors="coerce")
-    mask = x_num.notna() & y_num.notna()
+def safe_corr(x: pd.Series, y: pd.Series, method: str = "spearman") -> tuple[float, float, int]:
+    x = pd.to_numeric(x, errors="coerce")
+    y = pd.to_numeric(y, errors="coerce")
+    mask = x.notna() & y.notna()
     n = int(mask.sum())
-    if n < 3 or x_num[mask].nunique(dropna=True) < 2 or y_num[mask].nunique(dropna=True) < 2:
-        return np.nan, np.nan, n
+    if n < 3 or x[mask].nunique(dropna=True) < 2 or y[mask].nunique(dropna=True) < 2:
+        return float("nan"), float("nan"), n
     if method == "pearson":
-        r, p = stats.pearsonr(x_num[mask], y_num[mask])
+        r, p = stats.pearsonr(x[mask], y[mask])
     else:
-        r, p = stats.spearmanr(x_num[mask], y_num[mask])
+        r, p = stats.spearmanr(x[mask], y[mask])
     return float(r), float(p), n
 
 
-def correlation_table(df: pd.DataFrame, metric_cols: Iterable[str], target_cols: dict[str, str] | Iterable[str], method: str = "spearman") -> pd.DataFrame:
-    if isinstance(target_cols, dict):
-        targets = target_cols.items()
-    else:
-        targets = [(str(col), str(col)) for col in target_cols]
+def correlations_by_activity_window(
+    df: pd.DataFrame,
+    targets: dict[str, str],
+    method: str = "spearman",
+    metrics: Iterable[str] = MODEL_METRICS,
+) -> pd.DataFrame:
+    work = df.copy()
+    if "valid_window" in work.columns:
+        work = work[pd.to_numeric(work["valid_window"], errors="coerce").fillna(0).astype(int) == 1]
+    if "_merge" in work.columns:
+        work = work[work["_merge"].astype(str).eq("both")]
+    if "activity_number" in work.columns:
+        work = work[pd.to_numeric(work["activity_number"], errors="coerce").notna()]
+
+    group_cols = [col for col in ["scheme_window_size", "activity_number", "activity"] if col in work.columns]
+    grouped = work.groupby(group_cols, dropna=False) if group_cols else [((), work)]
     rows: list[dict] = []
-    for metric in metric_cols:
-        if metric not in df.columns:
-            continue
-        for target_name, target_col in targets:
-            if target_col not in df.columns or metric == target_col:
-                continue
-            r, p, n = _safe_corr(df[metric], df[target_col], method)
-            if n >= 3 and np.isfinite(r):
-                rows.append({"metric": metric, "target": target_name, "target_column": target_col, "r": r, "p": p, "n": n})
+    for keys, sub in grouped:
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        base = dict(zip(group_cols, keys))
+        if "code" in sub.columns:
+            sub = sub.drop_duplicates(subset=["code"])
+        for prefix in ("mean_", "global_"):
+            for metric in metrics:
+                col = f"{prefix}{metric}"
+                if col not in sub.columns:
+                    continue
+                for target_label, target_col in targets.items():
+                    r, p, n = safe_corr(sub[col], sub[target_col], method=method)
+                    if n < 3:
+                        continue
+                    rows.append(base | {"metric": col, "metric_base": metric, "target": target_label, "target_column": target_col, "r": r, "p": p, "n": n})
     out = pd.DataFrame(rows)
     if not out.empty:
         out["abs_r"] = out["r"].abs()
-        out = out.sort_values(["abs_r", "metric", "target"], ascending=[False, True, True]).reset_index(drop=True)
+        out = out.sort_values(["abs_r", "target", "metric"], ascending=[False, True, True])
     return out
 
 
-def _fdr_bh(p_values: pd.Series) -> pd.Series:
-    p = pd.to_numeric(p_values, errors="coerce").to_numpy(dtype=float)
-    q = np.full(len(p), np.nan)
-    mask = np.isfinite(p)
-    if mask.sum() == 0:
-        return pd.Series(q, index=p_values.index)
-    idx = np.where(mask)[0]
-    order = idx[np.argsort(p[mask])]
-    ranked = p[order] * len(order) / np.arange(1, len(order) + 1)
-    ranked = np.minimum.accumulate(ranked[::-1])[::-1]
-    q[order] = np.clip(ranked, 0, 1)
-    return pd.Series(q, index=p_values.index)
-
-
-def correlations_by_activity_window(df: pd.DataFrame, targets: dict[str, str], method: str = "spearman") -> pd.DataFrame:
-    work = df.copy()
-    if "_merge" in work.columns:
-        work = work[work["_merge"].astype(str).eq("both")]
-    if "valid_window" in work.columns:
-        work = work[pd.to_numeric(work["valid_window"], errors="coerce").eq(1)]
-    metrics = canonical_feature_columns(work, include_global=False, include_window_stats=True)
-    rows: list[pd.DataFrame] = []
-    group_cols = [c for c in ["scheme_window_size", "activity", "activity_number"] if c in work.columns]
-    for key, sub in work.groupby(group_cols, dropna=False) if group_cols else [((), work)]:
-        corr = correlation_table(sub, metrics, targets, method)
-        if corr.empty:
-            continue
-        key_tuple = key if isinstance(key, tuple) else (key,)
-        for col, value in zip(group_cols, key_tuple):
-            corr.insert(0, col, value)
-        rows.append(corr)
-    out = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
-    if not out.empty:
-        out["q_fdr"] = _fdr_bh(out["p"])
-        out = out.sort_values(["abs_r", "q_fdr"], ascending=[False, True]).reset_index(drop=True)
-    return out
-
-
-def build_activity_window_features(df: pd.DataFrame, targets: dict[str, str]) -> pd.DataFrame:
-    work = df.copy()
-    if "_merge" in work.columns:
-        work = work[work["_merge"].astype(str).eq("both")]
-    if "valid_window" in work.columns:
-        work = work[pd.to_numeric(work["valid_window"], errors="coerce").eq(1)]
-    base_cols = [c for c in ["code", "file", "activity", "activity_number", "scheme_window_size", "token_count", "window_count"] if c in work.columns]
-    feature_cols = canonical_feature_columns(work, include_global=True, include_window_stats=True)
-    target_cols = list(targets.values())
-    demo_cols = list(demographic_columns(work).values())
-    cols = list(dict.fromkeys(base_cols + feature_cols + target_cols + demo_cols))
-    return work[cols].copy()
-
-
-def build_subject_level_features(df: pd.DataFrame, targets: dict[str, str]) -> pd.DataFrame:
-    work = df.copy()
-    if "_merge" in work.columns:
-        work = work[work["_merge"].astype(str).eq("both")]
-    if "valid_window" in work.columns:
-        work = work[pd.to_numeric(work["valid_window"], errors="coerce").eq(1)]
-    if "activity_number" not in work.columns or "scheme_window_size" not in work.columns:
-        raise ValueError("Input must include activity_number and scheme_window_size to build subject-level features.")
-
-    feature_cols = canonical_feature_columns(work, include_global=False, include_window_stats=True)
-    pieces: list[pd.DataFrame] = []
-    for _, row in work.iterrows():
-        code = row["code"]
-        act = int(row["activity_number"]) if pd.notna(row["activity_number"]) else None
-        win = int(row["scheme_window_size"]) if pd.notna(row["scheme_window_size"]) else None
-        if act is None or win is None:
-            continue
-        item = {"code": code}
-        for col in feature_cols:
-            item[f"w{win}_a{act}_{col}"] = row[col]
-        pieces.append(pd.DataFrame([item]))
-    if pieces:
-        feature_matrix = pd.concat(pieces, ignore_index=True).groupby("code", as_index=False).first()
-    else:
-        feature_matrix = pd.DataFrame(columns=["code"])
-
-    global_cols = canonical_feature_columns(work, include_global=True, include_window_stats=False)
-    global_rows: list[dict] = []
-    first_per_activity = work.sort_values(["code", "activity_number", "scheme_window_size"]).drop_duplicates(["code", "activity_number"])
-    for _, row in first_per_activity.iterrows():
-        act = int(row["activity_number"]) if pd.notna(row["activity_number"]) else None
-        if act is None:
-            continue
-        item = {"code": row["code"]}
-        for col in global_cols:
-            item[f"a{act}_{col}"] = row[col]
-        global_rows.append(item)
-    if global_rows:
-        global_matrix = pd.DataFrame(global_rows).groupby("code", as_index=False).first()
-        feature_matrix = feature_matrix.merge(global_matrix, on="code", how="outer")
-
-    metadata_cols = ["code"] + list(targets.values()) + list(demographic_columns(work).values())
-    metadata = work[metadata_cols].drop_duplicates("code").copy()
-    out = feature_matrix.merge(metadata, on="code", how="left")
-    return out
-
-
-def correlations_subject_level(subject_df: pd.DataFrame, targets: dict[str, str], method: str = "spearman") -> pd.DataFrame:
-    excluded = {"code", *targets.values(), *demographic_columns(subject_df).values()}
-    metrics = []
-    for col in subject_df.columns:
-        if col in excluded:
-            continue
-        values = pd.to_numeric(subject_df[col], errors="coerce")
-        if values.notna().sum() >= 3 and values.nunique(dropna=True) > 1:
-            metrics.append(col)
-    out = correlation_table(subject_df, metrics, targets, method)
-    if not out.empty:
-        out["q_fdr"] = _fdr_bh(out["p"])
-    return out
-
-
-def profile_by_group(df: pd.DataFrame, group_cols: Iterable[str], value_cols: Iterable[str]) -> pd.DataFrame:
-    rows: list[pd.DataFrame] = []
+def profile_by_group(df: pd.DataFrame, group_cols: Iterable[str], metric_cols: Iterable[str]) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
     for group in group_cols:
         if group not in df.columns:
             continue
-        cols = [c for c in value_cols if c in df.columns]
+        cols = [col for col in metric_cols if col in df.columns]
         if not cols:
             continue
-        agg = df.groupby(group, dropna=False)[cols].agg(["mean", "std", "count"])
-        agg.columns = [f"{col}_{stat}" for col, stat in agg.columns]
-        agg = agg.reset_index()
-        agg.insert(0, "group_col", group)
-        rows.append(agg.copy())
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+        agg = df.groupby(group, dropna=False)[cols].agg(["mean", "std", "count"]).reset_index()
+        agg.columns = ["_".join(str(part) for part in col if part) if isinstance(col, tuple) else str(col) for col in agg.columns]
+        agg = pd.concat([pd.Series(group, index=agg.index, name="group_col"), agg], axis=1)
+        frames.append(agg)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def write_analysis_outputs(
+    combined: pd.DataFrame,
+    output_dir: Path,
+    targets_text: str = "Total,NPLAN,MOT,COG",
+    method: str = "spearman",
+    group_cols: str = "Gender,Educational level,School,School year,Age,Tipo",
+) -> dict[str, Path]:
+    analysis_dir = Path(output_dir) / "analysis"
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    targets = resolve_targets(combined, targets_text)
+    metric_cols = canonical_metric_columns(combined, prefixes=("mean_", "std_", "global_"))
+
+    corr = correlations_by_activity_window(combined, targets=targets, method=method)
+    corr_path = analysis_dir / "correlations_by_activity_window.csv"
+    corr.to_csv(corr_path, index=False)
+
+    profile = profile_by_group(combined, parse_csv_list(group_cols), metric_cols)
+    profile_path = analysis_dir / "profile_by_group.csv"
+    profile.to_csv(profile_path, index=False)
+
+    feature_summary = pd.DataFrame({"metric_column": metric_cols})
+    feature_summary_path = analysis_dir / "canonical_metric_columns.csv"
+    feature_summary.to_csv(feature_summary_path, index=False)
+
+    return {"correlations": corr_path, "profile": profile_path, "metric_columns": feature_summary_path}

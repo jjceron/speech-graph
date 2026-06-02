@@ -1,14 +1,17 @@
 from .stats import (
-    BARRATT_TARGETS,
-    build_activity_window_features,
-    build_subject_level_features,
-    canonical_feature_columns,
-    correlation_table,
+    ID_COLUMNS,
+    TARGET_ALIASES,
+    canonical_metric_columns,
+    correlations_by_activity_window,
+    parse_csv_list,
+    parse_int_set,
     profile_by_group,
-    resolve_target_columns,
+    resolve_targets,
+    safe_corr,
+    write_analysis_outputs,
 )
 
 __all__ = [
-    "BARRATT_TARGETS", "build_activity_window_features", "build_subject_level_features",
-    "canonical_feature_columns", "correlation_table", "profile_by_group", "resolve_target_columns",
+    "ID_COLUMNS", "TARGET_ALIASES", "canonical_metric_columns", "correlations_by_activity_window",
+    "parse_csv_list", "parse_int_set", "profile_by_group", "resolve_targets", "safe_corr", "write_analysis_outputs",
 ]

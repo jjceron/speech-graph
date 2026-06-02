@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Iterable
 
 GRAPH_TOKEN_LABELS = {"EE"}
 BREAK_LABELS = {"PAUSA", "DP", "DI"}
@@ -12,11 +13,8 @@ LABEL_ALIASES = {
     "EE": "EE", "EEE": "EE", "E E": "EE",
     "ES": "ES", "E S": "ES",
     "IF": "IF", "PS": "PS", "PNC": "PNC", "IM": "IM",
-    "DP": "DP", "DI": "DI",
-    "PAUSA": "PAUSA", "PAUA": "PAUSA", "PAUS": "PAUSA", "Pausa": "PAUSA",
-    "SIN RESPUESTA": "SIN_RESPUESTA", "SIN_RESPUESTA": "SIN_RESPUESTA",
-    "SIN-RESPUESTA": "SIN_RESPUESTA", "SIN REPUESTA": "SIN_RESPUESTA",
-    "SIN_REPUESTA": "SIN_RESPUESTA", "SIN-REPUESTA": "SIN_RESPUESTA",
+    "DI": "DI", "DP": "DP", "PAUSA": "PAUSA", "PAUA": "PAUSA", "PAUS": "PAUSA",
+    "SIN RESPUESTA": "SIN_RESPUESTA", "SIN_RESPUESTA": "SIN_RESPUESTA", "SIN-RESPUESTA": "SIN_RESPUESTA",
     "SIN PREGUNTA": "SIN_PREGUNTA", "SIN_PREGUNTA": "SIN_PREGUNTA", "SIN-PREGUNTA": "SIN_PREGUNTA",
 }
 
@@ -27,18 +25,11 @@ STANDALONE_TIMESTAMP_RE = re.compile(
 )
 
 
-@dataclass(frozen=True)
-class ActivityClass:
-    raw: str
-    number: int | None
-    canonical: str
-
-
 def _strip_timestamp_fields(text: str) -> str:
-    out = re.sub(r"\bStartTime\s*=?\s*[^\s\]]+", "", text, flags=re.IGNORECASE)
-    out = re.sub(r"\bStarTime\s*=?\s*[^\s\]]+", "", out, flags=re.IGNORECASE)
-    out = re.sub(r"\bEndTime\s*=?\s*[^\s\]]+", "", out, flags=re.IGNORECASE)
-    return out
+    text = re.sub(r"\bStartTime\s*=?\s*[^\s\]]+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bStarTime\s*=?\s*[^\s\]]+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bEndTime\s*=?\s*[^\s\]]+", "", text, flags=re.IGNORECASE)
+    return text
 
 
 def canonical_label(label: str) -> str:
@@ -51,7 +42,7 @@ def canonical_label(label: str) -> str:
     text = re.sub(r"\s+", " ", text).strip(" _-;,:.")
     key = text.upper().replace("-", "_")
     key_space = key.replace("_", " ")
-    for candidate in (text, key, key_space):
+    for candidate in (text.upper(), key, key_space):
         if candidate in LABEL_ALIASES:
             return LABEL_ALIASES[candidate]
     first = re.split(r"[\s_=;,:.-]+", key)[0]
@@ -63,19 +54,8 @@ def canonical_label(label: str) -> str:
 def normalize_double_bracket_markup(text: str) -> str:
     out = str(text or "")
     out = re.sub(r"\[\[\[+", "[[", out)
-    out = re.sub(r"\]\]\]+", "]]", out)
-    out = re.sub(
-        r"\[\[\s*(ES|EE|EEE|IF|PS|PNC|DI|DP|IM|PAUSA)\s*\](?!\])",
-        r"[[\1]]",
-        out,
-        flags=re.IGNORECASE,
-    )
-    out = re.sub(
-        r"\[\[\s*(ES|EE|EEE|IF|PS|PNC|DI|DP|IM|PAUSA)\s*\]\[",
-        r"[[\1]]",
-        out,
-        flags=re.IGNORECASE,
-    )
+    out = re.sub(r"\[\[\s*(ES|EE|EEE|IF|PS|PNC|DI|DP|IM|PAUSA)\s*\](?!\])", r"[[\1]]", out, flags=re.IGNORECASE)
+    out = re.sub(r"\[\[\s*(ES|EE|EEE|IF|PS|PNC|DI|DP|IM|PAUSA)\s*\]\[", r"[[\1]]", out, flags=re.IGNORECASE)
     return out
 
 
@@ -92,8 +72,26 @@ def normalize_annotations_text(text: str) -> str:
 
     out = DOUBLE_BRACKET_RE.sub(replace_label, raw)
     out = STANDALONE_TIMESTAMP_RE.sub(" ", out)
-    out = re.sub(r"\s+", " ", out).strip()
-    return out
+    return re.sub(r"\s+", " ", out).strip()
+
+
+def extract_double_bracket_labels(text_or_tokens: str | Iterable[str]) -> list[str]:
+    if isinstance(text_or_tokens, str):
+        text = normalize_annotations_text(text_or_tokens)
+        return [canonical_label(match.group(1)) for match in DOUBLE_BRACKET_RE.finditer(text)]
+    labels: list[str] = []
+    for token in text_or_tokens:
+        match = re.fullmatch(r"\[\[(.*?)\]\]", str(token).strip())
+        if match:
+            labels.append(canonical_label(match.group(1)))
+    return labels
+
+
+@dataclass(frozen=True)
+class ActivityClass:
+    raw: str
+    number: int | None
+    canonical: str
 
 
 def canonical_activity(value: object) -> ActivityClass:
