@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable
 
 from .annotations import canonical_activity, normalize_annotations_text
 
@@ -13,16 +13,16 @@ ACTIVITY_RE = re.compile(
     r"<<\s*NombreActividad\s*=\s*([^>]+)>>\s*(?:\[\s*StartTime\s*=\s*([^\s\]]+)\s+EndTime\s*=\s*([^\]]+)\])?",
     flags=re.IGNORECASE,
 )
-SPEAKER_RE = re.compile(r"^(spk_\d+):\s*(.*)$", flags=re.IGNORECASE)
+SPEAKER_RE = re.compile(r"^(spk_(?:\d+)?):\s*(.*)$", flags=re.IGNORECASE)
 STRUCTURAL_LINE_RE = re.compile(r"^</?\w+|^<Speaker\b|^<Speakers>|^</Speakers>", flags=re.IGNORECASE)
 
 
 @dataclass
 class Activity:
     name: str
-    start_time: Optional[str]
-    end_time: Optional[str]
-    speaker_lines: List[str] = field(default_factory=list)
+    start_time: str | None
+    end_time: str | None
+    speaker_lines: list[str] = field(default_factory=list)
 
     @property
     def canonical_name(self) -> str:
@@ -40,98 +40,79 @@ class Activity:
 class Transcript:
     code: str
     path: Path
-    scribe: Optional[str] = None
-    audio_filename: Optional[str] = None
-    date: Optional[str] = None
-    activities: List[Activity] = field(default_factory=list)
+    scribe: str | None = None
+    audio_filename: str | None = None
+    date: str | None = None
+    activities: list[Activity] = field(default_factory=list)
 
     def text(self) -> str:
         return " ".join(activity.text() for activity in self.activities if activity.text())
 
 
 def extract_code(filename: str) -> str:
-    name = filename
-    if name.endswith(".txt"):
+    name = Path(filename).name
+    if name.lower().endswith(".txt"):
         name = name[:-4]
     for suffix in ("_CorrEtiq", "-CorrEtiq", " CorrEtiq"):
         if name.endswith(suffix):
             name = name[: -len(suffix)]
-    return name
+    return name.strip()
 
 
-def parse_transinfo(lines: List[str]) -> dict[str, str]:
+def parse_transinfo(lines: list[str]) -> dict[str, str]:
     for line in lines:
         match = TRANSINFO_RE.search(line)
-        if not match:
-            continue
-        attrs = dict(TRANSINFO_ATTR_RE.findall(match.group(1)))
-        return {k: v.strip() for k, v in attrs.items()}
+        if match:
+            return {k: v.strip() for k, v in TRANSINFO_ATTR_RE.findall(match.group(1))}
     return {}
 
 
-def parse_transcript(path: Path, include_speakers: Iterable[str]) -> Transcript:
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+def parse_transcript(path: Path, include_speakers: Iterable[str] = ("spk_1",)) -> Transcript:
+    lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
     info = parse_transinfo(lines)
     transcript = Transcript(
         code=extract_code(path.name),
-        path=path,
+        path=Path(path),
         scribe=info.get("scribe"),
         audio_filename=info.get("audio_filename"),
         date=info.get("date"),
     )
-
     include_set = {s.strip().lower() for s in include_speakers}
-    current: Optional[Activity] = None
-    current_speaker: Optional[str] = None
+    current: Activity | None = None
+    current_speaker: str | None = None
 
     for raw_line in lines:
         line = raw_line.strip()
         if not line:
             continue
-
-        act_match = ACTIVITY_RE.match(line)
-        if act_match:
-            if current:
+        activity_match = ACTIVITY_RE.match(line)
+        if activity_match:
+            if current is not None:
                 transcript.activities.append(current)
-            raw_name = act_match.group(1).strip()
-            current = Activity(
-                name=canonical_activity(raw_name).canonical,
-                start_time=act_match.group(2),
-                end_time=act_match.group(3),
-            )
+            activity = canonical_activity(activity_match.group(1))
+            current = Activity(activity.canonical, activity_match.group(2), activity_match.group(3))
             current_speaker = None
             continue
-
-        spk_match = SPEAKER_RE.match(line)
-        if spk_match:
-            speaker_id = spk_match.group(1).lower()
+        speaker_match = SPEAKER_RE.match(line)
+        if speaker_match:
+            raw_speaker = speaker_match.group(1).lower()
+            speaker_id = raw_speaker if re.search(r"\d", raw_speaker) else (current_speaker or "spk_1")
             current_speaker = speaker_id
             if current is None:
-                current = Activity(name="UNSEGMENTED", start_time=None, end_time=None)
+                current = Activity("UNSEGMENTED", None, None)
             if speaker_id in include_set:
-                current.speaker_lines.append(spk_match.group(2))
+                current.speaker_lines.append(speaker_match.group(2))
             continue
-
-        # Continuation lines are common in manually edited text files. If a line
-        # does not introduce a new activity/speaker/metadata tag, attach it to
-        # the previous included speaker instead of silently dropping it.
         if current is not None and current_speaker in include_set and not STRUCTURAL_LINE_RE.match(line):
             current.speaker_lines.append(line)
 
-    if current:
+    if current is not None:
         transcript.activities.append(current)
-
     return transcript
 
 
-def iter_transcripts(
-    directory: Path,
-    include_speakers: Iterable[str],
-    max_files: int | None = None,
-) -> List[Transcript]:
-    transcripts: List[Transcript] = []
-    for i, path in enumerate(sorted(directory.glob("*.txt"))):
-        if max_files is not None and i >= max_files:
-            break
-        transcripts.append(parse_transcript(path, include_speakers))
-    return transcripts
+def iter_transcripts(directory: Path, include_speakers: Iterable[str] = ("spk_1",), max_files: int | None = None) -> list[Transcript]:
+    paths = sorted(Path(directory).glob("*.txt"))
+    if max_files is not None:
+        paths = paths[:max_files]
+    return [parse_transcript(path, include_speakers) for path in paths]
