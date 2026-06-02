@@ -3,177 +3,139 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
-
-try:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-except Exception as exc:  # pragma: no cover
-    raise RuntimeError("matplotlib is required for visualization. Install requirements.txt first.") from exc
-
-
-def _safe_name(value: object) -> str:
-    text = str(value or "").strip().replace(" ", "_")
-    return "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in text) or "plot"
 
 
 def _read(path: Path) -> pd.DataFrame:
-    if not path.exists() or path.stat().st_size == 0:
-        return pd.DataFrame()
-    try:
-        return pd.read_csv(path)
-    except pd.errors.EmptyDataError:
-        return pd.DataFrame()
+    return pd.read_csv(path) if path.exists() and path.stat().st_size > 0 else pd.DataFrame()
 
 
-def _barh(df: pd.DataFrame, label_col: str, value_col: str, title: str, output: Path, xlabel: str) -> bool:
-    if df.empty or label_col not in df.columns or value_col not in df.columns:
-        return False
-    plot_df = df.copy()
-    plot_df[value_col] = pd.to_numeric(plot_df[value_col], errors="coerce")
-    plot_df = plot_df.dropna(subset=[value_col]).tail(20)
-    if plot_df.empty:
-        return False
-    fig, ax = plt.subplots(figsize=(9, max(4, 0.35 * len(plot_df))))
-    ax.barh(plot_df[label_col].astype(str), plot_df[value_col])
-    ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    fig.tight_layout()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=170)
-    plt.close(fig)
-    return True
-
-
-def plot_model_results(run_dir: Path, figures_dir: Path) -> list[Path]:
-    paths: list[Path] = []
-    results = _read(run_dir / "models" / "linear_cv_results.csv")
-    predictions = _read(run_dir / "models" / "linear_cv_predictions.csv")
-    if not results.empty and {"target", "r2"}.issubset(results.columns):
-        plot_df = results.copy()
-        plot_df["r2"] = pd.to_numeric(plot_df["r2"], errors="coerce")
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.bar(plot_df["target"].astype(str), plot_df["r2"])
-        ax.axhline(0, linewidth=1)
-        ax.set_title("Cross-validated R² by Barratt dimension")
-        ax.set_xlabel("Target")
-        ax.set_ylabel("R²")
-        fig.tight_layout()
-        path = figures_dir / "models" / "r2_by_target.png"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(path, dpi=170)
-        plt.close(fig)
-        paths.append(path)
-
-    if not predictions.empty and {"target", "y_true", "y_pred"}.issubset(predictions.columns):
-        for target, sub in predictions.groupby("target"):
-            x = pd.to_numeric(sub["y_true"], errors="coerce")
-            y = pd.to_numeric(sub["y_pred"], errors="coerce")
-            mask = x.notna() & y.notna()
-            if mask.sum() < 3:
-                continue
-            fig, ax = plt.subplots(figsize=(5, 5))
-            ax.scatter(x[mask], y[mask], alpha=0.75)
-            mn = float(min(x[mask].min(), y[mask].min()))
-            mx = float(max(x[mask].max(), y[mask].max()))
-            ax.plot([mn, mx], [mn, mx], linewidth=1)
-            ax.set_title(f"Predicted vs observed: {target}")
-            ax.set_xlabel("Observed")
-            ax.set_ylabel("Predicted")
-            fig.tight_layout()
-            path = figures_dir / "models" / f"predicted_vs_observed_{_safe_name(target)}.png"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            fig.savefig(path, dpi=170)
-            plt.close(fig)
-            paths.append(path)
-    return paths
-
-
-def plot_correlations(run_dir: Path, figures_dir: Path, max_rows: int = 25) -> list[Path]:
-    paths: list[Path] = []
-    corr = _read(run_dir / "analysis" / "correlations_by_activity_window.csv")
-    if corr.empty or not {"metric", "target", "r"}.issubset(corr.columns):
-        return paths
-    corr = corr.copy()
-    corr["r"] = pd.to_numeric(corr["r"], errors="coerce")
-    corr = corr.dropna(subset=["r"])
-    corr["label"] = corr.apply(
-        lambda r: f"w{r.get('scheme_window_size','')}_a{r.get('activity_number','')} {r['metric']} → {r['target']}",
-        axis=1,
-    )
-    corr = corr.sort_values("r", key=lambda s: s.abs(), ascending=False).head(max_rows).sort_values("r")
-    if corr.empty:
-        return paths
-    fig, ax = plt.subplots(figsize=(10, max(5, 0.35 * len(corr))))
-    ax.barh(corr["label"], corr["r"])
-    ax.axvline(0, linewidth=1)
-    ax.set_title("Top speech-graph correlations by activity and window")
-    ax.set_xlabel("Correlation")
-    fig.tight_layout()
-    path = figures_dir / "analysis" / "top_correlations_by_activity_window.png"
+def _save(fig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=170)
+    fig.tight_layout()
+    fig.savefig(path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    paths.append(path)
-    return paths
 
 
-def plot_interpretability(run_dir: Path, figures_dir: Path, top_n: int = 20) -> list[Path]:
-    paths: list[Path] = []
-    population = _read(run_dir / "interpretability" / "contributions_population.csv")
-    by_age = _read(run_dir / "interpretability" / "contributions_by_age.csv")
-    by_school = _read(run_dir / "interpretability" / "contributions_by_schooling.csv")
+def plot_r2(results: pd.DataFrame, figures_dir: Path) -> int:
+    if results.empty or "r2" not in results.columns:
+        return 0
+    data = results.copy()
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.bar(data["target"].astype(str), pd.to_numeric(data["r2"], errors="coerce"))
+    ax.axhline(0, linewidth=1)
+    ax.set_ylabel("Cross-validated R²")
+    ax.set_xlabel("Barratt dimension")
+    ax.set_title("Linear model performance")
+    _save(fig, figures_dir / "models" / "r2_by_target.png")
+    return 1
 
-    if not population.empty and {"target", "feature", "mean_abs_contribution"}.issubset(population.columns):
-        for target, sub in population.groupby("target"):
-            top = sub.sort_values("mean_abs_contribution", ascending=False).head(top_n).sort_values("mean_abs_contribution")
-            path = figures_dir / "interpretability" / f"population_top_features_{_safe_name(target)}.png"
-            if _barh(top, "feature", "mean_abs_contribution", f"Population feature relevance: {target}", path, "Mean absolute contribution"):
-                paths.append(path)
 
-    for table, group_col, name in [(by_age, "age_group", "age"), (by_school, "schooling_group", "schooling")]:
-        if table.empty or not {"target", group_col, "feature", "mean_abs_contribution"}.issubset(table.columns):
+def plot_predictions(predictions: pd.DataFrame, figures_dir: Path) -> int:
+    if predictions.empty:
+        return 0
+    count = 0
+    for target, sub in predictions.groupby("target", dropna=False):
+        y_true = pd.to_numeric(sub["y_true"], errors="coerce")
+        y_pred = pd.to_numeric(sub["y_pred"], errors="coerce")
+        mask = y_true.notna() & y_pred.notna()
+        if mask.sum() < 3:
             continue
-        for (target, group), sub in table.groupby(["target", group_col], dropna=False):
-            top = sub.sort_values("mean_abs_contribution", ascending=False).head(min(12, top_n)).sort_values("mean_abs_contribution")
-            path = figures_dir / "interpretability" / name / f"top_features_{_safe_name(target)}_{_safe_name(group)}.png"
-            if _barh(top, "feature", "mean_abs_contribution", f"Feature relevance: {target} | {name}={group}", path, "Mean absolute contribution"):
-                paths.append(path)
-    return paths
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.scatter(y_true[mask], y_pred[mask], s=18, alpha=0.75)
+        lo = min(float(y_true[mask].min()), float(y_pred[mask].min()))
+        hi = max(float(y_true[mask].max()), float(y_pred[mask].max()))
+        ax.plot([lo, hi], [lo, hi], linewidth=1)
+        ax.set_xlabel("Observed")
+        ax.set_ylabel("Predicted")
+        ax.set_title(f"Observed vs predicted: {target}")
+        _save(fig, figures_dir / "models" / f"observed_vs_predicted_{target}.png")
+        count += 1
+    return count
 
 
-def generate_figures(run_dir: Path, figures_dir: Path | None = None) -> list[Path]:
-    figures_dir = figures_dir or run_dir / "figures"
-    figures_dir.mkdir(parents=True, exist_ok=True)
-    paths: list[Path] = []
-    paths.extend(plot_model_results(run_dir, figures_dir))
-    paths.extend(plot_correlations(run_dir, figures_dir))
-    paths.extend(plot_interpretability(run_dir, figures_dir))
-    manifest = pd.DataFrame({"figure": [str(p) for p in paths]})
-    manifest.to_csv(figures_dir / "figures_manifest.csv", index=False)
-    print(f"Generated {len(paths)} figures in {figures_dir}")
-    return paths
+def plot_population_relevance(relevance: pd.DataFrame, figures_dir: Path, top_n: int = 20) -> int:
+    if relevance.empty or "mean_abs_contribution" not in relevance.columns:
+        return 0
+    count = 0
+    for target, sub in relevance.groupby("target", dropna=False):
+        top = sub.sort_values("mean_abs_contribution", ascending=False).head(top_n).iloc[::-1]
+        if top.empty:
+            continue
+        fig, ax = plt.subplots(figsize=(9, max(4, 0.28 * len(top))))
+        ax.barh(top["feature"].astype(str), pd.to_numeric(top["mean_abs_contribution"], errors="coerce"))
+        ax.set_xlabel("Mean absolute contribution")
+        ax.set_title(f"Feature relevance: {target}")
+        _save(fig, figures_dir / "interpretability" / f"feature_relevance_population_{target}.png")
+        count += 1
+    return count
+
+
+def plot_group_relevance(relevance: pd.DataFrame, group_col: str, output_name: str, figures_dir: Path, top_n: int = 12) -> int:
+    if relevance.empty or group_col not in relevance.columns or "mean_abs_contribution" not in relevance.columns:
+        return 0
+    count = 0
+    for (target, group), sub in relevance.groupby(["target", group_col], dropna=False):
+        top = sub.sort_values("mean_abs_contribution", ascending=False).head(top_n).iloc[::-1]
+        if top.empty:
+            continue
+        safe_group = str(group).replace("/", "_").replace("\\", "_").replace(" ", "_")
+        fig, ax = plt.subplots(figsize=(9, max(4, 0.28 * len(top))))
+        ax.barh(top["feature"].astype(str), pd.to_numeric(top["mean_abs_contribution"], errors="coerce"))
+        ax.set_xlabel("Mean absolute contribution")
+        ax.set_title(f"{target} | {group_col}: {group}")
+        _save(fig, figures_dir / "interpretability" / f"feature_relevance_{output_name}_{target}_{safe_group}.png")
+        count += 1
+    return count
+
+
+def plot_correlations(corr: pd.DataFrame, figures_dir: Path, top_n: int = 25) -> int:
+    if corr.empty or "r" not in corr.columns:
+        return 0
+    count = 0
+    for target, sub in corr.groupby("target", dropna=False):
+        top = sub.sort_values("abs_r", ascending=False).head(top_n).iloc[::-1]
+        if top.empty:
+            continue
+        labels = top.apply(lambda r: f"w{r.get('scheme_window_size','')}_a{r.get('activity_number','')}_{r.get('metric','')}", axis=1)
+        fig, ax = plt.subplots(figsize=(9, max(4, 0.28 * len(top))))
+        ax.barh(labels.astype(str), pd.to_numeric(top["r"], errors="coerce"))
+        ax.axvline(0, linewidth=1)
+        ax.set_xlabel("Correlation r")
+        ax.set_title(f"Top graph-Barratt correlations: {target}")
+        _save(fig, figures_dir / "analysis" / f"top_correlations_{target}.png")
+        count += 1
+    return count
+
+
+def generate_figures(run_dir: Path) -> int:
+    figures_dir = run_dir / "figures"
+    models_dir = run_dir / "models"
+    interp_dir = run_dir / "interpretability"
+    analysis_dir = run_dir / "analysis"
+    count = 0
+    count += plot_r2(_read(models_dir / "linear_cv_results.csv"), figures_dir)
+    count += plot_predictions(_read(models_dir / "linear_cv_predictions.csv"), figures_dir)
+    count += plot_population_relevance(_read(interp_dir / "feature_relevance_population.csv"), figures_dir)
+    count += plot_group_relevance(_read(interp_dir / "feature_relevance_by_age.csv"), "age_group", "by_age", figures_dir)
+    schooling = _read(interp_dir / "feature_relevance_by_schooling.csv")
+    group_cols = [col for col in schooling.columns if col not in {"target", "feature", "mean_contribution", "mean_abs_contribution", "n"}]
+    count += plot_group_relevance(schooling, group_cols[0], "by_schooling", figures_dir) if group_cols else 0
+    count += plot_correlations(_read(analysis_dir / "correlations_by_activity_window.csv"), figures_dir)
+    print(f"Generated {count} figures in {figures_dir}")
+    return count
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate figures for one experiment run directory")
+    parser = argparse.ArgumentParser(description="Generate figures for one run directory")
     parser.add_argument("--run-dir", default="outputs/01_run")
-    parser.add_argument("--figures-dir", default="")
-    parser.add_argument("--outputs-root", default="", help="Compatibility option. If provided without --run-dir, use outputs-root/01_run.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    run_dir = Path(args.run_dir)
-    if args.outputs_root and args.run_dir == "outputs/01_run":
-        candidate = Path(args.outputs_root) / "01_run"
-        if candidate.exists():
-            run_dir = candidate
-    figures_dir = Path(args.figures_dir) if args.figures_dir else run_dir / "figures"
-    generate_figures(run_dir, figures_dir)
+    generate_figures(Path(args.run_dir))
 
 
 if __name__ == "__main__":

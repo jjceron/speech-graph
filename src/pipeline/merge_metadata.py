@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.analysis.stats import add_standard_target_columns
 from src.io import normalize_code
 
 
@@ -21,56 +20,61 @@ def find_metadata_code_column(meta: pd.DataFrame) -> str:
         if _norm(name) in lookup:
             return lookup[_norm(name)]
     for col in meta.columns:
-        key = _norm(col)
-        if key in {"cod", "codigo", "code"} or "codigo" in key:
+        normalized = _norm(col)
+        if normalized in {"cod", "codigo", "code"} or "codigo" in normalized:
             return col
-    raise ValueError("Metadata Excel must include a subject code column such as Cod, Código, Codigo, or Code.")
+    raise ValueError("Metadata Excel must include a code column such as Cod, Código or Code")
 
 
 def _parse_sheet_name(value: str) -> str | int:
     return int(value) if str(value).isdigit() else value
 
 
+def _write_merge_qc(merged: pd.DataFrame, meta: pd.DataFrame, output_csv: Path, code_col: str) -> None:
+    qc_dir = output_csv.parent / "analysis"
+    qc_dir.mkdir(parents=True, exist_ok=True)
+    if "_merge" in merged.columns:
+        cols = [col for col in ["code", "file", "level", "activity", "activity_number", "_join_code", "_merge"] if col in merged.columns]
+        missing = merged.loc[merged["_merge"] != "both", cols]
+        if not missing.empty:
+            missing.drop_duplicates().to_csv(qc_dir / "metadata_unmatched_transcripts.csv", index=False)
+    if "_join_code" in meta.columns and "_join_code" in merged.columns:
+        matched = set(merged.loc[merged.get("_merge", "") == "both", "_join_code"].dropna().astype(str))
+        meta_only = meta.loc[~meta["_join_code"].astype(str).isin(matched)].copy()
+        if not meta_only.empty:
+            cols = [col for col in [code_col, "_join_code"] if col in meta_only.columns]
+            meta_only[cols].drop_duplicates().to_csv(qc_dir / "metadata_without_transcript.csv", index=False)
+
+
 def merge_metadata(metrics_csv: Path, metadata_xlsx: Path, output_csv: Path, sheet_name: str | int = 0) -> pd.DataFrame:
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     metrics = pd.read_csv(metrics_csv).copy()
     meta = pd.read_excel(metadata_xlsx, sheet_name=sheet_name, engine="openpyxl", dtype=object).copy()
-    meta.columns = [str(c).strip() for c in meta.columns]
-
+    meta.columns = [str(col).strip() for col in meta.columns]
     if "code" not in metrics.columns:
-        raise ValueError("Metrics CSV must include a 'code' column.")
+        raise ValueError("Metrics CSV must include a 'code' column")
     code_col = find_metadata_code_column(meta)
     metrics["code"] = metrics["code"].map(normalize_code)
     metrics["_join_code"] = metrics["code"].map(normalize_code)
     meta[code_col] = meta[code_col].map(normalize_code)
     meta["_join_code"] = meta[code_col].map(normalize_code)
-
+    meta = meta.drop_duplicates(subset=["_join_code"], keep="first")
     merged = metrics.merge(meta, on="_join_code", how="left", indicator=True, suffixes=("", "_meta"))
     if "Cod" not in merged.columns:
         merged["Cod"] = merged.get(code_col, merged["_join_code"])
-    merged = add_standard_target_columns(merged)
     merged.to_csv(output_csv, index=False)
-
-    analysis_dir = output_csv.parent / "analysis"
-    analysis_dir.mkdir(parents=True, exist_ok=True)
-    missing_cols = [c for c in ["code", "file", "activity", "activity_number", "scheme_window_size", "_join_code", "_merge"] if c in merged.columns]
-    missing = merged.loc[merged["_merge"].ne("both"), missing_cols].drop_duplicates()
-    missing.to_csv(analysis_dir / "metadata_unmatched_transcripts.csv", index=False)
-
-    matched_codes = set(merged.loc[merged["_merge"].eq("both"), "_join_code"].dropna().astype(str))
-    meta_only = meta.loc[~meta["_join_code"].astype(str).isin(matched_codes), [code_col, "_join_code"]].drop_duplicates()
-    meta_only.to_csv(analysis_dir / "metadata_without_transcript.csv", index=False)
-
-    if not missing.empty:
-        print(f"Rows without metadata: {len(missing)}. See {analysis_dir / 'metadata_unmatched_transcripts.csv'}")
+    missing = int((merged["_merge"] != "both").sum())
+    if missing:
+        print(f"Rows without metadata: {missing}. See {output_csv.parent / 'analysis' / 'metadata_unmatched_transcripts.csv'}")
+    _write_merge_qc(merged, meta, output_csv, code_col)
     return merged
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Merge graph metrics with metadata")
-    parser.add_argument("--metrics-csv", default="outputs/01_run/graph_metrics_all_windows.csv")
+    parser.add_argument("--metrics-csv", default="outputs/graph_metrics.csv")
     parser.add_argument("--metadata-xlsx", default="data/processed/df_dataset.xlsx")
-    parser.add_argument("--output-csv", default="outputs/01_run/graph_metrics_all_windows_with_meta.csv")
+    parser.add_argument("--output-csv", default="outputs/graph_metrics_with_meta.csv")
     parser.add_argument("--sheet-name", default=0, type=_parse_sheet_name)
     return parser.parse_args()
 
