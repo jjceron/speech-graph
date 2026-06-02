@@ -1,91 +1,60 @@
-# actual_project
+# NLP Speech-Graph Analysis
 
-Pipeline para analizar transcripciones procesadas con grafos de palabras, preservando las etiquetas clínicas/anotaciones en `[[...]]` como tokens del discurso.
+This project analyzes annotated speech transcripts using NLP and graph-based metrics. Its main goal is to transform participant speech into directed word graphs and evaluate whether discourse structure is associated with behavioral, cognitive, academic, and clinical metadata.
 
-## Estructura principal
+## Purpose
+
+The pipeline extracts linguistic and graph features from transcript files, merges them with participant-level metadata, and generates analysis-ready outputs for exploratory research. The project is focused on identifying patterns in speech organization, discourse markers, and activity-specific performance.
+
+## What the Project Does
+
+- Parses annotated transcript files from `data/processed/Transcripciones`.
+- Selects target speaker data, by default `spk_1`.
+- Splits transcripts by activity when required.
+- Tokenizes speech and builds directed word-adjacency graphs.
+- Computes graph metrics such as:
+  - number of nodes and edges
+  - largest connected component
+  - largest strongly connected component
+  - graph density
+  - average shortest path
+  - diameter
+  - clustering
+  - repeated edges
+  - short cycles such as L1, L2, and L3
+- Supports sliding-window analysis, mainly using 30-word windows.
+- Optionally compares observed graph metrics against randomized word-order baselines.
+- Extracts discourse labels from transcript annotations such as `[[...]]`.
+- Merges graph metrics with participant metadata from `df_dataset.xlsx`.
+- Produces correlation tables, group profiles, quality-control files, Markdown reports, and visual summaries.
+
+## Main Research Questions
+
+This project is designed to explore whether speech-graph and discourse-label features are associated with:
+
+- age and school year
+- cognitive, motor, planning, and total scores
+- Barratt impulsivity measures
+- narrative coherence and language task performance
+- participant groups such as `Tipo`, educational level, gender, or school
+- differences between activity types, especially target activities `2`, `6`, and `7`
+
+The expected analysis is exploratory: the goal is to detect robust linguistic and graph-based signals that may help characterize discourse organization, task performance, and group-level differences.
+
+## Project Structure
 
 ```text
 src/
-  __init__.py
-  analysis/          # correlaciones, perfiles por grupo, estabilidad entre ventanas
-  config/            # rutas y parámetros por defecto
-  features/          # etiquetas [[...]] y léxicos emocionales opcionales
-  graphs/            # métricas de speech graphs, ventanas y baselines aleatorios
-  io/                # lectura de transcripciones y metadatos xlsx
-  pipeline/          # scripts orquestadores
-  preprocessing/     # tokenización en español preservando [[...]]
-  visualizations/    # reservado para figuras posteriores
-```
+  analysis/          Statistical summaries and activity-focused reports
+  config/            Default paths and analysis settings
+  emotions/          Optional emotion lexicon support
+  features/          Discourse-label feature extraction
+  graphs/            Word-graph metric computation
+  io/                Path and code normalization utilities
+  pipeline/          End-to-end extraction and analysis workflows
+  preprocessing/     Transcript parsing, annotation cleanup, and tokenization
+  visualization/     Figures, plots, and visual reports
 
-En la raíz de `src/` solo quedan carpetas y `src/__init__.py`.
-
-## Datos esperados
-
-- Transcripciones: `data/processed/Transcripciones/*.txt`
-- Metadatos/scores: `data/processed/df_dataset.xlsx`
-- Código de unión: `code` en métricas contra `Cod` en el xlsx.
-
-Las etiquetas `[[EE]]`, `[[PS]]`, `[[IF]]`, `[[DI StartTime=... EndTime=...]]`, etc. se preservan como tokens y también se cuantifican como variables `label_count_*` y `label_ratio_*`.
-
-## Comandos básicos
-
-Extraer métricas con ventana de 30 palabras:
-
-```bash
-python -m src.pipeline.extract_graph_metrics \
-  --transcripts-dir data/processed/Transcripciones \
-  --output-csv outputs/graph_metrics_w30.csv \
-  --window-size 30 \
-  --step 1
-```
-
-Unir con metadatos:
-
-```bash
-python -m src.pipeline.merge_metadata \
-  --metrics-csv outputs/graph_metrics_w30.csv \
-  --metadata-xlsx data/processed/df_dataset.xlsx \
-  --output-csv outputs/graph_metrics_w30_with_meta.csv
-```
-
-Correr y comparar los tres esquemas de ventana 10/20/30:
-
-```bash
-python -m src.pipeline.run_window_schemes \
-  --transcripts-dir data/processed/Transcripciones \
-  --metadata-xlsx data/processed/df_dataset.xlsx \
-  --output-dir outputs/window_schemes \
-  --window-sizes 10,20,30 \
-  --step 1
-```
-
-Esto genera:
-
-```text
-outputs/window_schemes/graph_metrics_w10_s1.csv
-outputs/window_schemes/graph_metrics_w20_s1.csv
-outputs/window_schemes/graph_metrics_w30_s1.csv
-outputs/window_schemes/graph_metrics_all_windows.csv
-outputs/window_schemes/graph_metrics_all_windows_with_meta.csv
-outputs/window_schemes/analysis/correlations_by_window.csv
-outputs/window_schemes/analysis/profile_by_group_and_window.csv
-outputs/window_schemes/analysis/window_metric_stability.csv
-```
-
-## Baselines aleatorios / z-scores
-
-Por defecto `--random-times 0` para que el pipeline sea rápido. Para una corrida estilo Mota con grafos aleatorios:
-
-```bash
-python -m src.pipeline.run_window_schemes --random-times 1000
-```
-
-En el corpus completo esto puede tardar bastante, especialmente con paso 1 y tres tamaños de ventana.
-
-## Smoke test
-
-Para probar estructura y parsing sin correr todo el corpus:
-
-```bash
-python -m src.pipeline.run_window_schemes --max-files 3 --output-dir outputs/smoke_test
-```
+data/                Local input data, not versioned
+docs/                Local documentation, not versioned
+outputs/             Generated results
