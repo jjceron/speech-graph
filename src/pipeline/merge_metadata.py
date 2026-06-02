@@ -37,7 +37,10 @@ def _write_merge_qc(merged: pd.DataFrame, meta: pd.DataFrame, output_csv: Path, 
         cols = [col for col in ["code", "file", "level", "activity", "activity_number", "_join_code", "_merge"] if col in merged.columns]
         missing = merged.loc[merged["_merge"] != "both", cols]
         if not missing.empty:
-            missing.drop_duplicates().to_csv(qc_dir / "metadata_unmatched_transcripts.csv", index=False)
+            missing = missing.drop_duplicates()
+            missing.to_csv(qc_dir / "metadata_unmatched_transcripts.csv", index=False)
+            subject_cols = [col for col in ["code", "file", "_join_code", "_merge"] if col in missing.columns]
+            missing[subject_cols].drop_duplicates().to_csv(qc_dir / "metadata_unmatched_subjects.csv", index=False)
     if "_join_code" in meta.columns and "_join_code" in merged.columns:
         matched = set(merged.loc[merged.get("_merge", "") == "both", "_join_code"].dropna().astype(str))
         meta_only = meta.loc[~meta["_join_code"].astype(str).isin(matched)].copy()

@@ -26,19 +26,15 @@ def parse_window_sizes(text: str | None) -> list[int]:
 
 
 def add_scheme_columns(df: pd.DataFrame, window_size: int, step: int, random_times: int) -> pd.DataFrame:
-    return pd.concat(
-        [
-            pd.DataFrame(
-                {
-                    "scheme_window_size": [int(window_size)] * len(df),
-                    "window_step": [int(step)] * len(df),
-                    "random_times": [int(random_times)] * len(df),
-                }
-            ),
-            df.reset_index(drop=True),
-        ],
-        axis=1,
-    )
+    out = df.reset_index(drop=True).copy()
+    out = out.loc[:, ~out.columns.duplicated()].copy()
+    out["scheme_window_size"] = int(window_size)
+    out["window_step"] = int(step)
+    out["random_times"] = int(random_times)
+    first = ["scheme_window_size", "window_size", "window_step", "random_times"]
+    ordered = [col for col in first if col in out.columns]
+    ordered += [col for col in out.columns if col not in ordered]
+    return out[ordered]
 
 
 def _metadata_columns(df: pd.DataFrame, target_cols: list[str]) -> list[str]:
@@ -53,15 +49,21 @@ def _metadata_columns(df: pd.DataFrame, target_cols: list[str]) -> list[str]:
     return cols
 
 
-def _filtered_model_rows(df: pd.DataFrame) -> pd.DataFrame:
+def _base_model_rows(df: pd.DataFrame, require_valid_window: bool) -> pd.DataFrame:
     work = df.copy()
-    if "valid_window" in work.columns:
-        work = work[pd.to_numeric(work["valid_window"], errors="coerce").fillna(0).astype(int) == 1]
     if "_merge" in work.columns:
         work = work[work["_merge"].astype(str).eq("both")]
     if "activity_number" in work.columns:
-        work = work[pd.to_numeric(work["activity_number"], errors="coerce").between(1, 7)]
+        activity = pd.to_numeric(work["activity_number"], errors="coerce")
+        work = work[activity.between(1, 7)]
+    if require_valid_window and "valid_window" in work.columns:
+        valid = pd.to_numeric(work["valid_window"], errors="coerce").fillna(0).astype(int)
+        work = work[valid == 1]
     return work.copy()
+
+
+def _filtered_model_rows(df: pd.DataFrame) -> pd.DataFrame:
+    return _base_model_rows(df, require_valid_window=True)
 
 
 def _first_metadata_by_subject(work: pd.DataFrame, targets_text: str) -> pd.DataFrame:
@@ -69,11 +71,76 @@ def _first_metadata_by_subject(work: pd.DataFrame, targets_text: str) -> pd.Data
     meta_cols = _metadata_columns(work, list(target_map.values()))
     if "code" not in meta_cols:
         meta_cols.insert(0, "code")
-    meta = work.sort_values("code").drop_duplicates("code")[meta_cols].copy()
-    return meta
+    return work.sort_values("code").drop_duplicates("code")[meta_cols].copy()
+
+
+def _metadata_for_rows(work: pd.DataFrame, targets_text: str) -> list[str]:
+    target_map = resolve_targets(work, targets_text)
+    meta_cols = _metadata_columns(work, list(target_map.values()))
+    for col in ["code", "activity", "activity_number", "scheme_window_size", "window_size", "valid_window", "window_count"]:
+        if col in work.columns and col not in meta_cols:
+            meta_cols.append(col)
+    return meta_cols
+
+
+def _numeric_value(row: pd.Series, col: str) -> float:
+    value = pd.to_numeric(pd.Series([row.get(col)]), errors="coerce").iloc[0]
+    return float(value) if pd.notna(value) else np.nan
 
 
 def build_subject_level_by_activity(combined: pd.DataFrame, targets_text: str = DEFAULT_TARGETS) -> pd.DataFrame:
+    """One row per subject with global graph metrics per activity."""
+    work = _base_model_rows(combined, require_valid_window=False)
+    if work.empty:
+        return pd.DataFrame()
+    meta = _first_metadata_by_subject(work, targets_text)
+    rows: list[dict] = []
+    ordered = work.sort_values([col for col in ["code", "activity_number", "scheme_window_size"] if col in work.columns])
+    for code, sub_code in ordered.groupby("code", dropna=False):
+        row: dict[str, float | str] = {"code": code}
+        for activity_number, sub_activity in sub_code.groupby("activity_number", dropna=False):
+            try:
+                activity = int(activity_number)
+            except Exception:
+                continue
+            item = sub_activity.iloc[0]
+            for metric in MODEL_METRICS:
+                source = f"global_{metric}" if f"global_{metric}" in sub_activity.columns else f"mean_{metric}"
+                values = pd.to_numeric(sub_activity[source], errors="coerce") if source in sub_activity.columns else pd.Series(dtype=float)
+                row[f"a{activity}_{metric}"] = float(values.dropna().iloc[0]) if values.notna().any() else np.nan
+        rows.append(row)
+    features = pd.DataFrame(rows)
+    out = meta.merge(features, on="code", how="left")
+    feature_cols = [col for col in out.columns if col.startswith("a") and "_" in col]
+    keep_features = [col for col in feature_cols if pd.to_numeric(out[col], errors="coerce").nunique(dropna=True) > 1]
+    return out[[col for col in out.columns if col not in feature_cols] + keep_features]
+
+
+def build_activity_window_features(combined: pd.DataFrame, targets_text: str = DEFAULT_TARGETS) -> pd.DataFrame:
+    """Long matrix: one row per subject, activity and window size using canonical window metrics."""
+    work = _filtered_model_rows(combined)
+    if work.empty:
+        return pd.DataFrame()
+    meta_cols = _metadata_for_rows(work, targets_text)
+    rows: list[dict] = []
+    for _, item in work.iterrows():
+        row = {col: item.get(col) for col in meta_cols if col in work.columns}
+        row["window_size"] = int(item.get("scheme_window_size", item.get("window_size")))
+        row["scheme_window_size"] = row["window_size"]
+        row["activity_number"] = int(item.get("activity_number"))
+        row["activity"] = item.get("activity", f"Actividad{row['activity_number']}")
+        for metric in MODEL_METRICS:
+            source = f"mean_{metric}"
+            row[metric] = _numeric_value(item, source) if source in work.columns else np.nan
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    first = [col for col in ["code", "Cod", "activity", "activity_number", "window_size", "scheme_window_size"] if col in out.columns]
+    rest = [col for col in out.columns if col not in first]
+    return out[first + rest]
+
+
+def build_subject_level_windowed(combined: pd.DataFrame, targets_text: str = DEFAULT_TARGETS) -> pd.DataFrame:
+    """Wide exploratory matrix: w{window}_a{activity}_{metric}."""
     work = _filtered_model_rows(combined)
     if work.empty:
         return pd.DataFrame()
@@ -81,19 +148,17 @@ def build_subject_level_by_activity(combined: pd.DataFrame, targets_text: str = 
     rows: list[dict] = []
     for code, sub_code in work.groupby("code", dropna=False):
         row: dict[str, float | str] = {"code": code}
-        for activity_number, sub_activity in sub_code.groupby("activity_number", dropna=False):
-            try:
-                activity = int(activity_number)
-            except Exception:
-                continue
+        for _, item in sub_code.iterrows():
+            window = int(item.get("scheme_window_size", item.get("window_size")))
+            activity = int(item["activity_number"])
+            prefix = f"w{window}_a{activity}"
             for metric in MODEL_METRICS:
                 col = f"mean_{metric}"
-                values = pd.to_numeric(sub_activity[col], errors="coerce") if col in sub_activity.columns else pd.Series(dtype=float)
-                row[f"a{activity}_{metric}"] = float(values.mean()) if values.notna().any() else np.nan
+                row[f"{prefix}_{metric}"] = _numeric_value(item, col) if col in sub_code.columns else np.nan
         rows.append(row)
     features = pd.DataFrame(rows)
     out = meta.merge(features, on="code", how="left")
-    feature_cols = [col for col in out.columns if col.startswith("a") and "_" in col]
+    feature_cols = [col for col in out.columns if col.startswith("w") and "_a" in col]
     keep_features = [col for col in feature_cols if pd.to_numeric(out[col], errors="coerce").nunique(dropna=True) > 1]
     return out[[col for col in out.columns if col not in feature_cols] + keep_features]
 
@@ -108,12 +173,11 @@ def build_subject_level_full(combined: pd.DataFrame, targets_text: str = DEFAULT
     for code, sub_code in work.groupby("code", dropna=False):
         row: dict[str, float | str] = {"code": code}
         for _, item in sub_code.iterrows():
-            window = int(item["scheme_window_size"])
+            window = int(item.get("scheme_window_size", item.get("window_size")))
             activity = int(item["activity_number"])
             prefix = f"w{window}_a{activity}"
             for col in metric_cols:
-                value = pd.to_numeric(pd.Series([item.get(col)]), errors="coerce").iloc[0]
-                row[f"{prefix}_{col}"] = float(value) if pd.notna(value) else np.nan
+                row[f"{prefix}_{col}"] = _numeric_value(item, col)
         rows.append(row)
     features = pd.DataFrame(rows)
     out = meta.merge(features, on="code", how="left")
@@ -126,20 +190,31 @@ def save_subject_matrices(combined: pd.DataFrame, output_dir: Path, targets_text
     analysis_dir = Path(output_dir) / "analysis"
     analysis_dir.mkdir(parents=True, exist_ok=True)
     by_activity = build_subject_level_by_activity(combined, targets_text=targets_text)
+    activity_window = build_activity_window_features(combined, targets_text=targets_text)
+    windowed = build_subject_level_windowed(combined, targets_text=targets_text)
     full = build_subject_level_full(combined, targets_text=targets_text)
+
     by_activity_path = analysis_dir / "subject_level_features.csv"
+    activity_window_path = analysis_dir / "activity_window_features.csv"
+    windowed_path = analysis_dir / "subject_level_features_windowed.csv"
     full_path = analysis_dir / "subject_level_features_full.csv"
+
     by_activity.to_csv(by_activity_path, index=False)
+    activity_window.to_csv(activity_window_path, index=False)
+    windowed.to_csv(windowed_path, index=False)
     full.to_csv(full_path, index=False)
+
     manifest = pd.DataFrame(
         [
-            {"matrix": "subject_level_features", "path": str(by_activity_path), "rows": len(by_activity), "columns": len(by_activity.columns)},
-            {"matrix": "subject_level_features_full", "path": str(full_path), "rows": len(full), "columns": len(full.columns)},
+            {"matrix": "subject_level_features", "purpose": "global metrics by activity", "path": str(by_activity_path), "rows": len(by_activity), "columns": len(by_activity.columns)},
+            {"matrix": "activity_window_features", "purpose": "main activity x window modelling matrix", "path": str(activity_window_path), "rows": len(activity_window), "columns": len(activity_window.columns)},
+            {"matrix": "subject_level_features_windowed", "purpose": "wide exploratory activity x window matrix", "path": str(windowed_path), "rows": len(windowed), "columns": len(windowed.columns)},
+            {"matrix": "subject_level_features_full", "purpose": "wide exploratory mean/std/global matrix", "path": str(full_path), "rows": len(full), "columns": len(full.columns)},
         ]
     )
     manifest_path = analysis_dir / "feature_matrices_manifest.csv"
     manifest.to_csv(manifest_path, index=False)
-    return {"by_activity": by_activity_path, "full": full_path, "manifest": manifest_path}
+    return {"by_activity": by_activity_path, "activity_window": activity_window_path, "windowed": windowed_path, "full": full_path, "manifest": manifest_path}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -246,11 +321,14 @@ def run_from_args(args: argparse.Namespace) -> Path:
         "save_task_sw": bool(args.save_task_sw),
         "main_output": str(combined_csv),
         "subject_level_features": str(matrix_paths["by_activity"]),
+        "activity_window_features": str(matrix_paths["activity_window"]),
+        "subject_level_features_windowed": str(matrix_paths["windowed"]),
         "subject_level_features_full": str(matrix_paths["full"]),
     }
     (output_dir / "run_manifest.json").write_text(json.dumps(run_manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Done. Main output: {combined_csv}")
     print(f"Subject-level features: {matrix_paths['by_activity']}")
+    print(f"Activity-window features: {matrix_paths['activity_window']}")
     return combined_csv
 
 
