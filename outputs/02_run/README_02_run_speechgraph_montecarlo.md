@@ -427,59 +427,71 @@ These values quantify how much each variable contributed to the fitted linear mo
 
 ### COG SHAP pattern
 
-For the strongest combined COG scheme, **COG, Activity 3, W10, `school_year_plus_nlp`**, School year was the dominant feature:
+For the best-performing combined COG scheme, **COG, Activity 3, W10, `school_year_plus_nlp`**, the attribution pattern was dominated by `School year`:
 
-| Feature | Mean |SHAP| | Interpretation |
+| Feature | Mean absolute SHAP | Interpretation |
 |---|---:|---|
-| `School year` | **0.2844** | Dominant contribution in the combined model |
-| `l1` | 0.0974 | Main NLP contribution |
-| `cc` | 0.0895 | Clustering contribution |
-| `lsc` | 0.0894 | Strongly connected structure |
-| `re` | 0.0580 | Repeated edges |
+| `School year` | **0.2844** | Dominant metadata contribution in the combined model |
+| `l1` | 0.0974 | Main SpeechGraph contribution; short-cycle / one-step recurrence structure |
+| `cc` | 0.0895 | Clustering structure |
+| `lsc` | 0.0894 | Largest strongly connected component structure |
+| `re` | 0.0580 | Repeated-edge structure |
 | `diameter` | 0.0486 | Graph path extent |
+| `atd` | 0.0415 | Average total degree |
+| `l3` | 0.0363 | Three-step cycle structure |
 
-For **COG, Activity 3, W10, `nlp_only`**, the main NLP features were:
+This pattern indicates that the positive COG signal in the combined model was driven primarily by `School year`, with SpeechGraph features providing smaller secondary contributions. Therefore, the combined COG result should be interpreted mainly as a school-year-associated effect rather than as strong evidence of independent SpeechGraph prediction.
 
-| Feature | Mean |SHAP| | Interpretation |
+For **COG, Activity 3, W10, `nlp_only`**, the largest SpeechGraph attributions were:
+
+| Feature | Mean absolute SHAP | Interpretation |
 |---|---:|---|
-| `l1` | 0.0516 | One-step recurrence/cycle structure |
-| `cc` | 0.0395 | Clustering |
-| `lsc` | 0.0393 | Strongly connected component structure |
-| `l3` | 0.0260 | Three-step cycles |
-| `diameter` | 0.0259 | Graph extent |
-| `re` | 0.0239 | Repeated edges |
+| `l1` | **0.0516** | Main SpeechGraph contribution; short-cycle / one-step recurrence structure |
+| `cc` | 0.0395 | Clustering structure |
+| `lsc` | 0.0393 | Largest strongly connected component structure |
+| `l3` | 0.0260 | Three-step cycle structure |
+| `diameter` | 0.0259 | Graph path extent |
+| `re` | 0.0239 | Repeated-edge structure |
+| `asp` | 0.0196 | Average shortest-path structure |
+| `atd` | 0.0153 | Average total degree |
 
-The combined COG model demonstrates that School year contributed more strongly than individual SpeechGraph features.
+However, the corresponding `nlp_only` COG model had negative mean cross-validated \(R^2\). Thus, these SHAP values describe how the linear model distributed attribution internally, but they do not establish robust predictive relevance.
 
 ### MOT SHAP pattern
 
-For **MOT, Activity 2, W20, `nlp_only`**, the largest contributions were:
+For the best-performing **MOT, `nlp_only`** scheme selected by the Monte Carlo summary, **Activity 2, W20**, the largest SpeechGraph attributions were:
 
-| Feature | Mean |SHAP| | Interpretation |
+| Feature | Mean absolute SHAP | Interpretation |
 |---|---:|---|
-| `pe` | 0.4960 | Parallel/repeated transition structure |
-| `cc` | 0.3205 | Clustering |
-| `l2` | 0.2751 | Two-step cycles |
-| `lsc` | 0.2418 | Strongly connected structure |
+| `pe` | **0.4960** | Parallel-edge / repeated transition structure |
+| `cc` | 0.3205 | Clustering structure |
+| `l2` | 0.2751 | Two-step cycle structure |
+| `lsc` | 0.2418 | Largest strongly connected component structure |
 | `diameter` | 0.1763 | Graph path extent |
-| `re` | 0.1438 | Repeated edges |
+| `re` | 0.1438 | Repeated-edge structure |
+| `asp` | 0.1427 | Average shortest-path structure |
+| `l1` | 0.1221 | One-step recurrence / cycle structure |
 
-However, this model had negative mean $R^2$. Therefore, these SHAP values describe model-internal weighting but do not establish robust predictive relevance.
+Although this attribution pattern is graph-theoretically interpretable, the corresponding MOT `nlp_only` model had negative mean cross-validated \(R^2\). Therefore, these SHAP values should be reported as descriptive model-internal attributions only, not as evidence of reliable MOT prediction.
 
 ### TOTAL SHAP pattern
 
-For **TOTAL, Activity 2, W20, `school_year_plus_nlp`**, the largest contributions were:
+For the best-performing **TOTAL, `school_year_plus_nlp`** scheme selected by the Monte Carlo summary, **Activity 2, W20**, the largest attributions were:
 
-| Feature | Mean |SHAP| | Interpretation |
+| Feature | Mean absolute SHAP | Interpretation |
 |---|---:|---|
-| `pe` | 0.7873 | Largest model contribution |
-| `School year` | 0.4752 | Strong metadata contribution |
-| `lsc` | 0.4737 | Strongly connected structure |
-| `l2` | 0.4275 | Two-step cycles |
-| `cc` | 0.4181 | Clustering |
-| `re` | 0.2633 | Repeated edges |
+| `pe` | **0.7873** | Largest SpeechGraph contribution; parallel-edge / repeated transition structure |
+| `School year` | 0.4752 | Main metadata contribution |
+| `lsc` | 0.4737 | Largest strongly connected component structure |
+| `l2` | 0.4275 | Two-step cycle structure |
+| `cc` | 0.4181 | Clustering structure |
+| `re` | 0.2633 | Repeated-edge structure |
+| `diameter` | 0.2611 | Graph path extent |
+| `asp` | 0.2053 | Average shortest-path structure |
 
-Because the corresponding mean $R^2$ remained negative, these contributions should be interpreted cautiously.
+Despite the large SHAP values, the corresponding TOTAL model had negative mean cross-validated \(R^2\). Therefore, this attribution pattern should not be interpreted as evidence that SpeechGraph robustly predicts Barratt TOTAL. It only indicates which variables carried the largest linear contributions within a model that did not generalize above the baseline.
+
+Overall, SHAP values in this analysis should be interpreted conditionally on model performance. Feature attribution is meaningful for scientific interpretation only when the associated model shows stable out-of-sample predictive value. In the Monte Carlo results, the strongest interpretable attribution pattern was the dominance of `School year` in the combined COG model, whereas the NLP-only attribution patterns for COG, MOT, and TOTAL remained descriptive because their corresponding mean \(R^2\) values were negative or very weak.
 
 ---
 
