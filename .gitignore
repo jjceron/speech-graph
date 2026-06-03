@@ -13,7 +13,11 @@ outputs/**
 !outputs/**/
 
 # Track figures/ on folders within outputs, but ignore all other files
-!outputs/**/figures/**/*.png
+!outputs/**/figures/analysis/*.png
+!outputs/**/figures/models/r2_heatmap_*.png
+!outputs/**/figures/models/r2_best_by_target.png
+!outputs/**/figures/interpretability/feature_relevance_by_schooling_*.png
+!outputs/**/figures/interpretability/feature_relevance_population_*.png
 
 # Track only Markdown files inside outputs, at any folder depth
 !outputs/**/*.md
