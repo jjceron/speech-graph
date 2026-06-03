@@ -28,19 +28,19 @@ Thus, each activity became a directed speech graph, where nodes represent lexica
 
 Graph metrics were extracted using sliding windows of **10**, **20**, and **30** words with step size **1**:
 
-\[
+$$
 W_{10}: (t_1,\ldots,t_{10}), (t_2,\ldots,t_{11}), (t_3,\ldots,t_{12}), \ldots
-\]
+$$
 
 The resulting window-level graph metrics were aggregated to the **subject × activity × window-size** level. This aggregation is important because overlapping windows are highly correlated; the final regression models did not treat each overlapping window as an independent subject.
 
 The final modeling unit was:
 
-\[
+$$
 X_{s,a,w} \rightarrow y_{s,k}
-\]
+$$
 
-where \(s\) is the subject, \(a\) is the activity, \(w \in \{10,20,30\}\) is the window size, and \(k\) is one Barratt target among TOTAL, NPLAN, MOT, or COG.
+where $s$ is the subject, $a$ is the activity, $w \in \{10,20,30\}$ is the window size, and $k$ is one Barratt target among TOTAL, NPLAN, MOT, or COG.
 
 Metadata were used only for merging and interpretation. Demographic or grouping variables such as age, gender, school, educational level, school year, and impulsivity group were **not used as predictors** in the primary NLP-to-Barratt models. This avoids inflating model performance through non-linguistic or derived psychometric information.
 
@@ -77,23 +77,23 @@ Subject counts varied by activity and window size because shorter responses cann
 
 For each Barratt target, activity, and window size, a separate Ridge regression model was fitted:
 
-\[
+$$
 y_{s,k} = \beta_0 + X_{s,a,w}\beta + \varepsilon_s
-\]
+$$
 
 with Ridge regularization:
 
-\[
+$$
 \hat{\beta} = \arg\min_{\beta}\left[\sum_s (y_s - \beta_0 - X_s\beta)^2 + \alpha\lVert\beta\rVert_2^2\right]
-\]
+$$
 
-Performance was evaluated using cross-validated \(R^2\):
+Performance was evaluated using cross-validated $R^2$:
 
-\[
+$$
 R^2_{CV} = 1 - \frac{\sum_s (y_s - \hat{y}_s)^2}{\sum_s (y_s - \bar{y}_{train})^2}
-\]
+$$
 
-Interpretation of \(R^2_{CV}\):
+Interpretation of $R^2_{CV}$:
 
 | R² behavior | Meaning |
 |---|---|
@@ -103,9 +103,9 @@ Interpretation of \(R^2_{CV}\):
 
 A total of **84 models** were evaluated:
 
-\[
+$$
 4\;\text{targets} \times 7\;\text{activities} \times 3\;\text{window sizes} = 84\;\text{models}
-\]
+$$
 
 Each model used **13 non-constant speech-graph features**. Word count and edge count were effectively constant within fixed window sizes and therefore did not contribute as predictors.
 
@@ -126,7 +126,7 @@ The result is not a strong predictive finding. The best models explain only a ve
 
 ## Positive models: where NLP features helped above baseline
 
-Only models with \(R^2 > 0\) and \(n \geq 100\) are shown.
+Only models with $R^2 > 0$ and $n \geq 100$ are shown.
 
 | Rank | Target | Activity | Window | n | R² | Pearson r | Pearson p | Spearman r | Interpretation |
 |---:|---|---:|---:|---:|---:|---:|---:|---:|---|
@@ -139,7 +139,7 @@ Only models with \(R^2 > 0\) and \(n \geq 100\) are shown.
 | 7 | TOTAL | 2 | 20 | 232 | 0.0018 | 0.0857 | 0.1936 | 0.0940 | Practically negligible |
 | 8 | COG | 4 | 10 | 252 | 0.0000 | 0.0582 | 0.3572 | 0.0647 | Effectively null |
 
-The only model with both positive \(R^2\) and a nominally significant Pearson association between predicted and observed scores was **MOT, Activity 7, W30**. Even there, the magnitude was small.
+The only model with both positive $R^2$ and a nominally significant Pearson association between predicted and observed scores was **MOT, Activity 7, W30**. Even there, the magnitude was small.
 
 ---
 
@@ -147,13 +147,13 @@ The only model with both positive \(R^2\) and a nominally significant Pearson as
 
 The practical gain was assessed by comparing model error against a mean-prediction baseline.
 
-\[
+$$
 \Delta RMSE = RMSE_{baseline} - RMSE_{model}
-\]
+$$
 
-\[
+$$
 \Delta MAE = MAE_{baseline} - MAE_{model}
-\]
+$$
 
 Positive values indicate that the speech-graph model improved prediction.
 
@@ -168,7 +168,7 @@ Positive values indicate that the speech-graph model improved prediction.
 | TOTAL | 2 | 20 | 0.0018 | 11.9415 | 11.9524 | 0.0109 | 10.2449 | 10.4393 | 0.1944 | Numerically positive but R² negligible |
 | COG | 4 | 10 | 0.0000 | 2.2435 | 2.2435 | 0.0000 | 1.7425 | 1.7285 | -0.0140 | Null |
 
-The error table confirms that the positive \(R^2\) models produced only **minor numerical improvements** over baseline. The best model reduced RMSE by only **0.0658** points and MAE by **0.1259** points.
+The error table confirms that the positive $R^2$ models produced only **minor numerical improvements** over baseline. The best model reduced RMSE by only **0.0658** points and MAE by **0.1259** points.
 
 ---
 
@@ -253,7 +253,7 @@ This activity-window combination shows clearer univariate correlations than its 
 
 The analysis shows a consistent distinction between **association** and **prediction**.
 
-Some individual graph metrics showed correlations around \(|r| \approx 0.15\) to \(0.23\), especially for MOT and COG. However, the multivariate models remained close to zero in cross-validated \(R^2\). This implies that the features may be partially redundant, collinear, or unstable across folds.
+Some individual graph metrics showed correlations around $|r| \approx 0.15$ to $0.23$, especially for MOT and COG. However, the multivariate models remained close to zero in cross-validated $R^2$. This implies that the features may be partially redundant, collinear, or unstable across folds.
 
 A feature can have a visible univariate correlation but still fail to improve prediction when combined with other graph metrics. Conversely, a feature can contribute multivariately without showing a strong univariate correlation, as observed for some recurrence features in the best MOT model.
 
