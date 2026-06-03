@@ -116,6 +116,28 @@ def build_subject_level_by_activity(combined: pd.DataFrame, targets_text: str = 
     return out[[col for col in out.columns if col not in feature_cols] + keep_features]
 
 
+def _deduplicate_activity_window_rows(out: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if out.empty or not {"code", "activity_number", "window_size"}.issubset(out.columns):
+        return out, pd.DataFrame()
+
+    keys = ["code", "activity_number", "window_size"]
+    duplicates = out[out.duplicated(keys, keep=False)].sort_values(keys).copy()
+    if duplicates.empty:
+        return out, duplicates
+
+    metric_cols = [metric for metric in MODEL_METRICS if metric in out.columns]
+    agg: dict[str, str] = {}
+    for col in out.columns:
+        if col in keys:
+            continue
+        agg[col] = "mean" if col in metric_cols or col in {"valid_window", "window_count"} else "first"
+
+    deduped = out.groupby(keys, dropna=False, as_index=False).agg(agg)
+    first = [col for col in ["code", "Cod", "activity", "activity_number", "window_size", "scheme_window_size"] if col in deduped.columns]
+    rest = [col for col in deduped.columns if col not in first]
+    return deduped[first + rest], duplicates
+
+
 def build_activity_window_features(combined: pd.DataFrame, targets_text: str = DEFAULT_TARGETS) -> pd.DataFrame:
     """Long matrix: one row per subject, activity and window size using canonical window metrics."""
     work = _filtered_model_rows(combined)
@@ -190,17 +212,20 @@ def save_subject_matrices(combined: pd.DataFrame, output_dir: Path, targets_text
     analysis_dir = Path(output_dir) / "analysis"
     analysis_dir.mkdir(parents=True, exist_ok=True)
     by_activity = build_subject_level_by_activity(combined, targets_text=targets_text)
-    activity_window = build_activity_window_features(combined, targets_text=targets_text)
+    raw_activity_window = build_activity_window_features(combined, targets_text=targets_text)
+    activity_window, duplicate_rows = _deduplicate_activity_window_rows(raw_activity_window)
     windowed = build_subject_level_windowed(combined, targets_text=targets_text)
     full = build_subject_level_full(combined, targets_text=targets_text)
 
     by_activity_path = analysis_dir / "subject_level_features.csv"
     activity_window_path = analysis_dir / "activity_window_features.csv"
+    duplicate_rows_path = analysis_dir / "activity_window_duplicate_rows.csv"
     windowed_path = analysis_dir / "subject_level_features_windowed.csv"
     full_path = analysis_dir / "subject_level_features_full.csv"
 
     by_activity.to_csv(by_activity_path, index=False)
     activity_window.to_csv(activity_window_path, index=False)
+    duplicate_rows.to_csv(duplicate_rows_path, index=False)
     windowed.to_csv(windowed_path, index=False)
     full.to_csv(full_path, index=False)
 
@@ -208,13 +233,21 @@ def save_subject_matrices(combined: pd.DataFrame, output_dir: Path, targets_text
         [
             {"matrix": "subject_level_features", "purpose": "global metrics by activity", "path": str(by_activity_path), "rows": len(by_activity), "columns": len(by_activity.columns)},
             {"matrix": "activity_window_features", "purpose": "main activity x window modelling matrix", "path": str(activity_window_path), "rows": len(activity_window), "columns": len(activity_window.columns)},
+            {"matrix": "activity_window_duplicate_rows", "purpose": "duplicate rows removed before modelling", "path": str(duplicate_rows_path), "rows": len(duplicate_rows), "columns": len(duplicate_rows.columns)},
             {"matrix": "subject_level_features_windowed", "purpose": "wide exploratory activity x window matrix", "path": str(windowed_path), "rows": len(windowed), "columns": len(windowed.columns)},
             {"matrix": "subject_level_features_full", "purpose": "wide exploratory mean/std/global matrix", "path": str(full_path), "rows": len(full), "columns": len(full.columns)},
         ]
     )
     manifest_path = analysis_dir / "feature_matrices_manifest.csv"
     manifest.to_csv(manifest_path, index=False)
-    return {"by_activity": by_activity_path, "activity_window": activity_window_path, "windowed": windowed_path, "full": full_path, "manifest": manifest_path}
+    return {
+        "by_activity": by_activity_path,
+        "activity_window": activity_window_path,
+        "activity_window_duplicates": duplicate_rows_path,
+        "windowed": windowed_path,
+        "full": full_path,
+        "manifest": manifest_path,
+    }
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

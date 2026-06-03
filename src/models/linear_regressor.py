@@ -98,6 +98,22 @@ def _context_from_df(df: pd.DataFrame) -> dict[str, Any]:
     return context
 
 
+def _deduplicate_by_group(df: pd.DataFrame, group_col: str, feature_cols: list[str], target_col: str) -> pd.DataFrame:
+    if group_col not in df.columns or not df[group_col].duplicated().any():
+        return df.copy()
+    work = df.copy()
+    agg: dict[str, str] = {}
+    numeric_cols = set(feature_cols) | {target_col}
+    for col in numeric_cols:
+        if col in work.columns:
+            work[col] = pd.to_numeric(work[col], errors="coerce")
+    for col in work.columns:
+        if col == group_col:
+            continue
+        agg[col] = "mean" if col in numeric_cols else "first"
+    return work.groupby(group_col, dropna=False, as_index=False).agg(agg)
+
+
 def cross_validated_model(
     df: pd.DataFrame,
     target_label: str,
@@ -111,6 +127,7 @@ def cross_validated_model(
     context: dict[str, Any] | None = None,
 ) -> tuple[dict, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     context = context or {}
+    df = _deduplicate_by_group(df, group_col, feature_cols, target_col).reset_index(drop=True)
     usable_cols = feature_cols + [target_col] + ([group_col] if group_col in df.columns else [])
     usable = df[usable_cols].copy()
     usable[target_col] = pd.to_numeric(usable[target_col], errors="coerce")
@@ -120,7 +137,8 @@ def cross_validated_model(
     work = df.loc[mask].reset_index(drop=True)
     usable = usable.loc[mask].reset_index(drop=True)
     if len(usable) < 4 or usable[target_col].nunique(dropna=True) < 2 or not feature_cols:
-        result = context | {"target": target_label, "target_column": target_col, "n_subjects": int(len(usable)), "features": len(feature_cols), "r2": np.nan}
+        n_subjects = int(usable[group_col].nunique(dropna=True)) if group_col in usable.columns else int(len(usable))
+        result = context | {"target": target_label, "target_column": target_col, "n_subjects": n_subjects, "features": len(feature_cols), "r2": np.nan}
         return result, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     groups = work[group_col] if group_col in work.columns else pd.Series(range(len(work)))
@@ -164,7 +182,7 @@ def cross_validated_model(
     result = context | {
         "target": target_label,
         "target_column": target_col,
-        "n_subjects": int(len(work)),
+        "n_subjects": int(work[group_col].nunique(dropna=True)) if group_col in work.columns else int(len(work)),
         "features": int(len(feature_cols)),
         "model": model_type,
         "alpha": float(alpha) if model_type == "ridge" and not alphas else np.nan,
