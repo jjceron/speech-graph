@@ -2,17 +2,15 @@
 .venv/
 
 # Project folders not to version
-data/
+data/**
 docs/
 
 # Ignore everything inside outputs
 outputs/**
 
-# Allow Git to traverse outputs and its subfolders
+# Track figures/ on folders within outputs, but ignore all other files
 !outputs/
 !outputs/**/
-
-# Track figures/ on folders within outputs, but ignore all other files
 !outputs/01_run/figures/analysis/*.png
 !outputs/01_run/figures/models/r2_heatmap_*.png
 !outputs/01_run/figures/models/r2_best_by_target.png
@@ -24,6 +22,15 @@ outputs/**
 !outputs/02_run/figures/models/mc_model_comparison_*.png
 !outputs/02_run/figures/shap/shap_top_*_school_year_plus_nlp.png
 !outputs/02_run/figures/shap/shap_top_*_nlp_only.png
+
+# Allow Git to traverse the needed data folders
+!data/
+!data/processed/
+!data/processed/metrics/
+!data/processed/metrics/**/
+
+# Track .txt files inside metrics at any depth
+!data/processed/metrics/**/*.txt
 
 # Track only Markdown files inside outputs, at any folder depth
 !outputs/**/*.md
