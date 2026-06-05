@@ -47,6 +47,7 @@ outputs/**
 # Selected output files to track
 !outputs/correlations/**/**/*.csv
 !outputs/correlations/**/**/*.png
+!outputs/linear_regression/**/*.csv
 
 # Operating system and editor files
 .DS_Store
