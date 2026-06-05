@@ -26,32 +26,48 @@ data/**
 !data/processed/metrics/**/*.txt
 
 #### Output files
-outputs/**
-!outputs/
-!outputs/**/
+outputs/*
+!outputs/linear_regression/
+!outputs/correlations/
 
-!outputs/.gitkeep
+#### Correlations — track all CSVs and PNGs
+!outputs/correlations/**/*.csv
+!outputs/correlations/**/*.png
 
-# Track selected correlation results
-!outputs/correlations/**/**/*.csv
-!outputs/correlations/**/**/*.png
+#### Linear regression — only selected models
+!outputs/linear_regression/perm_test/
+!outputs/linear_regression/perm_test/**/*.csv
+!outputs/linear_regression/perm_test/**/*.png
 
-# ols_mc — top 2 per target
-!outputs/linear_regression/ols_mc/COG_2feat_raw/**
-!outputs/linear_regression/ols_mc/COG_3feat_raw/**
-!outputs/linear_regression/ols_mc/MOT_2feat_raw/**
-!outputs/linear_regression/ols_mc/MOT_2feat_z/**
+!outputs/linear_regression/ols_mc/
+!outputs/linear_regression/ols_mc/COG_2feat_raw/
+!outputs/linear_regression/ols_mc/COG_2feat_raw/*.csv
+!outputs/linear_regression/ols_mc/COG_2feat_raw/figures/*.png
+!outputs/linear_regression/ols_mc/COG_3feat_raw/
+!outputs/linear_regression/ols_mc/COG_3feat_raw/*.csv
+!outputs/linear_regression/ols_mc/COG_3feat_raw/figures/*.png
+!outputs/linear_regression/ols_mc/MOT_2feat_raw/
+!outputs/linear_regression/ols_mc/MOT_2feat_raw/*.csv
+!outputs/linear_regression/ols_mc/MOT_2feat_raw/figures/*.png
+!outputs/linear_regression/ols_mc/MOT_2feat_z/
+!outputs/linear_regression/ols_mc/MOT_2feat_z/*.csv
+!outputs/linear_regression/ols_mc/MOT_2feat_z/figures/*.png
 
-# ridgecv_mc — top 2 per target
-!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/**
-!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z3_cov1/**
-!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/**
-!outputs/linear_regression/ridgecv_mc/MOT_MOT_mix/**
+!outputs/linear_regression/ridgecv_mc/
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/*.csv
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/figures/*.png
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z3_cov1/
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z3_cov1/*.csv
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z3_cov1/figures/*.png
+!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/
+!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/*.csv
+!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/figures/*.png
+!outputs/linear_regression/ridgecv_mc/MOT_MOT_mix/
+!outputs/linear_regression/ridgecv_mc/MOT_MOT_mix/*.csv
+!outputs/linear_regression/ridgecv_mc/MOT_MOT_mix/figures/*.png
 
-# perm_test — everything
-!outputs/linear_regression/perm_test/**
-
-# OS and editor files
+#### OS and editor files
 .DS_Store
 Thumbs.db
 .vscode/
