@@ -7,6 +7,8 @@ Usage:
     py -m src.analysis.linear_regression_mc --target MOT --type raw --top-k 5 --n-iter 400
     py -m src.analysis.linear_regression_mc --target MOT --type raw --feature-list "lsc_T7W30,l2_T2W30" --run-name myrun --n-iter 400
     py -m src.analysis.linear_regression_mc --target all --type all --top-k 5 --n-iter 400
+
+Output root (default): outputs/linear_regression/ols_mc/
 """
 
 from __future__ import annotations

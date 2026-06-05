@@ -7,6 +7,8 @@ Usage:
     py -m src.analysis.linear_regression_rcv --target MOT --type raw --feature-list "lsc_T7W30,l2_T2W30" --n-iter 400
     py -m src.analysis.linear_regression_rcv --target COG --type raw --feature-list "edges_T2W10,l3_T6W30" --covar "School year" --n-iter 400
     py -m src.analysis.linear_regression_rcv --target MOT --type raw --corr-dir outputs/correlations/Task7/raw_task7_schoolyear --top-k 10 --n-iter 400
+
+Output root (default): outputs/linear_regression/ridgecv_mc/
 """
 
 from __future__ import annotations
