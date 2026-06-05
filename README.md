@@ -87,9 +87,9 @@ The computed metrics include:
 | `edges` | Total number of directed transitions. |
 | `re` | Repeated edges, defined as transitions observed more than once. |
 | `pe` | Parallel or reciprocal edge count, computed from the adjacency matrix as implemented in `compute_metrics()`. |
-| `l1` | Self-loops, computed as $\operatorname{tr}(\mathbf{A})$. |
+| `l1` | Self-loops, computed as $\text{tr}(\mathbf{A})$. |
 | `l2` | Two-cycles, corresponding to reciprocal directed pairs. |
-| `l3` | Three-cycles, computed as $\frac{1}{3}\operatorname{tr}(\tilde{\mathbf{A}}^3)$, where $\tilde{\mathbf{A}}$ is the adjacency matrix with a zeroed diagonal. |
+| `l3` | Three-cycles, computed as $\frac{1}{3}\text{tr}(\tilde{\mathbf{A}}^3)$, where $\tilde{\mathbf{A}}$ is the adjacency matrix with a zeroed diagonal. |
 | `lcc` | Size of the largest connected component in the undirected projection. |
 | `lsc` | Size of the largest strongly connected component in the directed graph. |
 | `atd` | Average token degree, computed as $2m/n$. |
