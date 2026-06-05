@@ -67,8 +67,8 @@ The raw COG pattern is the most coherent correlation result. Activity 2 `edges` 
 
 The z-score COG evidence is secondary. Activity 2 `z_l3` and `z_cc` show negative partial associations after School year adjustment, but the simple correlations are weak or marginal. Activity 7 z-scores do not show convincing COG evidence in the available W20 output.
 
-<div style="display: flex; flex-wrap: wrap; gap: 20px;">
-  <figure>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
+  <figure style="text-align: center;">
     <figcaption><b>Figure 1.</b> Partial Spearman correlations (controlling for School year) between raw graph metrics and BIS-15 dimensions across Activity 2 windows. Warmer colours indicate positive associations with COG; cooler colours indicate negative associations.</figcaption>
     <img src="../correlations/Task2/raw_task2_schoolyear/heatmap_partial_raw.png" alt="Partial correlation heatmap for raw Task 2 metrics controlling for School year" width="700">
   </figure>
@@ -91,8 +91,8 @@ MOT raw correlations are weaker than the COG raw pattern, but they point to Acti
 
 The MOT z-score pattern is more coherent. Positive `z_l2` and `z_pe` indicate more reciprocal recurrence than expected from segment-preserving permutations. Negative `z_cc` and `z_l3` indicate less local clustering and fewer three-node cycles relative to the same baseline. Activity 7 z-score outputs are weak and non-significant; the strongest normalized MOT evidence remains Activity 2.
 
-<div style="display: flex; flex-wrap: wrap; gap: 20px;">
-  <figure>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
+  <figure style="text-align: center;">
     <figcaption><b>Figure 2.</b> Partial Spearman correlations (controlling for School year) between z-scored graph metrics and BIS-15 dimensions across Activity 2 windows. The MOT z-score pattern (z_cc negative, z_l2 and z_pe positive) is visible in the left panel.</figcaption>
     <img src="../correlations/Task2/zscore_task2_schoolyear/heatmap_partial_z.png" alt="Partial correlation heatmap for z-scored Task 2 metrics controlling for School year" width="700">
   </figure>
@@ -182,10 +182,10 @@ The COG permutation test supports a non-random full-model signal. Because School
 
 The MOT permutation test also reaches significance, but the effect size is small. It supports non-random structure in the compact Activity 2 z-score model while still indicating limited predictive strength.
 
-<div style="display: flex; flex-wrap: wrap; gap: 20px;">
-  <figure>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
+  <figure style="text-align: center;">
     <figcaption><b>Figure 5.</b> Permutation null distributions. Left: COG mixed RidgeCV model (real $R^2 = 0.125$, $p = 0.0002$). Right: MOT z-score RidgeCV model (real $R^2 = 0.018$, $p = 0.020$). The red vertical line marks the observed $R^2$.</figcaption>
-    <div>
+    <div style="display: flex; gap: 10px; justify-content: center;">
       <img src="perm_test/COG_3raw+z1/figures/null_histogram.png" alt="Null distribution for COG permutation test" width="500">
       <img src="perm_test/MOT_3z/figures/null_histogram.png" alt="Null distribution for MOT permutation test" width="500">
     </div>
