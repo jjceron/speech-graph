@@ -34,14 +34,15 @@ outputs/*
 !outputs/correlations/**/*.csv
 !outputs/correlations/**/*.png
 
-#### Linear regression — best models only
+#### Linear regression — best model per target per regressor
 !outputs/linear_regression/ols_mc/
-!outputs/linear_regression/ols_mc/COG_3feat_raw/
-!outputs/linear_regression/ols_mc/COG_3feat_raw/*.csv
-!outputs/linear_regression/ols_mc/COG_3feat_raw/figures/*.png
+!outputs/linear_regression/ols_mc/COG_2feat_raw/
+!outputs/linear_regression/ols_mc/COG_2feat_raw/*.csv
+!outputs/linear_regression/ols_mc/COG_2feat_raw/figures/*.png
 !outputs/linear_regression/ols_mc/MOT_2feat_z/
 !outputs/linear_regression/ols_mc/MOT_2feat_z/*.csv
 !outputs/linear_regression/ols_mc/MOT_2feat_z/figures/*.png
+
 !outputs/linear_regression/ridgecv_mc/
 !outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/
 !outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/*.csv
@@ -49,6 +50,7 @@ outputs/*
 !outputs/linear_regression/ridgecv_mc/MOT_3feat_z/
 !outputs/linear_regression/ridgecv_mc/MOT_3feat_z/*.csv
 !outputs/linear_regression/ridgecv_mc/MOT_3feat_z/figures/*.png
+
 !outputs/linear_regression/perm_test/**
 
 #### OS and editor files
