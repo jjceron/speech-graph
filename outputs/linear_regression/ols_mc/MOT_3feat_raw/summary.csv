@@ -1,0 +1,2 @@
+target,feature_type,descriptor,n_subjects,n_features,features,n_iter,test_size,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
+MOT,raw,3feat,228,3,"lsc_T7W30, l2_T2W30, asp_T6W30",400,0.2,-0.015874012285167306,0.08131635834406034,7.6004642851375115,0.5304208203181796,0.1611517892087999,0.13413259963600097,0.505

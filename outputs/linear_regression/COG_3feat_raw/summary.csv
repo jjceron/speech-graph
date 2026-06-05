@@ -1,2 +1,0 @@
-target,feature_type,descriptor,n_subjects,n_features,features,n_iter,test_size,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
-COG,raw,3feat,232,3,"edges_T2W10, l3_T6W30, edges_T7W50",400,0.2,0.003979770956309557,0.09490721331762188,2.1489004093332316,0.22930309108703217,0.2706924798834498,0.11934984652156484,0.3825

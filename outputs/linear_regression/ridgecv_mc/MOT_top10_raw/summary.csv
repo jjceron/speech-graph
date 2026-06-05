@@ -1,0 +1,2 @@
+target,feature_type,descriptor,covariates,n_subjects,n_predictors,predictors,n_iter,test_size,alpha_mean,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
+MOT,raw,top10,,243,10,"lsc_T7W30, cc_T7W40, cc_T7W30, cc_T7W50, edges_T7W50, edges_T7W40, edges_T7W30, edges_T7W20, cc_T7W20, diameter_T7W30",400,0.2,416.5713439475829,-0.04292378206082383,0.06018291671120864,7.7898364390135155,0.5139030127101538,0.1382020834921909,0.11337833360283839,0.7475

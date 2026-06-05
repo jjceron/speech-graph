@@ -1,0 +1,2 @@
+target,feature_type,descriptor,covariates,n_subjects,n_predictors,predictors,n_iter,test_size,alpha_mean,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
+MOT,z,2feat_sch,School year,237,3,"z_cc_T2W20, z_l2_T2W10, School year",400,0.2,9.636576869193238,-0.007563899662284182,0.06381457006918352,7.659333956553863,0.5395778046129814,0.13811245350024826,0.12565857693166152,0.4575

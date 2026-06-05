@@ -1,2 +1,0 @@
-target,feature_type,descriptor,n_subjects,n_features,features,n_iter,test_size,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
-COG,z,top5,237,5,"z_atd_T2W10, z_l3_T2W10, z_cc_T2W10, z_cc_T2W20, z_asp_T2W10",400,0.2,-0.04023696338007315,0.07941337133110168,2.233313163129473,0.22199067582753973,0.10907340834603761,0.12464149291971328,0.6425

@@ -1,0 +1,2 @@
+target,feature_type,descriptor,n_subjects,n_features,features,n_iter,test_size,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
+MOT,z,top5,237,5,"z_cc_T2W20, z_l2_T2W10, z_pe_T2W10, z_l3_T2W20, z_l2_T2W20",400,0.2,-0.014775543737902406,0.0766132023059377,7.6833625537196575,0.5398309616714806,0.11303229258073876,0.12359790910672494,0.5125

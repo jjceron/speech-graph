@@ -395,8 +395,8 @@ def parse_args() -> argparse.Namespace:
         help="Path to metadata Excel file (default: data/raw/metadata.xlsx)",
     )
     parser.add_argument(
-        "--output", default="outputs/linear_regression",
-        help="Root output directory (default: outputs/linear_regression)",
+        "--output", default="outputs/linear_regression/ols_mc",
+        help="Root output directory (default: outputs/linear_regression/ols_mc)",
     )
     parser.add_argument(
         "--top-k", type=int, default=5,

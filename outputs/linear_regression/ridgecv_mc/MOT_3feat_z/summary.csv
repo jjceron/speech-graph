@@ -1,0 +1,2 @@
+target,feature_type,descriptor,covariates,n_subjects,n_predictors,predictors,n_iter,test_size,alpha_mean,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
+MOT,z,3feat,,237,3,"z_cc_T2W20, z_l2_T2W10, z_pe_T2W10",400,0.2,8.205595963536517,0.004458670309107392,0.06141713240777927,7.6137998343748094,0.5352495774543977,0.15389862009857877,0.12443448753111559,0.3775
