@@ -1,57 +1,64 @@
-# Python virtual environment
+# Python environment
 .venv/
 
-# Project folders not to version
-data/**
+# Python generated files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Documentation
 docs/
 
-# Ignore everything inside outputs
+#### Data files
+# Ignore all data files by default.
+data/**
+
+# Allow Git to traverse the required data folders.
+!data/
+!data/processed/
+!data/processed/metrics/
+!data/processed/metrics/**/
+
+# Track text metric files inside data/processed/metrics at any folder depth.
+!data/processed/metrics/**/*.txt
+
+#### Output files
+# Ignore everything inside outputs by default.
 outputs/**
 
-# Track figures/ on folders within outputs, but ignore all other files
+# Allow Git to traverse outputs and its subfolders.
 !outputs/
 !outputs/**/
+
+# Track Markdown reports inside outputs at any folder depth.
+!outputs/**/*.md
+
+# Keep outputs folder in Git even when no tracked files exist.
+!outputs/.gitkeep
+
+# Selected output figures from run 01
 !outputs/01_run/figures/analysis/*.png
 !outputs/01_run/figures/models/r2_heatmap_*.png
 !outputs/01_run/figures/models/r2_best_by_target.png
 !outputs/01_run/figures/interpretability/feature_relevance_by_schooling_*.png
 !outputs/01_run/figures/interpretability/feature_relevance_population_*.png
 
+# Selected output figures from run 02
 !outputs/02_run/figures/analysis/top_partial_correlations_*.png
 !outputs/02_run/figures/models/mc_best_mean_r2_by_target_model_set.png
 !outputs/02_run/figures/models/mc_model_comparison_*.png
 !outputs/02_run/figures/shap/shap_top_*_school_year_plus_nlp.png
 !outputs/02_run/figures/shap/shap_top_*_nlp_only.png
 
-# Allow Git to traverse the needed data folders
-!data/
-!data/processed/
-!data/processed/metrics/
-!data/processed/metrics/**/
-
-# Track .txt files inside metrics at any depth
-!data/processed/metrics/**/*.txt
-
-# Track only Markdown files inside outputs, at any folder depth
-!outputs/**/*.md
-
-# Optional: keep the outputs folder in Git even if it has no tracked Markdown files
-!outputs/.gitkeep
-
-# Python cache files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Jupyter checkpoints
-.ipynb_checkpoints/
-
-# Environment variables / secrets
-.env
-.env.*
-!.env.example
-
-# OS/editor files
+# Operating system and editor files
 .DS_Store
 Thumbs.db
 .vscode/
