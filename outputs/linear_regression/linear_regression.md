@@ -67,6 +67,13 @@ The raw COG pattern is the most coherent correlation result. Activity 2 `edges` 
 
 The z-score COG evidence is secondary. Activity 2 `z_l3` and `z_cc` show negative partial associations after School year adjustment, but the simple correlations are weak or marginal. Activity 7 z-scores do not show convincing COG evidence in the available W20 output.
 
+<div style="display: flex; flex-wrap: wrap; gap: 20px;">
+  <figure>
+    <figcaption><b>Figure 1.</b> Partial Spearman correlations (controlling for School year) between raw graph metrics and BIS-15 dimensions across Activity 2 windows. Warmer colours indicate positive associations with COG; cooler colours indicate negative associations.</figcaption>
+    <img src="../correlations/Task2/raw_task2_schoolyear/heatmap_partial_raw.png" alt="Partial correlation heatmap for raw Task 2 metrics controlling for School year" width="700">
+  </figure>
+</div>
+
 ## Correlation Evidence for MOT
 
 | Activity | Window | Feature | n | Simple rho (p) | Partial rho (p) | Adjustment | Interpretation |
@@ -83,6 +90,13 @@ The z-score COG evidence is secondary. Activity 2 `z_l3` and `z_cc` show negativ
 MOT raw correlations are weaker than the COG raw pattern, but they point to Activity 7 connectivity and clustering. `lsc_T7W30`, `cc_T7W40`, and Activity 7 `edges` are positive, suggesting that MOT may increase with stronger local connectedness and larger strongly connected speech components.
 
 The MOT z-score pattern is more coherent. Positive `z_l2` and `z_pe` indicate more reciprocal recurrence than expected from segment-preserving permutations. Negative `z_cc` and `z_l3` indicate less local clustering and fewer three-node cycles relative to the same baseline. Activity 7 z-score outputs are weak and non-significant; the strongest normalized MOT evidence remains Activity 2.
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px;">
+  <figure>
+    <figcaption><b>Figure 2.</b> Partial Spearman correlations (controlling for School year) between z-scored graph metrics and BIS-15 dimensions across Activity 2 windows. The MOT z-score pattern (z_cc negative, z_l2 and z_pe positive) is visible in the left panel.</figcaption>
+    <img src="../correlations/Task2/zscore_task2_schoolyear/heatmap_partial_z.png" alt="Partial correlation heatmap for z-scored Task 2 metrics controlling for School year" width="700">
+  </figure>
+</div>
 
 ## Linear Regression and RidgeCV Results
 
@@ -104,6 +118,26 @@ The best COG model is the mixed RidgeCV specification with `edges_T2W10`, `l3_T6
 COG z-only models perform poorly, and the COG top-10 raw Ridge model also degrades performance. This pattern is consistent with redundancy among correlated windows and overfitting when many related graph features are included.
 
 For MOT, the best RidgeCV model by mean $R^2$ is the compact three-feature z-score model with `z_cc_T2W20`, `z_l2_T2W10`, and `z_pe_T2W10`. The raw MOT model with `lsc_T7W30` and `cc_T7W40` has higher mean Spearman rho but negative mean $R^2$, suggesting some rank-order signal without well-calibrated prediction. Larger MOT feature sets perform worse.
+
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+  <figure>
+    <figcaption><b>Figure 3.</b> Best COG RidgeCV model: `edges_T2W10 + l3_T6W30 + edges_T7W50 + z_l3_T2W10 + School year`. Observed versus predicted scores (left) and distribution of $R^2$ across 400 Monte Carlo splits (right).</figcaption>
+    <div>
+      <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/obs_vs_pred_COG_mixed.png" alt="Observed versus predicted COG scores" width="400">
+      <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/r2_dist_COG_mixed.png" alt="R² distribution for COG model" width="400">
+    </div>
+  </figure>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+  <figure>
+    <figcaption><b>Figure 4.</b> Best MOT RidgeCV model: `z_cc_T2W20 + z_l2_T2W10 + z_pe_T2W10`. Observed versus predicted scores (left) and distribution of $R^2$ across 400 Monte Carlo splits (right).</figcaption>
+    <div>
+      <img src="ridgecv_mc/MOT_3feat_z/figures/obs_vs_pred_MOT_z.png" alt="Observed versus predicted MOT scores" width="400">
+      <img src="ridgecv_mc/MOT_3feat_z/figures/r2_dist_MOT_z.png" alt="R² distribution for MOT model" width="400">
+    </div>
+  </figure>
+</div>
 
 ## Coefficient Direction in Key RidgeCV Models
 
@@ -147,6 +181,16 @@ The observed-versus-predicted figures pool predictions across Monte Carlo splits
 The COG permutation test supports a non-random full-model signal. Because School year is included, this test validates the complete model specification rather than the incremental graph-feature contribution above School year alone.
 
 The MOT permutation test also reaches significance, but the effect size is small. It supports non-random structure in the compact Activity 2 z-score model while still indicating limited predictive strength.
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px;">
+  <figure>
+    <figcaption><b>Figure 5.</b> Permutation null distributions. Left: COG mixed RidgeCV model (real $R^2 = 0.125$, $p = 0.0002$). Right: MOT z-score RidgeCV model (real $R^2 = 0.018$, $p = 0.020$). The red vertical line marks the observed $R^2$.</figcaption>
+    <div>
+      <img src="perm_test/COG_3raw+z1/figures/null_histogram.png" alt="Null distribution for COG permutation test" width="500">
+      <img src="perm_test/MOT_3z/figures/null_histogram.png" alt="Null distribution for MOT permutation test" width="500">
+    </div>
+  </figure>
+</div>
 
 ## Methodological Interpretation
 
