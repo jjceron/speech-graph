@@ -1,2 +1,0 @@
-target,feature_type,descriptor,covariates,n_subjects,n_predictors,predictors,n_iter,test_size,alpha_mean,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
-COG,mixed,COG_3raw+z3,School year,230,5,"edges_T2W10, l3_T6W30, edges_T7W50, z_l3_T2W20, School year",400,0.2,5.754559150246592,0.041231564575357975,0.10339441296042656,2.1062274609149654,0.21921833034029506,0.2905459944554391,0.11635545370755136,0.2975

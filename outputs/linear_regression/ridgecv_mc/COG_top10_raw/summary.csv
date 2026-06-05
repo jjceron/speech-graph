@@ -1,2 +1,0 @@
-target,feature_type,descriptor,covariates,n_subjects,n_predictors,predictors,n_iter,test_size,alpha_mean,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
-COG,raw,top10,,222,10,"edges_T2W20, edges_T2W10, edges_T2W40, edges_T2W30, lsc_T2W20, lsc_T2W30, l3_T2W10, cc_T2W10, lcc_T2W10, cc_T2W20",400,0.2,695.445249400623,-0.032669296064087465,0.05306534624371781,2.227397675633495,0.24476560704577896,0.10273048353567468,0.1435311434814259,0.7025

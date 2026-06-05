@@ -1,2 +1,0 @@
-target,feature_type,descriptor,covariates,n_subjects,n_predictors,predictors,n_iter,test_size,alpha_mean,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
-COG,raw,2feat,,240,2,"edges_T2W10, l3_T6W30",400,0.2,2.5275252541057,0.01851883620785412,0.06950674070863813,2.1576130916748695,0.22315275971495618,0.24419023588552363,0.12344088331668103,0.3225

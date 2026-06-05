@@ -36,6 +36,7 @@ outputs/*
 
 #### Linear regression — best model per target per regressor
 !outputs/linear_regression/ols_mc/
+outputs/linear_regression/ols_mc/*
 !outputs/linear_regression/ols_mc/COG_2feat_raw/
 !outputs/linear_regression/ols_mc/COG_2feat_raw/*.csv
 !outputs/linear_regression/ols_mc/COG_2feat_raw/figures/*.png
@@ -44,6 +45,7 @@ outputs/*
 !outputs/linear_regression/ols_mc/MOT_2feat_z/figures/*.png
 
 !outputs/linear_regression/ridgecv_mc/
+outputs/linear_regression/ridgecv_mc/*
 !outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/
 !outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/*.csv
 !outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/figures/*.png

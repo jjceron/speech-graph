@@ -1,2 +1,0 @@
-target,feature_type,descriptor,covariates,n_subjects,n_predictors,predictors,n_iter,test_size,alpha_mean,r2_mean,r2_std,rmse_mean,rmse_std,rho_mean,rho_std,frac_r2_below_zero
-MOT,mixed,MOT_2raw,,236,2,"lsc_T7W30, cc_T7W40",400,0.2,10.781898510441081,-0.005927656194018804,0.06941383099521378,7.728406105410468,0.554338566666616,0.21746561532374298,0.11710208960207905,0.43
