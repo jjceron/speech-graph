@@ -1,0 +1,2 @@
+target,feature_type,model,n_subjects,n_predictors,features,covariates,n_perm,real_r2,null_mean,null_std,null_ci_2.5,null_ci_97.5,p_value,significant
+COG,raw,RidgeCV,232,4,"edges_T2W10, l3_T6W30, edges_T7W50",School year,200,0.108596,-0.02724,0.034765,-0.134092,0.011065,0.004975,True
