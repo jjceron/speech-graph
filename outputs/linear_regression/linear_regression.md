@@ -122,9 +122,13 @@ For MOT, the best RidgeCV model by mean $R^2$ is the compact three-feature z-sco
 <div style="display: flex; flex-wrap: wrap; gap: 10px;">
   <figure>
     <figcaption><b>Figure 3.</b> Best COG RidgeCV model: `edges_T2W10 + l3_T6W30 + edges_T7W50 + z_l3_T2W10 + School year`. Observed versus predicted scores (left) and distribution of $R^2$ across 400 Monte Carlo splits (right).</figcaption>
-    <div>
-      <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/obs_vs_pred_COG_mixed.png" alt="Observed versus predicted COG scores" width="400">
-      <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/r2_dist_COG_mixed.png" alt="R² distribution for COG model" width="400">
+    <div style="display: flex; gap: 10px; justify-content: center;">
+      <div style="width: 400px; height: 300px; display: flex; align-items: center; justify-content: center;">
+        <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/obs_vs_pred_COG_mixed.png" alt="Observed versus predicted COG scores" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+      </div>
+      <div style="width: 400px; height: 300px; display: flex; align-items: center; justify-content: center;">
+        <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/r2_dist_COG_mixed.png" alt="R² distribution for COG model" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+      </div>
     </div>
   </figure>
 </div>
@@ -132,9 +136,13 @@ For MOT, the best RidgeCV model by mean $R^2$ is the compact three-feature z-sco
 <div style="display: flex; flex-wrap: wrap; gap: 10px;">
   <figure>
     <figcaption><b>Figure 4.</b> Best MOT RidgeCV model: `z_cc_T2W20 + z_l2_T2W10 + z_pe_T2W10`. Observed versus predicted scores (left) and distribution of $R^2$ across 400 Monte Carlo splits (right).</figcaption>
-    <div>
-      <img src="ridgecv_mc/MOT_3feat_z/figures/obs_vs_pred_MOT_z.png" alt="Observed versus predicted MOT scores" width="400">
-      <img src="ridgecv_mc/MOT_3feat_z/figures/r2_dist_MOT_z.png" alt="R² distribution for MOT model" width="400">
+    <div style="display: flex; gap: 10px; justify-content: center;">
+      <div style="width: 400px; height: 300px; display: flex; align-items: center; justify-content: center;">
+        <img src="ridgecv_mc/MOT_3feat_z/figures/obs_vs_pred_MOT_z.png" alt="Observed versus predicted MOT scores" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+      </div>
+      <div style="width: 400px; height: 300px; display: flex; align-items: center; justify-content: center;">
+        <img src="ridgecv_mc/MOT_3feat_z/figures/r2_dist_MOT_z.png" alt="R² distribution for MOT model" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+      </div>
     </div>
   </figure>
 </div>
