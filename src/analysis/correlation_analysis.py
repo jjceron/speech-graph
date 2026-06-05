@@ -1,15 +1,21 @@
 """Correlation analysis: simple and partial Spearman correlations
-between speech-graph features (raw and z-scores) and Barratt MOT/COG,
+between speech-graph features (raw and/or z-scores) and Barratt MOT/COG,
 controlling for School year.
 
 Usage:
     py -m src.analysis.correlation_analysis --output outputs/06_correlations
+    py -m src.analysis.correlation_analysis --task 2 --type raw --output outputs/06_correlations/T2_raw
+    py -m src.analysis.correlation_analysis --task 2,7 --type z --output outputs/06_correlations/T27_z
+    py -m src.analysis.correlation_analysis --task 2 --type raw --adj-var "School year" --output outputs/correlations/T2_raw
+    py -m src.analysis.correlation_analysis --task 7 --type z --adj-var "Age" --output outputs/correlations/T7_z_age
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+import traceback
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -19,7 +25,7 @@ from scipy.stats import spearmanr
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.pipeline.speechgraph import load_metadata
-from src.visualization.corr_metrics import plot_combined_heatmaps
+from src.visualization.corr_metrics import plot_correlation_heatmaps
 
 
 METRICS_OF_INTEREST = [
@@ -28,12 +34,14 @@ METRICS_OF_INTEREST = [
 ]
 
 
-def find_means_tables(metrics_dir: Path) -> list[dict]:
+def find_means_tables(metrics_dir: Path, tasks: list[int] | None = None) -> list[dict]:
     records = []
     for task_dir in sorted(metrics_dir.iterdir()):
         if not task_dir.is_dir() or not task_dir.name.startswith("Task"):
             continue
         task_num = int(task_dir.name.replace("Task", ""))
+        if tasks is not None and task_num not in tasks:
+            continue
         for fpath in sorted(task_dir.iterdir()):
             name = fpath.name
             if "means_params_table" in name:
@@ -73,18 +81,34 @@ def run_correlation_analysis(
     metrics_dir: str | Path = "data/processed/metrics",
     metadata_path: str | Path = "data/raw/metadata.xlsx",
     output_dir: str | Path = "outputs/06_correlations",
+    tasks: list[int] | None = None,
+    ftype_filter: str = "all",
+    adj_var: str = "School year",
 ) -> None:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     meta = load_metadata(metadata_path)
 
-    tables = find_means_tables(Path(metrics_dir))
+    tables = find_means_tables(Path(metrics_dir), tasks=tasks)
     if not tables:
         print("No means tables found.")
         return
 
+    if ftype_filter != "all":
+        tables = [t for t in tables if t["type"] == ftype_filter]
+        if not tables:
+            print(f"No tables found for type '{ftype_filter}'.")
+            return
+
+    task_str = f"tasks {tasks}" if tasks else "all tasks"
+    print(f"Processing: {task_str}, type='{ftype_filter}'")
     print(f"Found {len(tables)} means tables ({sum(1 for t in tables if t['type']=='raw')} raw, {sum(1 for t in tables if t['type']=='z')} z)")
+
+    if not pd.api.types.is_numeric_dtype(meta[adj_var]):
+        cats = sorted(meta[adj_var].unique())
+        mapping = {v: i for i, v in enumerate(cats)}
+        print(f"  Encoding '{adj_var}': {mapping}")
 
     all_rows = []
 
@@ -104,46 +128,65 @@ def run_correlation_analysis(
             feature_cols = [c for c in feature_cols if c.startswith("z_") and c.replace("z_", "") in METRICS_OF_INTEREST]
 
         for col in feature_cols:
-            valid = merged[col].notna() & merged["MOT"].notna() & merged["COG"].notna() & merged["School year"].notna()
+            valid = merged[col].notna() & merged["MOT"].notna() & merged["COG"].notna() & merged[adj_var].notna()
             sub = merged[valid]
             if len(sub) < 10:
                 continue
 
             x = sub[col].values.astype(float)
+            if np.nanvar(x) < 1e-10:
+                continue
             mot = sub["MOT"].values.astype(float)
             cog = sub["COG"].values.astype(float)
-            school_year = sub["School year"].values.astype(float)
+            if not pd.api.types.is_numeric_dtype(sub[adj_var]):
+                cats = sorted(sub[adj_var].unique())
+                mapping = {v: i for i, v in enumerate(cats)}
+                cov_vals = sub[adj_var].map(mapping).values.astype(float)
+            else:
+                cov_vals = sub[adj_var].values.astype(float)
 
-            r_mot, p_mot = spearmanr(x, mot)
-            r_cog, p_cog = spearmanr(x, cog)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                r_mot, p_mot = spearmanr(x, mot)
+                r_cog, p_cog = spearmanr(x, cog)
 
             try:
                 import pingouin as pg
-                partial_df = pd.DataFrame({"feat": x, "target": mot, "cov": school_year})
-                pcorr_mot = pg.partial_corr(
-                    data=partial_df, x="feat", y="target", covar="cov",
-                    method="spearman"
-                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    partial_df = pd.DataFrame({"feat": x, "target": mot, "cov": cov_vals})
+                    pcorr_mot = pg.partial_corr(
+                        data=partial_df, x="feat", y="target", covar="cov",
+                        method="spearman"
+                    )
                 r_partial_mot = pcorr_mot["r"].values[0]
-                p_partial_mot = pcorr_mot["p-val"].values[0]
-            except Exception as e:
+                pval_col = [c for c in pcorr_mot.columns if c.startswith("p")]
+                if not pval_col:
+                    raise KeyError(f"No p-value column found in {list(pcorr_mot.columns)}")
+                p_partial_mot = pcorr_mot[pval_col[0]].values[0]
+            except Exception:
                 r_partial_mot = np.nan
                 p_partial_mot = np.nan
-                print(f"  Warning: partial corr failed for {col} (MOT): {e}")
+                traceback.print_exc()
 
             try:
                 import pingouin as pg
-                partial_df = pd.DataFrame({"feat": x, "target": cog, "cov": school_year})
-                pcorr_cog = pg.partial_corr(
-                    data=partial_df, x="feat", y="target", covar="cov",
-                    method="spearman"
-                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    partial_df = pd.DataFrame({"feat": x, "target": cog, "cov": cov_vals})
+                    pcorr_cog = pg.partial_corr(
+                        data=partial_df, x="feat", y="target", covar="cov",
+                        method="spearman"
+                    )
                 r_partial_cog = pcorr_cog["r"].values[0]
-                p_partial_cog = pcorr_cog["p-val"].values[0]
-            except Exception as e:
+                pval_col = [c for c in pcorr_cog.columns if c.startswith("p")]
+                if not pval_col:
+                    raise KeyError(f"No p-value column found in {list(pcorr_cog.columns)}")
+                p_partial_cog = pcorr_cog[pval_col[0]].values[0]
+            except Exception:
                 r_partial_cog = np.nan
                 p_partial_cog = np.nan
-                print(f"  Warning: partial corr failed for {col} (COG): {e}")
+                traceback.print_exc()
 
             all_rows.append({
                 "feature": col,
@@ -172,7 +215,8 @@ def run_correlation_analysis(
     results["abs_r_COG"] = results["r_COG"].abs()
     results["abs_r_partial_COG"] = results["r_partial_COG"].abs()
 
-    for ftype in ("raw", "z"):
+    ftypes_present = results["type"].unique()
+    for ftype in ftypes_present:
         subset = results[results["type"] == ftype].copy()
 
         for target, col_r in [("MOT", "abs_r_MOT"), ("COG", "abs_r_COG")]:
@@ -208,7 +252,7 @@ def run_correlation_analysis(
 
     try:
         import matplotlib
-        plot_combined_heatmaps(results, output_dir)
+        plot_correlation_heatmaps(results, output_dir, adj_var=adj_var)
     except Exception as e:
         print(f"  Warning: heatmap plotting failed: {e}")
 
@@ -232,15 +276,33 @@ def parse_args() -> argparse.Namespace:
         "--output", default="outputs/06_correlations",
         help="Output directory for results",
     )
+    parser.add_argument(
+        "--task", default="all",
+        help="Comma-separated task numbers to process (e.g. '2,7') or 'all' (default: all)",
+    )
+    parser.add_argument(
+        "--type", default="all", choices=["raw", "z", "all"],
+        help="Feature type: 'raw', 'z', or 'all' (default: all)",
+    )
+    parser.add_argument(
+        "--adj-var", default="School year",
+        help="Column name in metadata for partial correlation adjustment (default: School year)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    tasks = None
+    if args.task.lower() != "all":
+        tasks = [int(t.strip()) for t in args.task.split(",")]
     run_correlation_analysis(
         metrics_dir=args.metrics_dir,
         metadata_path=args.metadata,
         output_dir=args.output,
+        tasks=tasks,
+        ftype_filter=args.type,
+        adj_var=args.adj_var,
     )
 
 
