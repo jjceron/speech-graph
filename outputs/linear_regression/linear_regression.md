@@ -124,10 +124,10 @@ For MOT, the best RidgeCV model by mean $R^2$ is the compact three-feature z-sco
     <figcaption><b>Figure 3.</b> Best COG RidgeCV model: `edges_T2W10 + l3_T6W30 + edges_T7W50 + z_l3_T2W10 + School year`. Observed versus predicted scores (left) and distribution of $R^2$ across 400 Monte Carlo splits (right).</figcaption>
     <div style="display: flex; gap: 10px; justify-content: center;">
       <div style="width: 400px; height: 300px; display: flex; align-items: center; justify-content: center;">
-        <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/obs_vs_pred_COG_mixed.png" alt="Observed versus predicted COG scores" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+        <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/obs_vs_pred_COG_mixed.png" alt="Observed versus predicted COG scores" style="max-width: 50%; max-height: 50%; object-fit: contain;">
       </div>
       <div style="width: 400px; height: 300px; display: flex; align-items: center; justify-content: center;">
-        <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/r2_dist_COG_mixed.png" alt="R² distribution for COG model" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+        <img src="ridgecv_mc/COG_COG_3raw+z1_cov1/figures/r2_dist_COG_mixed.png" alt="R² distribution for COG model" style="max-width: 50%; max-height: 50%; object-fit: contain;">
       </div>
     </div>
   </figure>
