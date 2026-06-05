@@ -131,6 +131,44 @@ def resolve_feature_ids(feat_ids: list[str], all_data: pd.DataFrame) -> pd.DataF
     return result
 
 
+def resolve_mixed_feature_ids(
+    feat_ids: list[str],
+    raw_df: pd.DataFrame,
+    z_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Resolve feature IDs from mixed raw/z sources.
+
+    Feature IDs starting with 'z_' are looked up in the z DataFrame;
+    others are looked up in the raw DataFrame.
+    """
+    series_list = []
+    for fid in feat_ids:
+        feature, task, window = parse_feature_id(fid)
+        is_z = fid.startswith("z_")
+        source = z_df if is_z else raw_df
+        if source.empty:
+            print(f"  Warning: no {('z' if is_z else 'raw')} data loaded for {fid}")
+            continue
+        mask = (source["_task"] == task) & (source["_window"] == window)
+        subset = source[mask]
+        if subset.empty:
+            print(f"  Warning: no data found for {fid} (task={task}, window={window})")
+            continue
+        if feature not in subset.columns:
+            print(f"  Warning: column '{feature}' not found in "
+                  f"{'z' if is_z else 'raw'} tables for {fid}")
+            continue
+        ser = subset.set_index("file")[feature].rename(fid)
+        series_list.append(ser)
+
+    if not series_list:
+        return pd.DataFrame()
+    result = pd.concat(series_list, axis=1)
+    result.index.name = "file"
+    result = result.dropna()
+    return result
+
+
 def build_model_matrix(
     feat_ids: list[str],
     all_data: pd.DataFrame,

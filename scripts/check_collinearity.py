@@ -49,12 +49,51 @@ def compute_vif(df: pd.DataFrame) -> pd.Series:
     return pd.Series(vifs)
 
 
+def resolve_mixed_feature_ids(
+    feat_ids: list[str],
+    raw_df: pd.DataFrame,
+    z_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Resolve feature IDs from mixed raw/z sources.
+
+    Feature IDs starting with 'z_' are looked up in the z DataFrame;
+    others are looked up in the raw DataFrame.
+    """
+    series_list = []
+    for fid in feat_ids:
+        feature, task, window = parse_feature_id(fid)
+        is_z = fid.startswith("z_")
+        source = z_df if is_z else raw_df
+        if source.empty:
+            print(f"  Warning: no {('z' if is_z else 'raw')} data loaded for {fid}")
+            continue
+        mask = (source["_task"] == task) & (source["_window"] == window)
+        subset = source[mask]
+        if subset.empty:
+            print(f"  Warning: no data found for {fid} (task={task}, window={window})")
+            continue
+        if feature not in subset.columns:
+            print(f"  Warning: column '{feature}' not found in "
+                  f"{'z' if is_z else 'raw'} tables for {fid}")
+            continue
+        ser = subset.set_index("file")[feature].rename(fid)
+        series_list.append(ser)
+
+    if not series_list:
+        return pd.DataFrame()
+    result = pd.concat(series_list, axis=1)
+    result.index.name = "file"
+    result = result.dropna()
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Check collinearity among candidate features",
     )
-    parser.add_argument("--type", default="raw", choices=["raw", "z"],
-                        help="Feature type (default: raw)")
+    parser.add_argument("--type", default="all", choices=["raw", "z", "all"],
+                        help="Feature type for --corr-dir mode (default: all; "
+                             "auto per feature when using --feature-list)")
     parser.add_argument("--feature-list", default=None,
                         help="Comma-separated feature identifiers")
     parser.add_argument("--corr-dir", default=None,
@@ -72,28 +111,32 @@ def main() -> None:
     print(f"Loading metadata...")
     meta = load_metadata(args.metadata)
 
-    print(f"Loading {args.type} metric tables...")
-    all_data = load_all_features(Path(args.metrics_dir), meta, ftype_filter=args.type)
-    df_all = all_data.get(args.type)
-    if df_all is None or df_all.empty:
-        print(f"  No {args.type} data loaded. Exiting.")
-        sys.exit(1)
+    print(f"Loading metric tables...")
+    all_data = load_all_features(Path(args.metrics_dir), meta, ftype_filter="all")
+    raw_df = all_data.get("raw", pd.DataFrame())
+    z_df = all_data.get("z", pd.DataFrame())
 
     if args.feature_list is not None:
         feat_ids = [f.strip() for f in args.feature_list.split(",") if f.strip()]
         desc = f"manual ({len(feat_ids)} features)"
+        X = resolve_mixed_feature_ids(feat_ids, raw_df, z_df)
     elif args.corr_dir is not None:
         corr_path = Path(args.corr_dir)
-        feat_ids = load_top_features(corr_path, args.target, args.type, args.top_k)
+        single_type = args.type if args.type != "all" else "raw"
+        feat_ids = load_top_features(corr_path, args.target, single_type, args.top_k)
         if not feat_ids:
             print(f"  No features loaded from {corr_path}. Exiting.")
             sys.exit(1)
         desc = f"top-{len(feat_ids)} from {corr_path.name}"
+        df_all = all_data.get(args.type if args.type != "all" else "raw")
+        if df_all is None or df_all.empty:
+            print(f"  No {args.type} data loaded. Exiting.")
+            sys.exit(1)
+        X = resolve_feature_ids(feat_ids, df_all)
     else:
         print("  Provide --feature-list or --corr-dir.")
         sys.exit(1)
 
-    X = resolve_feature_ids(feat_ids, df_all)
     if X.empty or len(X) < 10:
         print(f"  Only {len(X)} valid subjects. Exiting.")
         sys.exit(1)

@@ -123,21 +123,69 @@ def resolve_feature_ids(feat_ids: list[str], all_data: pd.DataFrame) -> pd.DataF
     return result
 
 
+def resolve_mixed_feature_ids(
+    feat_ids: list[str],
+    raw_df: pd.DataFrame,
+    z_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Resolve feature IDs from mixed raw/z sources.
+
+    Feature IDs starting with 'z_' are looked up in the z DataFrame;
+    others are looked up in the raw DataFrame.
+    """
+    series_list = []
+    for fid in feat_ids:
+        feature, task, window = parse_feature_id(fid)
+        is_z = fid.startswith("z_")
+        source = z_df if is_z else raw_df
+        if source.empty:
+            print(f"  Warning: no {('z' if is_z else 'raw')} data loaded for {fid}")
+            continue
+        mask = (source["_task"] == task) & (source["_window"] == window)
+        subset = source[mask]
+        if subset.empty:
+            print(f"  Warning: no data found for {fid} (task={task}, window={window})")
+            continue
+        if feature not in subset.columns:
+            print(f"  Warning: column '{feature}' not found in "
+                  f"{'z' if is_z else 'raw'} tables for {fid}")
+            continue
+        ser = subset.set_index("file")[feature].rename(fid)
+        series_list.append(ser)
+
+    if not series_list:
+        return pd.DataFrame()
+    result = pd.concat(series_list, axis=1)
+    result.index.name = "file"
+    result = result.dropna()
+    return result
+
+
 def build_model_matrix(
     feat_ids: list[str],
-    all_data: pd.DataFrame,
+    all_data: pd.DataFrame | dict[str, pd.DataFrame],
     target: str,
     covar_cols: list[str] | None = None,
 ) -> pd.DataFrame:
-    X = resolve_feature_ids(feat_ids, all_data)
+    if isinstance(all_data, dict):
+        # Mixed raw+z mode: resolve each feature against its type
+        raw_df = all_data.get("raw", pd.DataFrame())
+        z_df = all_data.get("z", pd.DataFrame())
+        X = resolve_mixed_feature_ids(feat_ids, raw_df, z_df)
+        source_for_target = z_df if not z_df.empty else raw_df
+    else:
+        # Single-type mode
+        X = resolve_feature_ids(feat_ids, all_data)
+        source_for_target = all_data
+
     if X.empty:
         return pd.DataFrame()
 
-    target_ser = all_data.groupby("file")[target].first()
+    target_ser = source_for_target.groupby("file")[target].first()
     X[target] = target_ser
 
     if covar_cols:
-        covar_df = all_data[["file"] + covar_cols].drop_duplicates(subset="file")
+        covar_df = source_for_target[["file"] + covar_cols].drop_duplicates(subset="file")
         covar_df = covar_df.set_index("file")
         X = X.join(covar_df, how="left")
 
@@ -233,10 +281,13 @@ def run_analysis(
     n_iter: int = 400,
     test_size: float = 0.2,
     seed: int = 42,
+    alphas: np.ndarray | None = None,
 ) -> None:
     output_root = Path(output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
 
+    if alphas is None:
+        alphas = ALPHA_GRID
     covar_cols = [c.strip() for c in covar.split(",") if c.strip()] if covar else None
     covar_suffix = f"_cov{len(covar_cols)}" if covar_cols else ""
 
@@ -244,39 +295,28 @@ def run_analysis(
     meta = load_metadata(metadata_path)
 
     print("Loading metric tables...")
-    type_filter = ftype if ftype != "all" else "all"
-    all_data = load_all_features(Path(metrics_dir), meta, ftype_filter=type_filter)
+    all_data = load_all_features(Path(metrics_dir), meta, ftype_filter="all")
+    raw_df = all_data.get("raw", pd.DataFrame())
+    z_df = all_data.get("z", pd.DataFrame())
 
     targets = ["MOT", "COG"] if target == "all" else [target]
     ftypes = ["raw", "z"] if ftype == "all" else [ftype]
 
     summary_rows = []
 
-    for tgt in targets:
-        for ft in ftypes:
+    if feature_list is not None:
+        # Mixed raw+z mode: resolve each feature against its type, run once per target
+        raw_feats = [f.strip() for f in feature_list.split(",") if f.strip()]
+        desc = run_name or f"rcv_manual{len(raw_feats)}"
+        for tgt in targets:
             print(f"\n{'='*60}")
-            print(f"Target: {tgt} | Type: {ft}" +
+            print(f"Target: {tgt} | Mixed features" +
                   (f" | Covariates: {covar_cols}" if covar_cols else ""))
             print(f"{'='*60}")
 
-            df = all_data.get(ft)
-            if df is None or df.empty:
-                print(f"  No {ft} data available. Skipping.")
-                continue
-
-            if feature_list is not None:
-                raw_feats = [f.strip() for f in feature_list.split(",") if f.strip()]
-                desc = run_name or f"rcv_manual{len(raw_feats)}"
-            else:
-                corr_dir_path = Path(corr_dir)
-                raw_feats = load_top_features(corr_dir_path, tgt, ft, top_k)
-                desc = run_name or f"rcv_top{top_k}"
-
-            if not raw_feats:
-                print("  No features loaded. Skipping.")
-                continue
-
-            matrix = build_model_matrix(raw_feats, df, tgt, covar_cols=covar_cols)
+            matrix = build_model_matrix(
+                raw_feats, {"raw": raw_df, "z": z_df}, tgt, covar_cols=covar_cols,
+            )
             if matrix.empty or len(matrix) < 20:
                 print(f"  Only {len(matrix)} valid subjects (< 20). Skipping.")
                 continue
@@ -289,7 +329,7 @@ def run_analysis(
             print(f"  Predictors ({X.shape[1]}): {list(X.columns)}")
 
             result = run_montecarlo_ridge(
-                X, y, n_iter=n_iter, test_size=test_size, random_state=seed
+                X, y, n_iter=n_iter, test_size=test_size, random_state=seed, alphas=alphas,
             )
 
             alpha_mean = np.mean(result["all_alphas"])
@@ -297,7 +337,7 @@ def run_analysis(
             print(f"  RMSE    = {result['rmse_mean']:.4f} +/- {result['rmse_std']:.4f}")
             print(f"  rho     = {result['rho_mean']:.4f} +/- {result['rho_std']:.4f}")
             print(f"  R2 < 0  = {result['r2_below_zero']:.1%} of iterations")
-            print(f"  alpha   = {alpha_mean:.3f} (grid: {ALPHA_GRID[0]:.2f}–{ALPHA_GRID[-1]:.0f})")
+            print(f"  alpha   = {alpha_mean:.3f} (grid: {alphas[0]:.2f}–{alphas[-1]:.0f})")
             print(f"  Top coefficients:")
             for _, row in result["coef_summary"].head(5).iterrows():
                 nz = row["frac_nonzero"]
@@ -305,16 +345,16 @@ def run_analysis(
                       f"{row['std_coef']:.4f} (nonzero in {nz:.0%})")
 
             folder_suffix = covar_suffix
-            run_dir = output_root / f"{tgt}_{desc}_{ft}{folder_suffix}"
+            run_dir = output_root / f"{tgt}_{desc}{folder_suffix}"
             run_dir.mkdir(parents=True, exist_ok=True)
             figs_dir = run_dir / "figures"
             figs_dir.mkdir(parents=True, exist_ok=True)
 
-            tag = f"{tgt}_{ft}"
+            tag = f"{tgt}_mixed"
 
             summary_rows.append({
                 "target": tgt,
-                "feature_type": ft,
+                "feature_type": "mixed",
                 "descriptor": desc,
                 "covariates": covar or "",
                 "n_subjects": len(matrix),
@@ -354,6 +394,106 @@ def run_analysis(
                 plot_all_regression_figures(result, figs_dir, tag)
             except Exception as e:
                 print(f"  Warning: regression plots failed: {e}")
+    else:
+        # Original per-type mode with --corr-dir
+        for tgt in targets:
+            for ft in ftypes:
+                print(f"\n{'='*60}")
+                print(f"Target: {tgt} | Type: {ft}" +
+                      (f" | Covariates: {covar_cols}" if covar_cols else ""))
+                print(f"{'='*60}")
+
+                df = all_data.get(ft)
+                if df is None or df.empty:
+                    print(f"  No {ft} data available. Skipping.")
+                    continue
+
+                corr_dir_path = Path(corr_dir)
+                raw_feats = load_top_features(corr_dir_path, tgt, ft, top_k)
+                desc = run_name or f"rcv_top{top_k}"
+
+                if not raw_feats:
+                    print("  No features loaded. Skipping.")
+                    continue
+
+                matrix = build_model_matrix(raw_feats, df, tgt, covar_cols=covar_cols)
+                if matrix.empty or len(matrix) < 20:
+                    print(f"  Only {len(matrix)} valid subjects (< 20). Skipping.")
+                    continue
+
+                y = matrix[tgt]
+                all_predictors = [c for c in matrix.columns if c not in (tgt, "file")]
+                X = matrix[all_predictors]
+
+                print(f"  Subjects: {len(matrix)}")
+                print(f"  Predictors ({X.shape[1]}): {list(X.columns)}")
+
+                result = run_montecarlo_ridge(
+                    X, y, n_iter=n_iter, test_size=test_size, random_state=seed, alphas=alphas,
+                )
+
+                alpha_mean = np.mean(result["all_alphas"])
+                print(f"\n  R2      = {result['r2_mean']:.4f} +/- {result['r2_std']:.4f}")
+                print(f"  RMSE    = {result['rmse_mean']:.4f} +/- {result['rmse_std']:.4f}")
+                print(f"  rho     = {result['rho_mean']:.4f} +/- {result['rho_std']:.4f}")
+                print(f"  R2 < 0  = {result['r2_below_zero']:.1%} of iterations")
+                print(f"  alpha   = {alpha_mean:.3f} (grid: {alphas[0]:.2f}–{alphas[-1]:.0f})")
+                print(f"  Top coefficients:")
+                for _, row in result["coef_summary"].head(5).iterrows():
+                    nz = row["frac_nonzero"]
+                    print(f"    {row['feature']}: coef={row['mean_coef']:.4f} +/- "
+                          f"{row['std_coef']:.4f} (nonzero in {nz:.0%})")
+
+                folder_suffix = covar_suffix
+                run_dir = output_root / f"{tgt}_{desc}_{ft}{folder_suffix}"
+                run_dir.mkdir(parents=True, exist_ok=True)
+                figs_dir = run_dir / "figures"
+                figs_dir.mkdir(parents=True, exist_ok=True)
+
+                tag = f"{tgt}_{ft}"
+
+                summary_rows.append({
+                    "target": tgt,
+                    "feature_type": ft,
+                    "descriptor": desc,
+                    "covariates": covar or "",
+                    "n_subjects": len(matrix),
+                    "n_predictors": X.shape[1],
+                    "predictors": ", ".join(X.columns),
+                    "n_iter": n_iter,
+                    "test_size": test_size,
+                    "alpha_mean": alpha_mean,
+                    "r2_mean": result["r2_mean"],
+                    "r2_std": result["r2_std"],
+                    "rmse_mean": result["rmse_mean"],
+                    "rmse_std": result["rmse_std"],
+                    "rho_mean": result["rho_mean"],
+                    "rho_std": result["rho_std"],
+                    "frac_r2_below_zero": result["r2_below_zero"],
+                })
+
+                pd.DataFrame([summary_rows[-1]]).to_csv(run_dir / "summary.csv", index=False)
+                result["all_results"].to_csv(run_dir / "iterations.csv", index=False)
+
+                pd.DataFrame({
+                    "y_true": result["y_true_all"],
+                    "y_pred": result["y_pred_all"],
+                }).to_csv(run_dir / "predictions.csv", index=False)
+
+                result["coef_summary"].to_csv(run_dir / "coefficients.csv", index=False)
+
+                alpha_df = pd.DataFrame({
+                    "alpha": result["all_alphas"],
+                })
+                alpha_df.to_csv(run_dir / "alpha_selected.csv", index=False)
+                print(f"  Saved: summary.csv, iterations.csv, predictions.csv, "
+                      f"coefficients.csv, alpha_selected.csv")
+
+                try:
+                    import matplotlib
+                    plot_all_regression_figures(result, figs_dir, tag)
+                except Exception as e:
+                    print(f"  Warning: regression plots failed: {e}")
 
     if len(summary_rows) > 1:
         summary_all = pd.DataFrame(summary_rows)
@@ -456,6 +596,7 @@ def main() -> None:
         n_iter=args.n_iter,
         test_size=args.test_size,
         seed=args.seed,
+        alphas=alphas,
     )
 
 
