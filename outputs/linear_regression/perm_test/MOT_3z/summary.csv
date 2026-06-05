@@ -1,2 +1,2 @@
 target,feature_type,model,n_subjects,n_predictors,features,covariates,n_perm,real_r2,null_mean,null_std,null_ci_2.5,null_ci_97.5,p_value,significant
-MOT,z,RidgeCV,237,3,"z_cc_T2W20, z_l2_T2W10, z_pe_T2W10",,1000,0.017502,-0.032814,0.046791,-0.164503,0.005502,0.011988,True
+MOT,raw,RidgeCV,237,3,"z_cc_T2W20, z_l2_T2W10, z_pe_T2W10",,5000,0.017502,-0.032168,0.047318,-0.162886,0.01319,0.019596,True

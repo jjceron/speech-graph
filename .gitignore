@@ -18,59 +18,40 @@ __pycache__/
 docs/
 
 #### Data files
-# Ignore all data files by default.
 data/**
-
-# Allow Git to traverse the required data folders.
 !data/
 !data/processed/
 !data/processed/metrics/
 !data/processed/metrics/**/
-
-# Track text metric files inside data/processed/metrics at any folder depth.
 !data/processed/metrics/**/*.txt
 
 #### Output files
-# Ignore everything inside outputs by default.
 outputs/**
-
-# Allow Git to traverse outputs and its subfolders.
 !outputs/
 !outputs/**/
 
-# Track Markdown reports inside outputs at any folder depth.
-!outputs/**/*.md
-
-# Keep outputs folder in Git even when no tracked files exist.
 !outputs/.gitkeep
 
-# Selected output files to track
+# Track selected correlation results
 !outputs/correlations/**/**/*.csv
 !outputs/correlations/**/**/*.png
 
-!outputs/linear_regression/**/**/*.csv
+# ols_mc — top 2 per target
+!outputs/linear_regression/ols_mc/COG_2feat_raw/**
+!outputs/linear_regression/ols_mc/COG_3feat_raw/**
+!outputs/linear_regression/ols_mc/MOT_2feat_raw/**
+!outputs/linear_regression/ols_mc/MOT_2feat_z/**
 
-!outputs/linear_regression/ols_mc/COG_2feat_raw/figures/
-!outputs/linear_regression/ols_mc/COG_2feat_raw/figures/*.png
-!outputs/linear_regression/ols_mc/COG_3feat_raw/figures/
-!outputs/linear_regression/ols_mc/COG_3feat_raw/figures/*.png
-!outputs/linear_regression/ols_mc/MOT_2feat_raw/figures/
-!outputs/linear_regression/ols_mc/MOT_2feat_raw/figures/*.png
-!outputs/linear_regression/ols_mc/MOT_2feat_z/figures/
-!outputs/linear_regression/ols_mc/MOT_2feat_z/figures/*.png
+# ridgecv_mc — top 2 per target
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z1_cov1/**
+!outputs/linear_regression/ridgecv_mc/COG_COG_3raw+z3_cov1/**
+!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/**
+!outputs/linear_regression/ridgecv_mc/MOT_MOT_mix/**
 
-!outputs/linear_regression/ridgecv_mc/COG_2feat_raw/figures/
-!outputs/linear_regression/ridgecv_mc/COG_2feat_raw/figures/*.png
-!outputs/linear_regression/ridgecv_mc/COG_3feat_sch_raw_cov1/figures/
-!outputs/linear_regression/ridgecv_mc/COG_3feat_sch_raw_cov1/figures/*.png
-!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/figures/
-!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/figures/*.png
-
-# Track everything inside perm_test
+# perm_test — everything
 !outputs/linear_regression/perm_test/**
-!outputs/linear_regression/perm_test/**/**
 
-# Operating system and editor files
+# OS and editor files
 .DS_Store
 Thumbs.db
 .vscode/

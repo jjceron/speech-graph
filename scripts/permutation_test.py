@@ -26,6 +26,7 @@ from src.analysis.linear_regression_mc import (
     load_top_features,
     load_all_features,
     resolve_feature_ids,
+    resolve_mixed_feature_ids,
     build_model_matrix,
 )
 from src.pipeline.speechgraph import load_metadata
@@ -91,40 +92,54 @@ def main() -> None:
     print(f"  Permutations: {args.n_perm}")
     print()
 
+    has_z = any(fid.startswith("z_") for fid in feat_ids)
+    has_raw = any(not fid.startswith("z_") for fid in feat_ids)
+
     meta = load_metadata(args.metadata)
-    all_data = load_all_features(Path(args.metrics_dir), meta, ftype_filter=args.type)
-    df = all_data.get(args.type)
-    if df is None or df.empty:
-        print(f"  No {args.type} data. Exiting.")
+    all_data = load_all_features(Path(args.metrics_dir), meta, ftype_filter="all")
+    raw_df = all_data.get("raw", pd.DataFrame())
+    z_df = all_data.get("z", pd.DataFrame())
+
+    if has_z and has_raw:
+        X = resolve_mixed_feature_ids(feat_ids, raw_df, z_df)
+        source_for_covar = z_df if not z_df.empty else raw_df
+    else:
+        ftype = "z" if has_z else "raw"
+        df = all_data.get(ftype)
+        if df is None or df.empty:
+            print(f"  No {ftype} data. Exiting.")
+            sys.exit(1)
+        X = resolve_feature_ids(feat_ids, df)
+        source_for_covar = df
+
+    if X.empty or len(X) < 20:
+        print(f"  Only {len(X)} valid subjects. Exiting.")
         sys.exit(1)
 
-    matrix = build_model_matrix(feat_ids, df, args.target)
-    if matrix.empty or len(matrix) < 20:
-        print(f"  Only {len(matrix)} valid subjects. Exiting.")
-        sys.exit(1)
-
-    y = matrix[args.target]
-    cols = [c for c in matrix.columns if c not in (args.target, "file")]
+    y_ser = source_for_covar.groupby("file")[args.target].first()
+    X[args.target] = y_ser
+    X = X.dropna()
+    cols = [c for c in X.columns if c not in (args.target, "file")]
 
     if covar_cols:
-        covar_df = df[["file"] + covar_cols].drop_duplicates(subset="file").set_index("file")
-        matrix = matrix.join(covar_df, on="file", how="left")
+        covar_df = source_for_covar[["file"] + covar_cols].drop_duplicates(subset="file").set_index("file")
+        X = X.join(covar_df, how="left")
         cols = cols + covar_cols
-        matrix = matrix.dropna()
+        X = X.dropna()
 
-    X = matrix[cols]
-    y = matrix[args.target]
+    y = X[args.target]
+    X_feats = X[cols]
 
     print(f"  Subjects: {len(X)}")
     print(f"  Predictors: {len(cols)}")
     print()
 
-    real_r2 = run_regression(X, y, use_ridge=args.ridge)
+    real_r2 = run_regression(X_feats, y, use_ridge=args.ridge)
 
     null_r2s = []
     for i in range(args.n_perm):
         y_shuff = y.sample(frac=1, random_state=args.seed + i).values
-        null_r2 = run_regression(X, y_shuff, use_ridge=args.ridge)
+        null_r2 = run_regression(X_feats, y_shuff, use_ridge=args.ridge)
         null_r2s.append(null_r2)
 
     null_r2s = np.array(null_r2s)
