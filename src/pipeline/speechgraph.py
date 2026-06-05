@@ -147,7 +147,7 @@ def save_activity_text(
     segments: list[list[str]],
     task_num: int,
     subject_code: str,
-    output_dir: str | Path = "data/processed/activities_processed",
+    output_dir: str | Path = "data/processed/tasks",
 ) -> None:
     """Save processed activity text to a file with newlines between segments."""
     out_dir = Path(output_dir) / f"MainText-Task{task_num}-ANSI"
@@ -276,7 +276,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--save-processed-text", action="store_true",
-        help="Save processed activity texts to data/processed/activities_processed/",
+        help="Save processed activity texts to data/processed/tasks/",
     )
     return parser.parse_args()
 
