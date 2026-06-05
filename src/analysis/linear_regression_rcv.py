@@ -1,12 +1,12 @@
-"""Monte Carlo cross-validated linear regression predicting MOT or COG
-from speech-graph features. Supports automatic top-K from a single task's
-correlation output, or manual feature lists spanning multiple tasks and
-windows with user-chosen feature identifiers.
+"""Monte Carlo cross-validated Ridge regression predicting MOT or COG
+from speech-graph features. Supports automatic top-K, manual feature lists,
+and optional covariates. Uses RidgeCV for automatic alpha selection
+within each Monte Carlo split.
 
 Usage:
-    py -m src.analysis.linear_regression_mc --target MOT --type raw --top-k 5 --n-iter 400
-    py -m src.analysis.linear_regression_mc --target MOT --type raw --feature-list "lsc_T7W30,l2_T2W30" --run-name myrun --n-iter 400
-    py -m src.analysis.linear_regression_mc --target all --type all --top-k 5 --n-iter 400
+    py -m src.analysis.linear_regression_rcv --target MOT --type raw --feature-list "lsc_T7W30,l2_T2W30" --n-iter 400
+    py -m src.analysis.linear_regression_rcv --target COG --type raw --feature-list "edges_T2W10,l3_T6W30" --covar "School year" --n-iter 400
+    py -m src.analysis.linear_regression_rcv --target MOT --type raw --corr-dir outputs/correlations/Task7/raw_task7_schoolyear --top-k 10 --n-iter 400
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import RidgeCV
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
@@ -35,18 +35,15 @@ METRICS_OF_INTEREST = [
     "lcc", "lsc", "atd", "density", "diameter", "asp", "cc",
 ]
 
+ALPHA_GRID = np.logspace(-2, 3, 20)
+
 
 def parse_feature_id(fid: str) -> tuple[str, int, str]:
-    """Parse a feature identifier like 'lsc_T7W30'.
-    
-    Returns (feature_name, task_number, window_tag).
-    window_tag is the full window string including the T prefix, e.g. 'T7W30'.
-    """
     m = re.match(r"^(.+)_T(\d+)W(.+)$", fid)
     if not m:
         raise ValueError(
             f"Cannot parse feature identifier: '{fid}'. "
-            f"Expected format like 'lsc_T7W30' (feature_T<task>W<window>)."
+            f"Expected format like 'lsc_T7W30'."
         )
     feature = m.group(1)
     task = int(m.group(2))
@@ -101,11 +98,6 @@ def load_all_features(
 
 
 def resolve_feature_ids(feat_ids: list[str], all_data: pd.DataFrame) -> pd.DataFrame:
-    """Resolve feature identifiers like 'lsc_T7W30' into a subject-level matrix.
-    
-    Returns a DataFrame indexed by subject ID (file) with one column per feature.
-    Rows with any missing value are dropped.
-    """
     series_list = []
     for fid in feat_ids:
         feature, task, window = parse_feature_id(fid)
@@ -133,32 +125,40 @@ def build_model_matrix(
     feat_ids: list[str],
     all_data: pd.DataFrame,
     target: str,
+    covar_cols: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Build a subject-level matrix with features and the target column.
-    
-    Returns a DataFrame with columns: file, <feat_id_1>, ..., <feat_id_n>, target.
-    """
     X = resolve_feature_ids(feat_ids, all_data)
     if X.empty:
         return pd.DataFrame()
 
     target_ser = all_data.groupby("file")[target].first()
     X[target] = target_ser
+
+    if covar_cols:
+        covar_df = all_data[["file"] + covar_cols].drop_duplicates(subset="file")
+        covar_df = covar_df.set_index("file")
+        X = X.join(covar_df, how="left")
+
     result = X.dropna().reset_index()
     return result
 
 
-def run_montecarlo_regression(
+def run_montecarlo_ridge(
     X: pd.DataFrame,
     y: pd.Series,
     n_iter: int = 400,
     test_size: float = 0.2,
     random_state: int = 42,
+    alphas: np.ndarray | None = None,
 ) -> dict:
+    if alphas is None:
+        alphas = ALPHA_GRID
+
     results = []
     all_y_true = []
     all_y_pred = []
     all_coefs = []
+    all_alphas = []
     feature_names = list(X.columns)
 
     for i in range(n_iter):
@@ -167,7 +167,7 @@ def run_montecarlo_regression(
             X, y, test_size=test_size, random_state=seed
         )
 
-        model = LinearRegression()
+        model = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error")
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
@@ -179,8 +179,9 @@ def run_montecarlo_regression(
         all_y_true.extend(y_test)
         all_y_pred.extend(y_pred)
         all_coefs.append(model.coef_)
+        all_alphas.append(model.alpha_)
 
-    df = pd.DataFrame(results)
+    df_results = pd.DataFrame(results)
     coefs = np.array(all_coefs)
 
     n_nonzero = np.sum(np.abs(coefs) > 1e-12, axis=0)
@@ -191,20 +192,28 @@ def run_montecarlo_regression(
         "frac_nonzero": n_nonzero / n_iter,
     }).sort_values("mean_coef", key=abs, ascending=False)
 
+    alpha_summary = pd.DataFrame({
+        "alpha_mean": np.mean(all_alphas),
+        "alpha_std": np.std(all_alphas),
+        "alpha_selected_counts": pd.Series(all_alphas).value_counts().to_dict(),
+    })
+
     return {
-        "r2_mean": df["r2"].mean(),
-        "r2_std": df["r2"].std(),
-        "rmse_mean": df["rmse"].mean(),
-        "rmse_std": df["rmse"].std(),
-        "rho_mean": df["rho"].mean(),
-        "rho_std": df["rho"].std(),
-        "r2_below_zero": (df["r2"] < 0).mean(),
+        "r2_mean": df_results["r2"].mean(),
+        "r2_std": df_results["r2"].std(),
+        "rmse_mean": df_results["rmse"].mean(),
+        "rmse_std": df_results["rmse"].std(),
+        "rho_mean": df_results["rho"].mean(),
+        "rho_std": df_results["rho"].std(),
+        "r2_below_zero": (df_results["r2"] < 0).mean(),
         "n_iter": n_iter,
         "test_size": test_size,
-        "all_results": df,
+        "all_results": df_results,
         "y_true_all": all_y_true,
         "y_pred_all": all_y_pred,
         "coef_summary": coef_summary,
+        "alpha_summary": alpha_summary,
+        "all_alphas": all_alphas,
     }
 
 
@@ -213,6 +222,7 @@ def run_analysis(
     ftype: str = "all",
     feature_list: str | None = None,
     run_name: str | None = None,
+    covar: str | None = None,
     corr_dir: str | Path = "outputs/correlations",
     metrics_dir: str | Path = "data/processed/metrics",
     metadata_path: str | Path = "data/raw/metadata.xlsx",
@@ -224,6 +234,9 @@ def run_analysis(
 ) -> None:
     output_root = Path(output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
+
+    covar_cols = [c.strip() for c in covar.split(",") if c.strip()] if covar else None
+    covar_suffix = f"_cov{len(covar_cols)}" if covar_cols else ""
 
     print("Loading metadata...")
     meta = load_metadata(metadata_path)
@@ -240,7 +253,8 @@ def run_analysis(
     for tgt in targets:
         for ft in ftypes:
             print(f"\n{'='*60}")
-            print(f"Target: {tgt} | Type: {ft}")
+            print(f"Target: {tgt} | Type: {ft}" +
+                  (f" | Covariates: {covar_cols}" if covar_cols else ""))
             print(f"{'='*60}")
 
             df = all_data.get(ft)
@@ -250,42 +264,46 @@ def run_analysis(
 
             if feature_list is not None:
                 raw_feats = [f.strip() for f in feature_list.split(",") if f.strip()]
-                desc = run_name or f"manual{len(raw_feats)}"
+                desc = run_name or f"rcv_manual{len(raw_feats)}"
             else:
                 corr_dir_path = Path(corr_dir)
                 raw_feats = load_top_features(corr_dir_path, tgt, ft, top_k)
-                desc = run_name or f"top{top_k}"
+                desc = run_name or f"rcv_top{top_k}"
 
             if not raw_feats:
                 print("  No features loaded. Skipping.")
                 continue
 
-            matrix = build_model_matrix(raw_feats, df, tgt)
+            matrix = build_model_matrix(raw_feats, df, tgt, covar_cols=covar_cols)
             if matrix.empty or len(matrix) < 20:
                 print(f"  Only {len(matrix)} valid subjects (< 20). Skipping.")
                 continue
 
-            # 'file' column comes from build_model_matrix
             y = matrix[tgt]
-            X = matrix.drop(columns=[tgt, "file"])
+            all_predictors = [c for c in matrix.columns if c not in (tgt, "file")]
+            X = matrix[all_predictors]
 
             print(f"  Subjects: {len(matrix)}")
-            print(f"  Features ({X.shape[1]}): {list(X.columns)}")
+            print(f"  Predictors ({X.shape[1]}): {list(X.columns)}")
 
-            result = run_montecarlo_regression(
+            result = run_montecarlo_ridge(
                 X, y, n_iter=n_iter, test_size=test_size, random_state=seed
             )
 
-            print(f"  R2   = {result['r2_mean']:.4f} +/- {result['r2_std']:.4f}")
-            print(f"  RMSE = {result['rmse_mean']:.4f} +/- {result['rmse_std']:.4f}")
-            print(f"  rho  = {result['rho_mean']:.4f} +/- {result['rho_std']:.4f}")
-            print(f"  R2 < 0: {result['r2_below_zero']:.1%} of iterations")
+            alpha_mean = np.mean(result["all_alphas"])
+            print(f"\n  R2      = {result['r2_mean']:.4f} +/- {result['r2_std']:.4f}")
+            print(f"  RMSE    = {result['rmse_mean']:.4f} +/- {result['rmse_std']:.4f}")
+            print(f"  rho     = {result['rho_mean']:.4f} +/- {result['rho_std']:.4f}")
+            print(f"  R2 < 0  = {result['r2_below_zero']:.1%} of iterations")
+            print(f"  alpha   = {alpha_mean:.3f} (grid: {ALPHA_GRID[0]:.2f}–{ALPHA_GRID[-1]:.0f})")
             print(f"  Top coefficients:")
             for _, row in result["coef_summary"].head(5).iterrows():
-                print(f"    {row['feature']}: coef={row['mean_coef']:.4f} +/- {row['std_coef']:.4f} "
-                      f"(nonzero in {row['frac_nonzero']:.0%})")
+                nz = row["frac_nonzero"]
+                print(f"    {row['feature']}: coef={row['mean_coef']:.4f} +/- "
+                      f"{row['std_coef']:.4f} (nonzero in {nz:.0%})")
 
-            run_dir = output_root / f"{tgt}_{desc}_{ft}"
+            folder_suffix = covar_suffix
+            run_dir = output_root / f"{tgt}_{desc}_{ft}{folder_suffix}"
             run_dir.mkdir(parents=True, exist_ok=True)
             figs_dir = run_dir / "figures"
             figs_dir.mkdir(parents=True, exist_ok=True)
@@ -296,11 +314,13 @@ def run_analysis(
                 "target": tgt,
                 "feature_type": ft,
                 "descriptor": desc,
+                "covariates": covar or "",
                 "n_subjects": len(matrix),
-                "n_features": X.shape[1],
-                "features": ", ".join(X.columns),
+                "n_predictors": X.shape[1],
+                "predictors": ", ".join(X.columns),
                 "n_iter": n_iter,
                 "test_size": test_size,
+                "alpha_mean": alpha_mean,
                 "r2_mean": result["r2_mean"],
                 "r2_std": result["r2_std"],
                 "rmse_mean": result["rmse_mean"],
@@ -310,25 +330,22 @@ def run_analysis(
                 "frac_r2_below_zero": result["r2_below_zero"],
             })
 
-            summary_path = run_dir / "summary.csv"
-            pd.DataFrame([summary_rows[-1]]).to_csv(summary_path, index=False)
-            print(f"  Saved: {summary_path.name}")
+            pd.DataFrame([summary_rows[-1]]).to_csv(run_dir / "summary.csv", index=False)
+            result["all_results"].to_csv(run_dir / "iterations.csv", index=False)
 
-            iter_path = run_dir / "iterations.csv"
-            result["all_results"].to_csv(iter_path, index=False)
-            print(f"  Saved: {iter_path.name}")
-
-            pred_df = pd.DataFrame({
+            pd.DataFrame({
                 "y_true": result["y_true_all"],
                 "y_pred": result["y_pred_all"],
-            })
-            pred_path = run_dir / "predictions.csv"
-            pred_df.to_csv(pred_path, index=False)
-            print(f"  Saved: {pred_path.name}")
+            }).to_csv(run_dir / "predictions.csv", index=False)
 
-            coef_path = run_dir / "coefficients.csv"
-            result["coef_summary"].to_csv(coef_path, index=False)
-            print(f"  Saved: {coef_path.name}")
+            result["coef_summary"].to_csv(run_dir / "coefficients.csv", index=False)
+
+            alpha_df = pd.DataFrame({
+                "alpha": result["all_alphas"],
+            })
+            alpha_df.to_csv(run_dir / "alpha_selected.csv", index=False)
+            print(f"  Saved: summary.csv, iterations.csv, predictions.csv, "
+                  f"coefficients.csv, alpha_selected.csv")
 
             try:
                 import matplotlib
@@ -343,16 +360,16 @@ def run_analysis(
         print(f"\nMulti-run summary saved: {summary_all_path.name}")
         print(summary_all.round(4).to_string(index=False))
 
-    print("\nDone. Regression analysis complete.")
+    print("\nDone. Ridge regression analysis complete.")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Monte Carlo cross-validated linear regression predicting "
+            "Monte Carlo cross-validated Ridge regression predicting "
             "MOT or COG from speech-graph features."
         ),
-        prog="python -m src.analysis.linear_regression_mc",
+        prog="python -m src.analysis.linear_regression_rcv",
     )
     parser.add_argument(
         "--target", default="all", choices=["MOT", "COG", "all"],
@@ -364,46 +381,37 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--feature-list", default=None,
-        help=(
-            "Comma-separated feature identifiers for manual feature selection, "
-            "e.g. 'lsc_T7W30,cc_T7W40,l2_T2W30'. When provided, --corr-dir "
-            "and --top-k are ignored."
-        ),
+        help="Comma-separated feature identifiers, e.g. 'lsc_T7W30,l2_T2W30'",
     )
     parser.add_argument(
         "--run-name", default=None,
-        help=(
-            "Custom name for the output subfolder. When using --feature-list, "
-            "the folder becomes {target}_{name}_{type}. If omitted, defaults to "
-            "'manual{N}' where N is the number of features."
-        ),
+        help="Custom name for output subfolder. Default: rcv_manual{N} or rcv_top{K}",
+    )
+    parser.add_argument(
+        "--covar", default=None,
+        help="Comma-separated covariate column names from metadata, "
+             "e.g. 'School year' or 'School year,Age'",
     )
     parser.add_argument(
         "--corr-dir", default="outputs/correlations",
-        help=(
-            "Directory with top feature CSVs from correlation_analysis.py. "
-            "Only used when --feature-list is not provided (default: "
-            "outputs/correlations)"
-        ),
+        help="Directory with top feature CSVs from correlation_analysis.py. "
+             "Only used without --feature-list.",
     )
     parser.add_argument(
         "--metrics-dir", default="data/processed/metrics",
-        help="Directory with metrics tables (default: data/processed/metrics)",
+        help="Directory with metrics tables",
     )
     parser.add_argument(
         "--metadata", default="data/raw/metadata.xlsx",
-        help="Path to metadata Excel file (default: data/raw/metadata.xlsx)",
+        help="Path to metadata Excel file",
     )
     parser.add_argument(
-        "--output", default="outputs/linear_regression/ols_mc",
-        help="Root output directory (default: outputs/linear_regression/ols_mc)",
+        "--output", default="outputs/linear_regression/ridgecv_mc",
+        help="Root output directory (default: outputs/linear_regression/ridgecv_mc)",
     )
     parser.add_argument(
         "--top-k", type=int, default=5,
-        help=(
-            "Number of top features to use from --corr-dir. "
-            "Only used when --feature-list is not provided (default: 5)"
-        ),
+        help="Number of top features to use from --corr-dir (default: 5)",
     )
     parser.add_argument(
         "--n-iter", type=int, default=400,
@@ -417,16 +425,27 @@ def parse_args() -> argparse.Namespace:
         "--seed", type=int, default=42,
         help="Base random seed (default: 42)",
     )
+    parser.add_argument(
+        "--alphas", type=str, default=None,
+        help="Comma-separated alpha grid, e.g. '0.01,0.1,1,10,100'. "
+             "Default: logspace(-2, 3, 20)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.alphas is not None:
+        alphas = np.array([float(a.strip()) for a in args.alphas.split(",")])
+    else:
+        alphas = ALPHA_GRID
+
     run_analysis(
         target=args.target,
         ftype=args.type,
         feature_list=args.feature_list,
         run_name=args.run_name,
+        covar=args.covar,
         corr_dir=args.corr_dir,
         metrics_dir=args.metrics_dir,
         metadata_path=args.metadata,

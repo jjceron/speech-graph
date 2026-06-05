@@ -47,7 +47,26 @@ outputs/**
 # Selected output files to track
 !outputs/correlations/**/**/*.csv
 !outputs/correlations/**/**/*.png
-!outputs/linear_regression/**/*.csv
+
+!outputs/linear_regression/**/**/*.csv
+
+!outputs/linear_regression/ols_mc/COG_2feat_raw/figures/
+!outputs/linear_regression/ols_mc/COG_2feat_raw/figures/*.png
+!outputs/linear_regression/ols_mc/COG_3feat_raw/figures/
+!outputs/linear_regression/ols_mc/COG_3feat_raw/figures/*.png
+!outputs/linear_regression/ols_mc/MOT_2feat_raw/figures/
+!outputs/linear_regression/ols_mc/MOT_2feat_raw/figures/*.png
+!outputs/linear_regression/ols_mc/MOT_2feat_z/figures/
+!outputs/linear_regression/ols_mc/MOT_2feat_z/figures/*.png
+
+!outputs/linear_regression/ridgecv_mc/COG_2feat_raw/figures/
+!outputs/linear_regression/ridgecv_mc/COG_2feat_raw/figures/*.png
+!outputs/linear_regression/ridgecv_mc/COG_3feat_sch_raw_cov1/figures/
+!outputs/linear_regression/ridgecv_mc/COG_3feat_sch_raw_cov1/figures/*.png
+!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/figures/
+!outputs/linear_regression/ridgecv_mc/MOT_3feat_z/figures/*.png
+
+!outputs/linear_regression/ridgecv_mc/**/*.csv
 
 # Operating system and editor files
 .DS_Store
