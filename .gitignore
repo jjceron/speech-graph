@@ -44,19 +44,9 @@ outputs/**
 # Keep outputs folder in Git even when no tracked files exist.
 !outputs/.gitkeep
 
-# Selected output figures from run 01
-!outputs/01_run/figures/analysis/*.png
-!outputs/01_run/figures/models/r2_heatmap_*.png
-!outputs/01_run/figures/models/r2_best_by_target.png
-!outputs/01_run/figures/interpretability/feature_relevance_by_schooling_*.png
-!outputs/01_run/figures/interpretability/feature_relevance_population_*.png
-
-# Selected output figures from run 02
-!outputs/02_run/figures/analysis/top_partial_correlations_*.png
-!outputs/02_run/figures/models/mc_best_mean_r2_by_target_model_set.png
-!outputs/02_run/figures/models/mc_model_comparison_*.png
-!outputs/02_run/figures/shap/shap_top_*_school_year_plus_nlp.png
-!outputs/02_run/figures/shap/shap_top_*_nlp_only.png
+# Selected output files to track
+!outputs/correlations/**/**/*.csv
+!outputs/correlations/**/**/*.png
 
 # Operating system and editor files
 .DS_Store

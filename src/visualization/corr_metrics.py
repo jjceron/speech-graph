@@ -80,6 +80,7 @@ def _build_heatmap_data(
 def plot_correlation_heatmaps(
     results: pd.DataFrame,
     output_dir: str | Path,
+    adj_var: str = "School year",
     figsize: tuple[float, float] = (14, 10),
     dpi: int = 150,
 ) -> None:
@@ -98,6 +99,8 @@ def plot_correlation_heatmaps(
 
             vmax = max(matrix.abs().max().max(), 1e-8)
 
+            title = f"Simple Spearman correlations — {label}" if corr_type == "simple" else f"Partial Spearman correlations (controlling {adj_var}) — {label}"
+
             fig, ax = plt.subplots(figsize=figsize)
             sns.heatmap(
                 matrix, annot=True, fmt=".3f", cmap=cmap,
@@ -105,7 +108,7 @@ def plot_correlation_heatmaps(
                 linewidths=0.5, linecolor="white",
                 ax=ax, cbar_kws={"label": "Spearman rho"},
             )
-            ax.set_title(f"{corr_label} Spearman correlations — {label}", fontsize=14)
+            ax.set_title(title, fontsize=14)
             ax.set_xlabel("Target / Task-Window")
             ax.set_ylabel("Feature")
             plt.xticks(rotation=45, ha="right")

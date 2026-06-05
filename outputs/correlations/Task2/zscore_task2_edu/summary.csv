@@ -1,0 +1,2 @@
+type,n_features,mean_abs_r_MOT,mean_abs_partial_MOT,mean_abs_r_COG,mean_abs_partial_COG
+z,22,0.0783,0.0784,0.0655,0.0625
