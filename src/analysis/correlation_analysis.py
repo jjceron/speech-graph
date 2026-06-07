@@ -1,13 +1,12 @@
 """Correlation analysis: simple and partial Spearman correlations
-between speech-graph features (raw and/or z-scores) and Barratt MOT/COG,
-controlling for School year.
+between speech-graph features and Barratt impulsivity targets.
+
+Targets: MOT, COG, MOT_V4 (items 8+13+16+21+23), COG_V1 (items 3+6).
 
 Usage:
-    py -m src.analysis.correlation_analysis --output outputs/06_correlations
-    py -m src.analysis.correlation_analysis --task 2 --type raw --output outputs/06_correlations/T2_raw
-    py -m src.analysis.correlation_analysis --task 2,7 --type z --output outputs/06_correlations/T27_z
-    py -m src.analysis.correlation_analysis --task 2 --type raw --adj-var "School year" --output outputs/correlations/T2_raw
-    py -m src.analysis.correlation_analysis --task 7 --type z --adj-var "Age" --output outputs/correlations/T7_z_age
+    py -m src.analysis.correlation_analysis --task 2 --type raw --adj-var "School year"
+    py -m src.analysis.correlation_analysis --task 2 --type raw --window T2W10 --adj-var "School year"
+    py -m src.analysis.correlation_analysis --task 7 --type z --adj-var "Age"
 """
 
 from __future__ import annotations
@@ -32,6 +31,12 @@ METRICS_OF_INTEREST = [
     "nodes", "edges", "re", "pe", "l1", "l2", "l3",
     "lcc", "lsc", "atd", "density", "diameter", "asp", "cc",
 ]
+
+# New targets derived from BIS-11 items
+ITEM = {
+    "MOT_V4": ["8.", "13.", "16.", "21.", "23."],
+    "COG_V1": ["3.", "6."],
+}
 
 
 def find_means_tables(metrics_dir: Path, tasks: list[int] | None = None) -> list[dict]:
@@ -77,6 +82,14 @@ def load_feature_table(
     return df
 
 
+def _compute_targets(meta: pd.DataFrame) -> pd.DataFrame:
+    """Add MOT_V4 and COG_V1 columns to metadata."""
+    meta = meta.copy()
+    meta["MOT_V4"] = meta[ITEM["MOT_V4"]].sum(axis=1)
+    meta["COG_V1"] = meta[ITEM["COG_V1"]].sum(axis=1)
+    return meta
+
+
 def run_correlation_analysis(
     metrics_dir: str | Path = "data/processed/metrics",
     metadata_path: str | Path = "data/raw/metadata.xlsx",
@@ -84,11 +97,17 @@ def run_correlation_analysis(
     tasks: list[int] | None = None,
     ftype_filter: str = "all",
     adj_var: str = "School year",
+    window: str | None = None,
 ) -> None:
+    TARGETS = ["MOT", "COG", "MOT_V4", "COG_V1"]
+    PARTIAL_COLS = [f"r_partial_{t}" for t in TARGETS] + [f"p_partial_{t}" for t in TARGETS]
+    SIMPLE_COLS = [f"r_{t}" for t in TARGETS] + [f"p_{t}" for t in TARGETS]
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     meta = load_metadata(metadata_path)
+    meta = _compute_targets(meta)
 
     tables = find_means_tables(Path(metrics_dir), tasks=tasks)
     if not tables:
@@ -101,9 +120,20 @@ def run_correlation_analysis(
             print(f"No tables found for type '{ftype_filter}'.")
             return
 
+    if window is not None:
+        tables = [t for t in tables if t["tag"] == window]
+        if not tables:
+            print(f"No tables found for window '{window}'.")
+            return
+
     task_str = f"tasks {tasks}" if tasks else "all tasks"
-    print(f"Processing: {task_str}, type='{ftype_filter}'")
+    window_str = f", window='{window}'" if window else ""
+    print(f"Processing: {task_str}, type='{ftype_filter}'{window_str}")
     print(f"Found {len(tables)} means tables ({sum(1 for t in tables if t['type']=='raw')} raw, {sum(1 for t in tables if t['type']=='z')} z)")
+
+    print(f"Targets: {TARGETS}")
+    print(f"  MOT_V4 = {' + '.join(ITEM['MOT_V4'])}")
+    print(f"  COG_V1 = {' + '.join(ITEM['COG_V1'])}")
 
     if not pd.api.types.is_numeric_dtype(meta[adj_var]):
         cats = sorted(meta[adj_var].unique())
@@ -128,7 +158,10 @@ def run_correlation_analysis(
             feature_cols = [c for c in feature_cols if c.startswith("z_") and c.replace("z_", "") in METRICS_OF_INTEREST]
 
         for col in feature_cols:
-            valid = merged[col].notna() & merged["MOT"].notna() & merged["COG"].notna() & merged[adj_var].notna()
+            valid = merged[col].notna()
+            for tgt in TARGETS:
+                valid = valid & merged[tgt].notna()
+            valid = valid & merged[adj_var].notna()
             sub = merged[valid]
             if len(sub) < 10:
                 continue
@@ -136,8 +169,7 @@ def run_correlation_analysis(
             x = sub[col].values.astype(float)
             if np.nanvar(x) < 1e-10:
                 continue
-            mot = sub["MOT"].values.astype(float)
-            cog = sub["COG"].values.astype(float)
+
             if not pd.api.types.is_numeric_dtype(sub[adj_var]):
                 cats = sorted(sub[adj_var].unique())
                 mapping = {v: i for i, v in enumerate(cats)}
@@ -145,64 +177,44 @@ def run_correlation_analysis(
             else:
                 cov_vals = sub[adj_var].values.astype(float)
 
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                r_mot, p_mot = spearmanr(x, mot)
-                r_cog, p_cog = spearmanr(x, cog)
-
-            try:
-                import pingouin as pg
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    partial_df = pd.DataFrame({"feat": x, "target": mot, "cov": cov_vals})
-                    pcorr_mot = pg.partial_corr(
-                        data=partial_df, x="feat", y="target", covar="cov",
-                        method="spearman"
-                    )
-                r_partial_mot = pcorr_mot["r"].values[0]
-                pval_col = [c for c in pcorr_mot.columns if c.startswith("p")]
-                if not pval_col:
-                    raise KeyError(f"No p-value column found in {list(pcorr_mot.columns)}")
-                p_partial_mot = pcorr_mot[pval_col[0]].values[0]
-            except Exception:
-                r_partial_mot = np.nan
-                p_partial_mot = np.nan
-                traceback.print_exc()
-
-            try:
-                import pingouin as pg
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    partial_df = pd.DataFrame({"feat": x, "target": cog, "cov": cov_vals})
-                    pcorr_cog = pg.partial_corr(
-                        data=partial_df, x="feat", y="target", covar="cov",
-                        method="spearman"
-                    )
-                r_partial_cog = pcorr_cog["r"].values[0]
-                pval_col = [c for c in pcorr_cog.columns if c.startswith("p")]
-                if not pval_col:
-                    raise KeyError(f"No p-value column found in {list(pcorr_cog.columns)}")
-                p_partial_cog = pcorr_cog[pval_col[0]].values[0]
-            except Exception:
-                r_partial_cog = np.nan
-                p_partial_cog = np.nan
-                traceback.print_exc()
-
-            all_rows.append({
+            row = {
                 "feature": col,
                 "type": ftype,
                 "task": task,
                 "window_tag": tag,
                 "n": len(sub),
-                "r_MOT": r_mot,
-                "p_MOT": p_mot,
-                "r_partial_MOT": r_partial_mot,
-                "p_partial_MOT": p_partial_mot,
-                "r_COG": r_cog,
-                "p_COG": p_cog,
-                "r_partial_COG": r_partial_cog,
-                "p_partial_COG": p_partial_cog,
-            })
+            }
+
+            for tgt in TARGETS:
+                y = sub[tgt].values.astype(float)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    r_val, p_val = spearmanr(x, y)
+                row[f"r_{tgt}"] = r_val
+                row[f"p_{tgt}"] = p_val
+
+                try:
+                    import pingouin as pg
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        partial_df = pd.DataFrame({"feat": x, "target": y, "cov": cov_vals})
+                        pcorr = pg.partial_corr(
+                            data=partial_df, x="feat", y="target", covar="cov",
+                            method="spearman"
+                        )
+                    rp = pcorr["r"].values[0]
+                    pval_col = [c for c in pcorr.columns if c.startswith("p")]
+                    if not pval_col:
+                        raise KeyError(f"No p-value column found in {list(pcorr.columns)}")
+                    pp = pcorr[pval_col[0]].values[0]
+                except Exception:
+                    rp = np.nan
+                    pp = np.nan
+
+                row[f"r_partial_{tgt}"] = rp
+                row[f"p_partial_{tgt}"] = pp
+
+            all_rows.append(row)
 
     if not all_rows:
         print("No correlations computed.")
@@ -210,23 +222,25 @@ def run_correlation_analysis(
 
     results = pd.DataFrame(all_rows)
 
-    results["abs_r_MOT"] = results["r_MOT"].abs()
-    results["abs_r_partial_MOT"] = results["r_partial_MOT"].abs()
-    results["abs_r_COG"] = results["r_COG"].abs()
-    results["abs_r_partial_COG"] = results["r_partial_COG"].abs()
+    # Absolute value columns for ranking
+    for tgt in TARGETS:
+        results[f"abs_r_{tgt}"] = results[f"r_{tgt}"].abs()
+        results[f"abs_r_partial_{tgt}"] = results[f"r_partial_{tgt}"].abs()
 
     ftypes_present = results["type"].unique()
     for ftype in ftypes_present:
         subset = results[results["type"] == ftype].copy()
 
-        for target, col_r in [("MOT", "abs_r_MOT"), ("COG", "abs_r_COG")]:
+        for target in TARGETS:
+            col_r = f"abs_r_{target}"
             top = subset.sort_values(col_r, ascending=False).head(30)
             clean = top.drop(columns=[c for c in top.columns if c.startswith("abs_")])
             out_path = output_dir / f"top_simple_{target}_{ftype}.csv"
             clean.to_csv(out_path, index=False)
             print(f"  Saved: {out_path.name}")
 
-        for target, col_r in [("MOT", "abs_r_partial_MOT"), ("COG", "abs_r_partial_COG")]:
+        for target in TARGETS:
+            col_r = f"abs_r_partial_{target}"
             top = subset.sort_values(col_r, ascending=False).head(30)
             clean = top.drop(columns=[c for c in top.columns if c.startswith("abs_")])
             out_path = output_dir / f"top_partial_{target}_{ftype}.csv"
@@ -238,13 +252,11 @@ def run_correlation_analysis(
     print(f"  Saved: {full_path.name} ({len(results)} rows)")
 
     print()
-    summary = results.groupby("type").agg(
-        n_features=("feature", "count"),
-        mean_abs_r_MOT=("r_MOT", lambda x: x.abs().mean()),
-        mean_abs_partial_MOT=("r_partial_MOT", lambda x: x.dropna().abs().mean()),
-        mean_abs_r_COG=("r_COG", lambda x: x.abs().mean()),
-        mean_abs_partial_COG=("r_partial_COG", lambda x: x.dropna().abs().mean()),
-    ).round(4)
+    agg = {}
+    for tgt in TARGETS:
+        agg[f"mean_abs_r_{tgt}"] = (f"r_{tgt}", lambda x: x.abs().mean())
+        agg[f"mean_abs_partial_{tgt}"] = (f"r_partial_{tgt}", lambda x: x.dropna().abs().mean())
+    summary = results.groupby("type").agg(**{k: v for k, v in agg.items()}).round(4)
     print(summary.to_string())
     summary_path = output_dir / "summary.csv"
     summary.to_csv(summary_path)
@@ -252,7 +264,7 @@ def run_correlation_analysis(
 
     try:
         import matplotlib
-        plot_correlation_heatmaps(results, output_dir, adj_var=adj_var)
+        plot_correlation_heatmaps(results, output_dir, adj_var=adj_var, window=window)
     except Exception as e:
         print(f"  Warning: heatmap plotting failed: {e}")
 
@@ -261,7 +273,7 @@ def run_correlation_analysis(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Simple and partial Spearman correlations between speech-graph features and Barratt MOT/COG",
+        description="Simple and partial Spearman correlations between speech-graph features and Barratt targets (MOT, COG, MOT_V4, COG_V1)",
         prog="python -m src.analysis.correlation_analysis",
     )
     parser.add_argument(
@@ -273,16 +285,20 @@ def parse_args() -> argparse.Namespace:
         help="Path to metadata Excel file",
     )
     parser.add_argument(
-        "--output", default="outputs/06_correlations",
-        help="Output directory for results",
+        "--output", default=None,
+        help="Output directory (default: auto-generated from task/type/window)",
     )
     parser.add_argument(
         "--task", default="all",
-        help="Comma-separated task numbers to process (e.g. '2,7') or 'all' (default: all)",
+        help="Comma-separated task numbers (e.g. '2,7') or 'all' (default: all)",
     )
     parser.add_argument(
         "--type", default="all", choices=["raw", "z", "all"],
         help="Feature type: 'raw', 'z', or 'all' (default: all)",
+    )
+    parser.add_argument(
+        "--window", default=None,
+        help="Specific window tag (e.g. T2W10). When set, output goes to outputs/correlations/Task{N}/{window}_{type}/",
     )
     parser.add_argument(
         "--adj-var", default="School year",
@@ -296,13 +312,27 @@ def main() -> None:
     tasks = None
     if args.task.lower() != "all":
         tasks = [int(t.strip()) for t in args.task.split(",")]
+
+    output_dir = args.output
+    if output_dir is None:
+        task_str = args.task if args.task.lower() != "all" else "all"
+        type_str = args.type if args.type != "all" else "mixed"
+        if args.window:
+            win = args.window
+            task_num = win[1:win.index("W")]
+            output_dir = f"outputs/correlations/Task{task_num}/{win}_{type_str}"
+        else:
+            output_dir = f"outputs/correlations/task{task_str}_{type_str}"
+        print(f"Auto output: {output_dir}")
+
     run_correlation_analysis(
         metrics_dir=args.metrics_dir,
         metadata_path=args.metadata,
-        output_dir=args.output,
+        output_dir=output_dir,
         tasks=tasks,
         ftype_filter=args.type,
         adj_var=args.adj_var,
+        window=args.window,
     )
 
 
