@@ -1,7 +1,7 @@
 """Plotting utilities for Monte Carlo linear regression results.
 
 Called from linear_regression_mc.py to produce:
-  - R² distribution across MC iterations
+  - R2 distribution across MC iterations
   - RMSE distribution across MC iterations
   - Observed vs predicted scatter plot
 """
@@ -27,9 +27,9 @@ def plot_r2_distribution(
     ax.axvline(results_df["r2"].mean(), color="crimson", linestyle="--", linewidth=2,
                label=f"Mean = {results_df['r2'].mean():.4f}")
     ax.axvline(0, color="gray", linestyle=":", linewidth=1, alpha=0.7)
-    ax.set_xlabel("R²")
+    ax.set_xlabel("R2")
     ax.set_ylabel("Iterations")
-    ax.set_title(f"R² distribution — {tag}", fontsize=13)
+    ax.set_title(f"R2 distribution — {tag}", fontsize=13)
     ax.legend(fontsize=10)
     ax.grid(axis="y", alpha=0.3)
     plt.tight_layout()
@@ -133,8 +133,22 @@ def plot_all_regression_figures(
     result: dict,
     output_dir: str | Path,
     tag: str,
+    has_val: bool = False,
 ) -> None:
-    plot_r2_distribution(result["all_results"], output_dir, tag)
-    plot_rmse_distribution(result["all_results"], output_dir, tag)
-    plot_rho_distribution(result["all_results"], output_dir, tag)
-    plot_observed_vs_predicted(result["y_true_all"], result["y_pred_all"], output_dir, tag)
+    if has_val:
+        for set_name in ("val", "test"):
+            tag_set = f"{tag}_{set_name}"
+            df_key = f"all_results_{set_name}"
+            yt_key = f"y_true_{set_name}"
+            yp_key = f"y_pred_{set_name}"
+            if df_key in result:
+                plot_r2_distribution(result[df_key], output_dir, tag_set)
+                plot_rmse_distribution(result[df_key], output_dir, tag_set)
+                plot_rho_distribution(result[df_key], output_dir, tag_set)
+            if yt_key in result and yp_key in result:
+                plot_observed_vs_predicted(result[yt_key], result[yp_key], output_dir, tag_set)
+    else:
+        plot_r2_distribution(result["all_results"], output_dir, tag)
+        plot_rmse_distribution(result["all_results"], output_dir, tag)
+        plot_rho_distribution(result["all_results"], output_dir, tag)
+        plot_observed_vs_predicted(result["y_true_all"], result["y_pred_all"], output_dir, tag)
