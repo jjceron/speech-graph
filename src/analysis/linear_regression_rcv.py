@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import warnings
 import sys
 from pathlib import Path
 
@@ -28,6 +29,8 @@ from scipy.stats import spearmanr
 from sklearn.linear_model import RidgeCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -284,8 +287,13 @@ def run_mmcv_ridge(
     y: pd.Series,
     splits: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     alphas: np.ndarray | None = None,
+    top_k: int | None = None,
 ) -> dict:
-    """Run MMCV Ridge regression with pre-computed splits. Reports VAL and TEST metrics."""
+    """Run MMCV Ridge regression with pre-computed splits.
+    
+    If top_k is set, selects top-K features by |Spearman r| on the training
+    set of EACH split (within-CV selection, no data leakage).
+    """
     if alphas is None:
         alphas = ALPHA_GRID
 
@@ -296,27 +304,46 @@ def run_mmcv_ridge(
     test_results = []
     val_y_true_all, val_y_pred_all = [], []
     test_y_true_all, test_y_pred_all = [], []
-    all_coefs = []
+    subjects_val, subjects_test = [], []
+    split_ids_val, split_ids_test = [], []
     all_alphas = []
-    all_split_ids = []
+    coef_tracker: dict[str, list[float]] = {}
 
     for i, (train_idx, val_idx, test_idx) in enumerate(splits):
         X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
         X_val, y_val = X.iloc[val_idx], y.iloc[val_idx]
         X_test, y_test = X.iloc[test_idx], y.iloc[test_idx]
 
-        model = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error")
-        model.fit(X_train, y_train)
+        # Within-CV feature selection: compute |Spearman r| on train only
+        if top_k is not None and top_k < len(feature_names):
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=sp_stats.ConstantInputWarning)
+                train_r = X_train.apply(
+                    lambda col: abs(spearmanr(col, y_train)[0])
+                ).dropna()
+            current_feats = train_r.sort_values(ascending=False).head(top_k).index.tolist()
+        else:
+            current_feats = feature_names
+
+        X_train_k = X_train[current_feats]
+        X_val_k = X_val[current_feats]
+        X_test_k = X_test[current_feats]
+
+        model = make_pipeline(
+            StandardScaler(),
+            RidgeCV(alphas=alphas, scoring="neg_mean_squared_error"),
+        )
+        model.fit(X_train_k, y_train)
 
         # VAL predictions
-        y_val_pred = model.predict(X_val)
+        y_val_pred = model.predict(X_val_k)
         r2_val = r2_score(y_val, y_val_pred)
         rmse_val = np.sqrt(mean_squared_error(y_val, y_val_pred))
         mae_val = mean_absolute_error(y_val, y_val_pred)
         rho_val, _ = spearmanr(y_val, y_val_pred)
 
         # TEST predictions
-        y_test_pred = model.predict(X_test)
+        y_test_pred = model.predict(X_test_k)
         r2_test = r2_score(y_test, y_test_pred)
         rmse_test = np.sqrt(mean_squared_error(y_test, y_test_pred))
         mae_test = mean_absolute_error(y_test, y_test_pred)
@@ -333,25 +360,30 @@ def run_mmcv_ridge(
         val_y_pred_all.extend(y_val_pred)
         test_y_true_all.extend(y_test)
         test_y_pred_all.extend(y_test_pred)
-        all_coefs.append(model.coef_)
-        all_alphas.append(model.alpha_)
-        all_split_ids.append(i)
+        subjects_val.extend(X.iloc[val_idx].index.tolist())
+        subjects_test.extend(X.iloc[test_idx].index.tolist())
+        split_ids_val.extend([i] * len(val_idx))
+        split_ids_test.extend([i] * len(test_idx))
+        all_alphas.append(model.named_steps["ridgecv"].alpha_)
 
-        # Store split assignments
-        for idx in train_idx:
-            val_y_true_all.extend  # noop
+        for feat, coef in zip(current_feats, model.named_steps["ridgecv"].coef_):
+            coef_tracker.setdefault(feat, []).append(coef)
 
     df_val = pd.DataFrame(val_results)
     df_test = pd.DataFrame(test_results)
-    coefs = np.array(all_coefs)
 
-    n_nonzero = np.sum(np.abs(coefs) > 1e-12, axis=0)
-    coef_summary = pd.DataFrame({
-        "feature": feature_names,
-        "mean_coef": coefs.mean(axis=0),
-        "std_coef": coefs.std(axis=0),
-        "frac_nonzero": n_nonzero / n_splits,
-    }).sort_values("mean_coef", key=abs, ascending=False)
+    coef_rows = []
+    for feat, coefs in coef_tracker.items():
+        arr = np.array(coefs)
+        coef_rows.append({
+            "feature": feat,
+            "mean_coef": float(arr.mean()),
+            "std_coef": float(arr.std()),
+            "frac_nonzero": float(np.mean(np.abs(arr) > 1e-12)),
+            "n_selected": len(coefs),
+            "frac_selected": len(coefs) / n_splits,
+        })
+    coef_summary = pd.DataFrame(coef_rows).sort_values("mean_coef", key=abs, ascending=False)
 
     alpha_mean = float(np.mean(all_alphas))
     alpha_std = float(np.std(all_alphas))
@@ -389,6 +421,10 @@ def run_mmcv_ridge(
         "y_pred_val": val_y_pred_all,
         "y_true_test": test_y_true_all,
         "y_pred_test": test_y_pred_all,
+        "subjects_val": subjects_val,
+        "subjects_test": subjects_test,
+        "split_ids_val": split_ids_val,
+        "split_ids_test": split_ids_test,
     }
     return summary
 
@@ -406,7 +442,6 @@ def run_per_window_analysis(
     seed: int = 42,
     alphas: np.ndarray | None = None,
     top_k: int | None = None,
-    corr_dir: Path = Path("outputs/correlations"),
     run_name: str | None = None,
 ) -> list[dict]:
     """Run per-window MMCV Ridge regression for all targets."""
@@ -436,33 +471,15 @@ def run_per_window_analysis(
               f" | Mode: {metric_mode}")
         print(f"{'='*60}")
 
-        # --- Feature selection: top-K or all metrics ---
-        if top_k is not None:
-            fname = f"top_partial_{tgt}_{window_type}.csv"
-            fpath = corr_dir / fname
-            if not fpath.exists():
-                print(f"  Warning: {fpath} not found. Skipping {tgt}.")
-                continue
-            top_df = pd.read_csv(fpath)
-            top_df = top_df[top_df["window_tag"] == full_window]
-            if top_df.empty:
-                print(f"  Warning: no top features for {tgt}/{full_window} in {fpath}. Skipping.")
-                continue
-            sort_col = f"r_partial_{tgt}"
-            if sort_col not in top_df.columns:
-                print(f"  Warning: column '{sort_col}' not found in {fpath}. Skipping.")
-                continue
-            top_df = top_df.sort_values(sort_col, key=abs, ascending=False).head(top_k)
-            feature_cols = top_df["feature"].tolist()
+        # Build full feature set (same for all_metrics and top-k — top-k selection happens inside CV loop)
+        feature_cols = [c for c in feats.columns if c != "file"]
+        if window_type == "raw":
+            feature_cols = [c for c in feature_cols if c in METRICS_OF_INTEREST]
         else:
-            feature_cols = [c for c in feats.columns if c != "file"]
-            if window_type == "raw":
-                feature_cols = [c for c in feature_cols if c in METRICS_OF_INTEREST]
-            else:
-                feature_cols = [
-                    c for c in feature_cols
-                    if c.startswith("z_") and c.replace("z_", "") in METRICS_OF_INTEREST
-                ]
+            feature_cols = [
+                c for c in feature_cols
+                if c.startswith("z_") and c.replace("z_", "") in METRICS_OF_INTEREST
+            ]
 
         feat_ids = [f"{c}_{full_window}" for c in feature_cols]
         feat_ids = filter_cc_features(feat_ids)
@@ -503,8 +520,8 @@ def run_per_window_analysis(
             X_matrix, y_series, n_splits=n_iter, random_state=seed,
         )
 
-        # Run MMCV Ridge
-        result = run_mmcv_ridge(X_matrix, y_series, splits, alphas=alphas)
+        # Run MMCV Ridge (within-CV feature selection if top_k is set)
+        result = run_mmcv_ridge(X_matrix, y_series, splits, alphas=alphas, top_k=top_k)
 
         # Save split assignments
         split_records = []
@@ -554,7 +571,8 @@ def run_per_window_analysis(
             "feature_type": window_type,
             "covariates": ", ".join(covar_cols) if covar_cols else "",
             "n_subjects": len(combined),
-            "n_predictors": X_matrix.shape[1],
+            "n_candidate_predictors": X_matrix.shape[1],
+            "n_selected_per_split": top_k if top_k is not None else X_matrix.shape[1],
             "predictors": ", ".join(X_matrix.columns),
             "n_iter": n_iter,
             "alpha_mean": result["alpha_mean"],
@@ -618,6 +636,9 @@ def run_per_window_analysis(
 
         result["all_results_test"].to_csv(run_dir / "iterations.csv", index=False)
         pd.DataFrame({
+            "split": result["split_ids_test"],
+            "subject": result["subjects_test"],
+            "set": "TEST",
             "y_true": result["y_true_test"],
             "y_pred": result["y_pred_test"],
         }).to_csv(run_dir / "predictions.csv", index=False)
@@ -718,7 +739,6 @@ def run_analysis(
             seed=seed,
             alphas=alphas,
             top_k=effective_top_k,
-            corr_dir=Path(corr_dir),
             run_name=run_name,
         )
         return
@@ -759,7 +779,7 @@ def run_analysis(
             splits = generate_mmcv_splits(
                 X, y, n_splits=n_iter, random_state=seed,
             )
-            result = run_mmcv_ridge(X, y, splits, alphas=alphas)
+            result = run_mmcv_ridge(X, y, splits, alphas=alphas, top_k=None)
 
             covar_suffix = f"_cov{len(covar_cols)}" if covar_cols else ""
 
@@ -869,7 +889,7 @@ def run_analysis(
                 splits = generate_mmcv_splits(
                     X, y, n_splits=n_iter, random_state=seed,
                 )
-                result = run_mmcv_ridge(X, y, splits, alphas=alphas)
+                result = run_mmcv_ridge(X, y, splits, alphas=alphas, top_k=None)
 
                 covar_suffix = f"_cov{len(covar_cols)}" if covar_cols else ""
 

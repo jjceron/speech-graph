@@ -24,7 +24,7 @@ from src.preprocessing.loaders import load_transcript_txt
 from src.preprocessing.tokenizer import tokenize_segments
 from src.graphs.metrics import compute_metrics, METRICS
 from src.graphs.windowing import sliding_windows
-from src.analysis.random import generate_random_graphs, compute_z_scores
+from src.analysis.random_graph import generate_random_graphs, compute_z_scores
 
 
 TASK_ACTIVITIES = {

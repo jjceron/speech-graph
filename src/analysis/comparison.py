@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from src.graphs.metrics import compute_metrics, METRICS
-from .random import generate_random_graphs, compute_z_scores
+from .random_graph import generate_random_graphs, compute_z_scores
 
 
 def compare_original_vs_random(
