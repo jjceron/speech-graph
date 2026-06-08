@@ -31,6 +31,7 @@ from src.analysis.linear_regression_mc import (
     load_all_features,
     resolve_feature_ids,
 )
+from src.analysis.linear_regression_rcv import METRICS_OF_INTEREST
 
 
 def compute_vif(df: pd.DataFrame) -> pd.Series:
@@ -91,9 +92,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Check collinearity among candidate features",
     )
-    parser.add_argument("--type", default="all", choices=["raw", "z", "all"],
-                        help="Feature type for --corr-dir mode (default: all; "
-                             "auto per feature when using --feature-list)")
+    parser.add_argument("--type", default="raw", choices=["raw", "z"],
+                        help="Feature type for per-window or --corr-dir mode (default: raw)")
+    parser.add_argument("--task", type=int, default=None,
+                        help="Task number for per-window collinearity check")
+    parser.add_argument("--window", type=int, default=None,
+                        help="Window size for per-window collinearity check")
+    parser.add_argument("--all-metrics", action="store_true", default=False,
+                        help="Use all METRICS_OF_INTEREST (default); otherwise uses them all anyway")
     parser.add_argument("--feature-list", default=None,
                         help="Comma-separated feature identifiers")
     parser.add_argument("--corr-dir", default=None,
@@ -108,34 +114,63 @@ def main() -> None:
                         help="Path to metadata Excel file")
     args = parser.parse_args()
 
-    print(f"Loading metadata...")
-    meta = load_metadata(args.metadata)
-
-    print(f"Loading metric tables...")
-    all_data = load_all_features(Path(args.metrics_dir), meta, ftype_filter="all")
-    raw_df = all_data.get("raw", pd.DataFrame())
-    z_df = all_data.get("z", pd.DataFrame())
-
-    if args.feature_list is not None:
-        feat_ids = [f.strip() for f in args.feature_list.split(",") if f.strip()]
-        desc = f"manual ({len(feat_ids)} features)"
-        X = resolve_mixed_feature_ids(feat_ids, raw_df, z_df)
-    elif args.corr_dir is not None:
-        corr_path = Path(args.corr_dir)
-        single_type = args.type if args.type != "all" else "raw"
-        feat_ids = load_top_features(corr_path, args.target, single_type, args.top_k)
-        if not feat_ids:
-            print(f"  No features loaded from {corr_path}. Exiting.")
+    # --- Per-window mode ---
+    if args.task is not None and args.window is not None:
+        full_window = f"T{args.task}W{args.window}"
+        print(f"Loading means table for {full_window} ({args.type})...")
+        tables = find_means_tables(Path(args.metrics_dir), tasks=[args.task])
+        tables = [
+            t for t in tables
+            if t["tag"] == full_window and t["type"] == args.type
+        ]
+        if not tables:
+            print(f"  No means table found for {full_window} type={args.type}. Exiting.")
             sys.exit(1)
-        desc = f"top-{len(feat_ids)} from {corr_path.name}"
-        df_all = all_data.get(args.type if args.type != "all" else "raw")
-        if df_all is None or df_all.empty:
-            print(f"  No {args.type} data loaded. Exiting.")
-            sys.exit(1)
-        X = resolve_feature_ids(feat_ids, df_all)
+        feats = load_feature_table(tables[0]["path"])
+        feature_cols = [c for c in feats.columns if c != "file"]
+        if args.type == "raw":
+            feature_cols = [c for c in feature_cols if c in METRICS_OF_INTEREST]
+        else:
+            feature_cols = [
+                c for c in feature_cols
+                if c.startswith("z_") and c.replace("z_", "") in METRICS_OF_INTEREST
+            ]
+        feat_ids = [f"{c}_{full_window}" for c in feature_cols]
+        from src.analysis.linear_regression_rcv import filter_cc_features
+        feat_ids = filter_cc_features(feat_ids)
+        X = feats[["file"] + feature_cols].set_index("file")
+        X.columns = [f"{c}_{full_window}" for c in X.columns]
+        X = X[feat_ids]
+        X = X.dropna()
+        desc = f"{full_window} {args.type} ({X.shape[1]} features)"
     else:
-        print("  Provide --feature-list or --corr-dir.")
-        sys.exit(1)
+        print(f"Loading metadata...")
+        meta = load_metadata(args.metadata)
+
+        print(f"Loading metric tables...")
+        all_data = load_all_features(Path(args.metrics_dir), meta, ftype_filter="all")
+        raw_df = all_data.get("raw", pd.DataFrame())
+        z_df = all_data.get("z", pd.DataFrame())
+
+        if args.feature_list is not None:
+            feat_ids = [f.strip() for f in args.feature_list.split(",") if f.strip()]
+            desc = f"manual ({len(feat_ids)} features)"
+            X = resolve_mixed_feature_ids(feat_ids, raw_df, z_df)
+        elif args.corr_dir is not None:
+            corr_path = Path(args.corr_dir)
+            feat_ids = load_top_features(corr_path, args.target, args.type, args.top_k)
+            if not feat_ids:
+                print(f"  No features loaded from {corr_path}. Exiting.")
+                sys.exit(1)
+            desc = f"top-{len(feat_ids)} from {corr_path.name}"
+            df_all = all_data.get(args.type)
+            if df_all is None or df_all.empty:
+                print(f"  No {args.type} data loaded. Exiting.")
+                sys.exit(1)
+            X = resolve_feature_ids(feat_ids, df_all)
+        else:
+            print("  Provide --task/--window, --feature-list, or --corr-dir.")
+            sys.exit(1)
 
     if X.empty or len(X) < 10:
         print(f"  Only {len(X)} valid subjects. Exiting.")
