@@ -66,7 +66,11 @@ def process_single_subject(
     step: int,
     include_speakers: tuple[str, ...] = ("spk_1",),
     task: int | None = None,
+    clean_func: str = "clean_text",
+    pos_filter: bool = False,
+    pos_lang: str = "es",
 ) -> tuple[list[dict], list[list[str]], list[str]] | None:
+    
     """Process one subject for one activity and one window size.
 
     Returns (window_rows, segments, flat_tokens), or None if not found.
@@ -85,7 +89,9 @@ def process_single_subject(
     if not text.strip():
         return None
 
-    segments, segment_map = tokenize_segments(text, return_segment_map=True)
+    segments, segment_map = tokenize_segments(
+        text, return_segment_map=True, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,
+    )
     flat_tokens = [t for seg in segments for t in seg]
     if not flat_tokens:
         return None
@@ -114,12 +120,13 @@ def save_results(
     task_num: int,
     window_size: int,
     output_dir: str | Path,
+    suffix: str = "",
 ) -> None:
     """Save params_table, mean (per-subject across windows), and median files."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    tag = f"T{task_num}W{window_size}"
+    tag = f"T{task_num}W{window_size}{suffix}"
 
     df = pd.DataFrame(rows)
     cols = [c for c in OUTPUT_COLUMNS if c in df.columns]
@@ -185,6 +192,9 @@ def run_pipeline(
     output_dir: str | Path = "data/processed/metrics",
     include_speakers: tuple[str, ...] = ("spk_1",),
     save_processed_text: bool = False,
+    clean_func: str = "clean_text",
+    pos_filter: bool = False,
+    pos_lang: str = "es",
 ) -> None:
     """Run the full pipeline for a task and list of window sizes."""
     activity_name = TASK_ACTIVITIES.get(task)
@@ -215,7 +225,7 @@ def run_pipeline(
             if subject_code not in subject_codes:
                 continue
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, windows[0], step0, include_speakers, task=task)
+            result = process_single_subject(filepath, activity_name, windows[0], step0, include_speakers, task=task, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang)
             if result is not None:
                 _, segments, _ = result
                 save_activity_text(segments, task, subject_code)
@@ -235,7 +245,7 @@ def run_pipeline(
                 continue
 
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, window_size, resolved, include_speakers, task=task)
+            result = process_single_subject(filepath, activity_name, window_size, resolved, include_speakers, task=task, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang)
             if result is None:
                 continue
 
@@ -248,8 +258,14 @@ def run_pipeline(
         print(f"  Processed: {processed} subjects, {len(rows)} windows")
 
         if rows:
+            suffix_parts = []
+            if clean_func == "clean_text_all":
+                suffix_parts.append("all")
+            if pos_filter:
+                suffix_parts.append("pos")
+            suffix = "_" + "_".join(suffix_parts) if suffix_parts else ""
             out_dir = os.path.join(output_dir, f"Task{task}")
-            save_results(rows, task, window_size, out_dir)
+            save_results(rows, task, window_size, out_dir, suffix=suffix)
         else:
             print(f"  No data for W{window_size}")
         print()
@@ -294,6 +310,18 @@ def parse_args() -> argparse.Namespace:
         "--save-processed-text", action="store_true",
         help="Save processed activity texts to data/processed/tasks/",
     )
+    parser.add_argument(
+        "--clean-func", default="clean_text", choices=["clean_text", "clean_text_all"],
+        help="Cleaning function to use (default: clean_text)",
+    )
+    parser.add_argument(
+        "--pos-filter", action="store_true",
+        help="Apply POS tag filtering via stanza",
+    )
+    parser.add_argument(
+        "--pos-lang", default="es",
+        help="Language for stanza POS tagging (default: es)",
+    )
     return parser.parse_args()
 
 
@@ -311,6 +339,9 @@ def main() -> None:
         output_dir=args.output_dir,
         include_speakers=speakers,
         save_processed_text=args.save_processed_text,
+        clean_func=args.clean_func,
+        pos_filter=args.pos_filter,
+        pos_lang=args.pos_lang,
     )
 
 

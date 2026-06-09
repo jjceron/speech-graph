@@ -63,6 +63,9 @@ def process_single_subject(
     seed: int,
     include_speakers: tuple[str, ...] = ("spk_1",),
     task: int | None = None,
+    clean_func: str = "clean_text",
+    pos_filter: bool = False,
+    pos_lang: str = "es",
 ) -> list[dict] | None:
     spk_first_only = task is not None and task in {6, 7}
     activities = load_transcript_txt(transcript_path, include_speakers=include_speakers, spk_first_only=spk_first_only)
@@ -78,7 +81,9 @@ def process_single_subject(
     if not text.strip():
         return None
 
-    segments, segment_map = tokenize_segments(text, return_segment_map=True)
+    segments, segment_map = tokenize_segments(
+        text, return_segment_map=True, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,
+    )
     flat_tokens = [t for seg in segments for t in seg]
     if not flat_tokens:
         return None
@@ -106,11 +111,12 @@ def save_results(
     task_num: int,
     window_size: int,
     output_dir: str | Path,
+    suffix: str = "",
 ) -> None:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    tag = f"T{task_num}W{window_size}"
+    tag = f"T{task_num}W{window_size}{suffix}"
 
     df = pd.DataFrame(rows)
     cols = [c for c in OUTPUT_COLUMNS if c in df.columns]
@@ -155,6 +161,9 @@ def run_pipeline(
     metadata_path: str | Path = "data/raw/metadata.xlsx",
     output_dir: str | Path = "data/processed/metrics",
     include_speakers: tuple[str, ...] = ("spk_1",),
+    clean_func: str = "clean_text",
+    pos_filter: bool = False,
+    pos_lang: str = "es",
 ) -> None:
     activity_name = TASK_ACTIVITIES.get(task)
     if activity_name is None:
@@ -190,7 +199,7 @@ def run_pipeline(
 
             filepath = os.path.join(transcripts_dir, filename)
             result = process_single_subject(
-                filepath, activity_name, window_size, resolved, n_random, seed, include_speakers, task=task
+                filepath, activity_name, window_size, resolved, n_random, seed, include_speakers, task=task, clean_func, pos_filter, pos_lang,
             )
             if result is None:
                 continue
@@ -201,8 +210,14 @@ def run_pipeline(
         print(f"  Processed: {processed} subjects, {len(rows)} windows")
 
         if rows:
+            suffix_parts = []
+            if clean_func == "clean_text_all":
+                suffix_parts.append("all")
+            if pos_filter:
+                suffix_parts.append("pos")
+            suffix = "_" + "_".join(suffix_parts) if suffix_parts else ""
             out_dir = os.path.join(output_dir, f"Task{task}")
-            save_results(rows, task, window_size, out_dir)
+            save_results(rows, task, window_size, out_dir, suffix=suffix)
         else:
             print(f"  No data for W{window_size}")
         print()
@@ -251,6 +266,18 @@ def parse_args() -> argparse.Namespace:
         "--include-speakers", default="spk_1",
         help="Comma-separated speaker IDs to include (default: spk_1)",
     )
+    parser.add_argument(
+        "--clean-func", default="clean_text", choices=["clean_text", "clean_text_all"],
+        help="Cleaning function to use (default: clean_text)",
+    )
+    parser.add_argument(
+        "--pos-filter", action="store_true",
+        help="Apply POS tag filtering via stanza",
+    )
+    parser.add_argument(
+        "--pos-lang", default="es",
+        help="Language for stanza POS tagging (default: es)",
+    )
     return parser.parse_args()
 
 
@@ -269,6 +296,9 @@ def main() -> None:
         metadata_path=args.metadata,
         output_dir=args.output_dir,
         include_speakers=speakers,
+        clean_func=args.clean_func,
+        pos_filter=args.pos_filter,
+        pos_lang=args.pos_lang,
     )
 
 
