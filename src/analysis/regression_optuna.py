@@ -983,7 +983,7 @@ def main() -> None:
 
         suffix = f"_{args.run_name}" if args.run_name else ""
         experiment_name = f"task{args.task}_W{args.window}_{experiment}_{target}_rfe{args.rfe}_{args.optimize}{suffix}"
-        output_dir = Path(args.output) / f"task{args.task}" / f"W{args.window}_{experiment}" / target
+        output_dir = Path(args.output) / f"task{args.task}" / f"W{args.window}_{experiment}_{args.rfe}" / target
 
         run_one_target(
             X=X,
