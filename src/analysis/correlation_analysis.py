@@ -4,9 +4,9 @@ between speech-graph features and Barratt impulsivity targets.
 Targets: MOT, COG, MOT_V4 (items 8+13+16+21+23), COG_V1 (items 3+6).
 
 Usage:
-    py -m src.analysis.correlation_analysis --task 2 --type raw --adj-var "School year"
-    py -m src.analysis.correlation_analysis --task 2 --type raw --window T2W10 --adj-var "School year"
-    py -m src.analysis.correlation_analysis --task 7 --type z --adj-var "Age"
+    py -m src.analysis.correlation_analysis --task 2 --experiment raw --adj-var "School year"
+    py -m src.analysis.correlation_analysis --task 2 --experiment raw --window T2W10 --adj-var "School year"
+    py -m src.analysis.correlation_analysis --task 7 --experiment zscores --adj-var "Age"
 """
 
 from __future__ import annotations
@@ -293,8 +293,8 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated task numbers (e.g. '2,7') or 'all' (default: all)",
     )
     parser.add_argument(
-        "--type", default="all", choices=["raw", "z", "all"],
-        help="Feature type: 'raw', 'z', or 'all' (default: all)",
+        "--experiment", default="raw", choices=["raw", "zscores", "rawzscore"],
+        help="Feature experiment: 'raw', 'zscores', or 'rawzscore' (default: raw)",
     )
     parser.add_argument(
         "--window", default=None,
@@ -316,21 +316,22 @@ def main() -> None:
     output_dir = args.output
     if output_dir is None:
         task_str = args.task if args.task.lower() != "all" else "all"
-        type_str = args.type if args.type != "all" else "mixed"
+        exp_str = args.experiment
         if args.window:
             win = args.window
             task_num = win[1:win.index("W")]
-            output_dir = f"outputs/correlations/Task{task_num}/{win}_{type_str}"
+            output_dir = f"outputs/correlations/Task{task_num}/{win}_{exp_str}"
         else:
-            output_dir = f"outputs/correlations/task{task_str}_{type_str}"
+            output_dir = f"outputs/correlations/task{task_str}_{exp_str}"
         print(f"Auto output: {output_dir}")
 
+    ftype_map = {"raw": "raw", "zscores": "z", "rawzscore": "all"}
     run_correlation_analysis(
         metrics_dir=args.metrics_dir,
         metadata_path=args.metadata,
         output_dir=output_dir,
         tasks=tasks,
-        ftype_filter=args.type,
+        ftype_filter=ftype_map[args.experiment],
         adj_var=args.adj_var,
         window=args.window,
     )

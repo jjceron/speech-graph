@@ -26,13 +26,10 @@ data/**
 !data/processed/metrics/**/*.txt
 
 #### Output files
-outputs/*
-!outputs/linear_regression/
+outputs/**
 !outputs/correlations/
+!outputs/linear_regression/
 
-#### Track correlations/ and allow PNG files
-outputs/correlations/*
-!outputs/correlations/Task*/
 
 #### OS and editor files
 .DS_Store
