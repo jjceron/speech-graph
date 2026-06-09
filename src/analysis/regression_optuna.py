@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 import time
 import warnings
 from functools import partial
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import optuna
@@ -91,6 +94,63 @@ DEFAULT_REGRESSORS = [
 
 class TrialTimeout(Exception):
     pass
+
+
+def setup_logging(log_dir: Path | None = None, level: int = logging.INFO) -> None:
+    fmt = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(fmt)
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.addHandler(handler)
+
+    if log_dir is not None:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        fh = logging.FileHandler(log_dir / "experiment.log", encoding="utf-8")
+        fh.setFormatter(fmt)
+        root.addHandler(fh)
+
+    optuna.logging.enable_propagation()
+    optuna.logging.disable_default_handler()
+
+
+class TrialProgressCallback:
+    """Reports optimization progress every `report_every` trials."""
+    def __init__(self, n_trials: int, report_every: int = 25) -> None:
+        self.n_trials = n_trials
+        self.report_every = report_every
+        self._start: float | None = None
+
+    def __call__(self, study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        if self._start is None:
+            self._start = time.time()
+        if trial.number == 0 or trial.number % self.report_every != 0:
+            return
+        done = trial.number + 1
+        best = study.best_value
+        bt = study.best_trial.number
+        elapsed = time.time() - self._start
+        rate = done / elapsed if elapsed > 0 else 0
+        remaining = (self.n_trials - done) / rate if rate > 0 else 0
+        logger.info(
+            "Trial %4d/%d | best: %.6f (trial %d) | elapsed: %s | remaining: %s",
+            done, self.n_trials, best, bt,
+            _format_duration(elapsed),
+            _format_duration(remaining),
+        )
+
+
+def _format_duration(seconds: float) -> str:
+    h, r = divmod(int(seconds), 3600)
+    m, s = divmod(r, 60)
+    if h:
+        return f"{h}h{m:02d}m{s:02d}s"
+    if m:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
 
 
 def as_1d(y: Any) -> np.ndarray:
@@ -730,8 +790,10 @@ def run_one_target(
     rfe_mode: str = "global",
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Generating %d MMCV splits…", n_iter)
     splits = generate_mmcv_splits(X, y, n_splits=n_iter, random_state=seed)
     splits_df = split_assignments(X, splits)
+    logger.info("MMCV splits generated (%d train/val/test triples)", len(splits))
 
     train_idx = splits[0][0] if rfe_mode == "fixed" else None
 
@@ -748,6 +810,11 @@ def run_one_target(
         load_if_exists=True,
     )
 
+    logger.info(
+        "Starting optimization: %d trials, %d splits per trial, RFE=%s",
+        n_trials, n_iter, rfe_mode,
+    )
+
     study.optimize(
         partial(
             objective_regression,
@@ -762,11 +829,15 @@ def run_one_target(
             train_idx=train_idx,
         ),
         n_trials=n_trials,
+        callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=25)],
         catch=(ValueError, FloatingPointError, np.linalg.LinAlgError, TrialTimeout),
+        show_progress_bar=True,
     )
 
     if study.best_trial is None:
         raise RuntimeError("No completed trial is available")
+
+    logger.info("Best trial found (trial %d). Re-evaluating on all splits…", study.best_trial.number)
 
     final_report = evaluate_fixed_trial(
         params=study.best_trial.params,
@@ -782,14 +853,16 @@ def run_one_target(
 
     val = final_report["validation_summary"]
     test = final_report["test_summary"]
-    print(f"\nBest validation trial: {study.best_trial.number}")
-    print(f"RFE mode: {rfe_mode}")
-    print(f"Selected features: {len(final_report['selected_features'])}")
-    print(
-        f"VALIDATION {optimize_metric}: {val[f'{optimize_metric}_mean_val']:.6f} | "
-        f"TEST {optimize_metric}: {test[f'{optimize_metric}_mean_test']:.6f}"
+    logger.info("Best validation trial: %d", study.best_trial.number)
+    logger.info("RFE mode: %s | Selected features: %d", rfe_mode, len(final_report["selected_features"]))
+    logger.info(
+        "VALIDATION %s: %.6f | TEST %s: %.6f",
+        optimize_metric,
+        val[f"{optimize_metric}_mean_val"],
+        optimize_metric,
+        test[f"{optimize_metric}_mean_test"],
     )
-    print(f"Saved outputs in: {output_dir}")
+    logger.info("Saved outputs in: %s", output_dir)
 
 
 def parse_args() -> argparse.Namespace:
@@ -828,12 +901,25 @@ def main() -> None:
     regressors = parse_regressors(args.regressors)
     covar_cols = [item.strip() for item in args.covar.split(",") if item.strip()] if args.covar else None
 
-    print("Regression Optuna experiment with RFE")
-    print(f"Task={args.task} | Window=W{args.window} | Experiment={experiment} | RFE={args.rfe} | Targets={targets}")
-    print(f"Optimization metric={args.optimize} | Trials={args.n_trials} | MMCV splits={args.n_iter}")
-    print(f"Regressors={regressors}")
+    output_root = Path(args.output)
+    setup_logging(log_dir=output_root / "logs")
+
+    logger.info("=" * 60)
+    logger.info("Regression Optuma experiment with RFE")
+    logger.info("=" * 60)
+    logger.info(
+        "Task=%s | Window=W%s | Experiment=%s | RFE=%s | Targets=%s",
+        args.task, args.window, experiment, args.rfe, targets,
+    )
+    logger.info(
+        "Optimization metric=%s | Trials=%d | MMCV splits=%d",
+        args.optimize, args.n_trials, args.n_iter,
+    )
+    logger.info("Regressors=%s", regressors)
 
     for target in targets:
+        logger.info("-" * 60)
+        logger.info("Loading data for target=%s", target)
         X, y = load_per_window_matrix(
             task=args.task,
             window=args.window,
@@ -843,7 +929,10 @@ def main() -> None:
             metadata_path=args.metadata,
             covar_cols=covar_cols,
         )
-        print(f"\nTarget={target} | Subjects={len(y)} | Candidate predictors={X.shape[1]}")
+        logger.info(
+            "Target=%s | Subjects=%d | Candidate predictors=%d",
+            target, len(y), X.shape[1],
+        )
 
         suffix = f"_{args.run_name}" if args.run_name else ""
         experiment_name = f"task{args.task}_W{args.window}_{experiment}_{target}_rfe{args.rfe}_{args.optimize}{suffix}"
@@ -866,7 +955,9 @@ def main() -> None:
             rfe_mode=args.rfe,
         )
 
-    print("\nDone.")
+    logger.info("=" * 60)
+    logger.info("ALL TARGETS COMPLETE")
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":
