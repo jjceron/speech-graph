@@ -425,7 +425,8 @@ def fit_global_rfe(
         scaler = StandardScaler()
         X_proc = scaler.fit_transform(X_proc)
 
-    selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=1)
+    step = max(1, n_candidates // 4)
+    selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step)
     selector.fit(X_proc, as_1d(y))
 
     selected_features = X.columns[selector.support_].tolist()
@@ -795,6 +796,13 @@ def run_one_target(
 
     train_idx = splits[0][0] if rfe_mode == "fixed" else None
 
+    # Para RFE fixed: split 0 solo se usa para RFE (nunca entra en optimización)
+    splits_opt = splits[1:] if rfe_mode == "fixed" else splits
+    logger.info(
+        "Using %d splits for optimization (split 0 reserved for RFE learning: %s)",
+        len(splits_opt), rfe_mode == "fixed",
+    )
+
     db_path = output_dir / f"optuna_trials_{experiment_name}.db"
     study = optuna.create_study(
         sampler=optuna.samplers.TPESampler(seed=seed),
@@ -808,9 +816,10 @@ def run_one_target(
         load_if_exists=True,
     )
 
+    n_splits_opt = len(splits_opt)
     logger.info(
         "Starting optimization: %d trials, %d splits per trial, RFE=%s",
-        n_trials, n_iter, rfe_mode,
+        n_trials, n_splits_opt, rfe_mode,
     )
 
     study.optimize(
@@ -818,7 +827,7 @@ def run_one_target(
             objective_regression,
             X=X,
             y=y,
-            splits=splits,
+            splits=splits_opt,
             optimize_metric=optimize_metric,
             regressors=regressors,
             timeout_sec=timeout_sec,
