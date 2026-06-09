@@ -16,6 +16,9 @@ import sys
 import time
 import warnings
 from functools import partial
+
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+warnings.filterwarnings("ignore", category=Warning, module="xgboost")
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +88,19 @@ DEFAULT_REGRESSORS = [
     "BaggingRegressor",
     "StackingRegressor",
     "GaussianProcessRegressor",
+    "KNeighborsRegressor",
+    "DecisionTreeRegressor",
+    "XGBRegressor",
+]
+
+FAST_REGRESSORS = [
+    "LinearRegression",
+    "Ridge",
+    "ElasticNet",
+    "QuantileRegressor",
+    "SVR",
+    "RandomForestRegressor",
+    "ExtraTreesRegressor",
     "KNeighborsRegressor",
     "DecisionTreeRegressor",
     "XGBRegressor",
@@ -787,6 +803,7 @@ def run_one_target(
     pruner_startup_trials: int,
     pruner_warmup_steps: int,
     rfe_mode: str = "global",
+    optimize_splits: int | None = None,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Generating %d MMCV splits…", n_iter)
@@ -796,11 +813,18 @@ def run_one_target(
 
     train_idx = splits[0][0] if rfe_mode == "fixed" else None
 
-    # Para RFE fixed: split 0 solo se usa para RFE (nunca entra en optimización)
-    splits_opt = splits[1:] if rfe_mode == "fixed" else splits
+    # Determinar splits para optimización
+    if optimize_splits is None:
+        optimize_splits = n_iter
+    n_opt = max(min(optimize_splits, n_iter), 20)
+
+    splits_opt = splits[:n_opt]
+    if rfe_mode == "fixed":
+        splits_opt = splits_opt[1:]  # quitar split 0 (reservado para RFE)
+        n_opt = len(splits_opt)
     logger.info(
-        "Using %d splits for optimization (split 0 reserved for RFE learning: %s)",
-        len(splits_opt), rfe_mode == "fixed",
+        "Using %d splits for optimization (RFE fixed=%s)",
+        n_opt, rfe_mode == "fixed",
     )
 
     db_path = output_dir / f"optuna_trials_{experiment_name}.db"
@@ -892,6 +916,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--timeout-sec", type=int, default=480)
     parser.add_argument("--max-rfe-features", type=int, default=100)
+    parser.add_argument("--fast", action="store_true",
+                        help="Modo rápido: excluye Bagging, Stacking, GPR y reduce splits en optimización")
+    parser.add_argument("--optimize-splits", type=int, default=None,
+                        help="Splits usados durante optimización (default: n_iter; con --fast: n_iter//4, min 50)")
     parser.add_argument("--pruner-startup-trials", type=int, default=50)
     parser.add_argument("--pruner-warmup-steps", type=int, default=10)
     parser.add_argument("--metrics-dir", default="data/processed/metrics")
@@ -908,6 +936,15 @@ def main() -> None:
     regressors = parse_regressors(args.regressors)
     covar_cols = [item.strip() for item in args.covar.split(",") if item.strip()] if args.covar else None
 
+    if args.fast:
+        regressors = [r for r in regressors if r in FAST_REGRESSORS]
+        if not regressors:
+            regressors = FAST_REGRESSORS[:]
+        if args.pruner_warmup_steps == 10:
+            args.pruner_warmup_steps = 5
+        if args.optimize_splits is None:
+            args.optimize_splits = max(50, args.n_iter // 4)
+
     output_root = Path(args.output)
     setup_logging(log_dir=output_root / "logs")
 
@@ -919,10 +956,13 @@ def main() -> None:
         args.task, args.window, experiment, args.rfe, targets,
     )
     logger.info(
-        "Optimization metric=%s | Trials=%d | MMCV splits=%d",
+        "Optimization metric=%s | Trials=%d | MMCV splits=%d (opt=%s)",
         args.optimize, args.n_trials, args.n_iter,
+        args.optimize_splits or args.n_iter,
     )
     logger.info("Regressors=%s", regressors)
+    if args.fast:
+        logger.info("Fast mode: ON (excluye Bagging, Stacking, GPR)")
 
     for target in targets:
         logger.info("-" * 60)
@@ -960,6 +1000,7 @@ def main() -> None:
             pruner_startup_trials=args.pruner_startup_trials,
             pruner_warmup_steps=args.pruner_warmup_steps,
             rfe_mode=args.rfe,
+            optimize_splits=args.optimize_splits,
         )
 
     logger.info("=" * 60)
