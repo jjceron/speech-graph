@@ -4,8 +4,7 @@ The model is selected only with validation metrics. Test metrics are computed
 once for the best validation trial and saved as the final report.
 
 Usage:
-    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment raw --rfe fixed --targets all
-    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment zscores --rfe global --targets MOT,COG
+    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment raw --rfe fixed --targets all --optimize mae --n-trials 300 --n-iter 400 
 """
 
 from __future__ import annotations
@@ -113,8 +112,7 @@ def setup_logging(log_dir: Path | None = None, level: int = logging.INFO) -> Non
         fh.setFormatter(fmt)
         root.addHandler(fh)
 
-    optuna.logging.enable_propagation()
-    optuna.logging.disable_default_handler()
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
 class TrialProgressCallback:
@@ -289,7 +287,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             min_samples_split=trial.suggest_int("et_min_samples_split", 2, 12),
             min_samples_leaf=trial.suggest_int("et_min_samples_leaf", 1, 5),
             max_features=trial.suggest_categorical("et_max_features", ["sqrt", "log2", None]),
-            criterion="friedman_mse",
+            criterion="squared_error",
             random_state=random_state,
             n_jobs=-1,
         )
@@ -388,7 +386,7 @@ def get_rfe_estimator(
             max_depth=trial.suggest_int("rfe_proxy_et_max_depth", 2, 12),
             min_samples_split=trial.suggest_int("rfe_proxy_et_min_samples_split", 2, 12),
             min_samples_leaf=trial.suggest_int("rfe_proxy_et_min_samples_leaf", 1, 5),
-            criterion="friedman_mse",
+            criterion="squared_error",
             random_state=random_state,
             n_jobs=-1,
         )
@@ -829,7 +827,7 @@ def run_one_target(
             train_idx=train_idx,
         ),
         n_trials=n_trials,
-        callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=25)],
+        callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=50)],
         catch=(ValueError, FloatingPointError, np.linalg.LinAlgError, TrialTimeout),
         show_progress_bar=True,
     )
