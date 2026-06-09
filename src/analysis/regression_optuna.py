@@ -582,6 +582,85 @@ def objective_regression(
     return metric_to_objective(validation_summary[f"{optimize_metric}_mean_val"], optimize_metric)
 
 
+def objective_regression_split_rfe(
+    trial: optuna.Trial,
+    X: pd.DataFrame,
+    y: pd.Series,
+    splits: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    optimize_metric: str,
+    regressors: list[str],
+    timeout_sec: int | None,
+    random_state: int,
+    max_rfe_features: int | None,
+) -> float:
+    start = time.time()
+
+    regressor_name = trial.suggest_categorical("regressor", regressors)
+    use_scaler = trial.suggest_categorical("use_scaler", [True, False])
+    if regressor_name in {"SVR", "KNeighborsRegressor", "GaussianProcessRegressor"}:
+        use_scaler = True
+
+    regressor, is_svr_non_linear = get_regressor(trial, regressor_name, random_state)
+
+    n_candidates = X.shape[1]
+    upper = min(n_candidates, max_rfe_features or n_candidates)
+    lower = 1 if upper == 1 else 2
+    n_features = trial.suggest_int("rfe_n_features", lower, upper)
+
+    trial.set_user_attr("regressor_final", regressor_name)
+    trial.set_user_attr("use_scaler_final", use_scaler)
+    trial.set_user_attr("rfe_n_features", n_features)
+
+    validation_rows: list[dict[str, float]] = []
+
+    for step, (train_idx, val_idx, _test_idx) in enumerate(splits, start=1):
+        X_train_raw = X.iloc[train_idx]
+        y_train = as_1d(y.iloc[train_idx])
+        X_val_raw = X.iloc[val_idx]
+        y_val = as_1d(y.iloc[val_idx])
+
+        imputer = SimpleImputer(strategy="mean")
+        X_tr = imputer.fit_transform(X_train_raw)
+        X_va = imputer.transform(X_val_raw)
+
+        if use_scaler:
+            scaler = StandardScaler()
+            X_tr = scaler.fit_transform(X_tr)
+            X_va = scaler.transform(X_va)
+
+        rfe_estimator, _ = get_rfe_estimator(
+            trial, regressor_name, regressor, is_svr_non_linear, random_state
+        )
+        step_size = max(1, n_candidates // 4)
+        selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step_size)
+        selector.fit(X_tr, y_train)
+
+        X_tr_sel = X_tr[:, selector.support_]
+        X_va_sel = X_va[:, selector.support_]
+
+        model = clone(make_final_pipeline(regressor))
+        model.fit(X_tr_sel, y_train)
+        val_pred = as_1d(model.predict(X_va_sel))
+        validation_rows.append(calculate_metrics(y_val, val_pred))
+
+        partial = float(pd.DataFrame(validation_rows)[optimize_metric].mean())
+        trial.report(metric_to_objective(partial, optimize_metric), step)
+
+        if trial.should_prune():
+            trial.set_user_attr("termination_reason", "pruned")
+            raise optuna.TrialPruned()
+        if timeout_sec is not None and (time.time() - start) > timeout_sec:
+            trial.set_user_attr("termination_reason", "timeout")
+            raise optuna.TrialPruned()
+
+    validation_summary = summarize_metric_rows(validation_rows, "val")
+    for key, value in validation_summary.items():
+        trial.set_user_attr(key, value)
+    trial.set_user_attr("termination_reason", "completed")
+
+    return metric_to_objective(validation_summary[f"{optimize_metric}_mean_val"], optimize_metric)
+
+
 def evaluate_fixed_trial(
     params: dict[str, Any],
     X: pd.DataFrame,
@@ -639,6 +718,105 @@ def evaluate_fixed_trial(
         "selected_features": metadata["rfe_selected_features"],
         "rfe_ranking": metadata["rfe_ranking"],
         "metadata": {k: v for k, v in metadata.items() if k not in {"imputer", "scaler", "selector", "rfe_ranking"}},
+    }
+
+
+def evaluate_fixed_trial_split_rfe(
+    params: dict[str, Any],
+    X: pd.DataFrame,
+    y: pd.Series,
+    splits: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    regressors: list[str],
+    random_state: int,
+    max_rfe_features: int | None,
+) -> dict[str, Any]:
+    fixed_trial = optuna.trial.FixedTrial(params)
+    regressor_name = fixed_trial.params["regressor"]
+    use_scaler = fixed_trial.params["use_scaler"]
+    if regressor_name in {"SVR", "KNeighborsRegressor", "GaussianProcessRegressor"}:
+        use_scaler = True
+
+    regressor, is_svr_non_linear = get_regressor(fixed_trial, regressor_name, random_state)
+
+    n_candidates = X.shape[1]
+    n_features = fixed_trial.params["rfe_n_features"]
+
+    validation_rows: list[dict[str, float]] = []
+    test_rows: list[dict[str, float]] = []
+    pred_rows: list[dict[str, Any]] = []
+    rankings_list: list[pd.Series] = []
+
+    for split_id, (train_idx, val_idx, test_idx) in enumerate(splits):
+        X_train_raw = X.iloc[train_idx]
+        y_train = as_1d(y.iloc[train_idx])
+
+        imputer = SimpleImputer(strategy="mean")
+        X_tr = imputer.fit_transform(X_train_raw)
+
+        if use_scaler:
+            scaler = StandardScaler()
+            X_tr = scaler.fit_transform(X_tr)
+
+        rfe_estimator, _ = get_rfe_estimator(
+            fixed_trial, regressor_name, regressor, is_svr_non_linear, random_state
+        )
+        step_size = max(1, n_candidates // 4)
+        selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step_size)
+        selector.fit(X_tr, y_train)
+
+        rankings_list.append(pd.Series(selector.ranking_, index=X.columns))
+        selected = X.columns[selector.support_].tolist()
+
+        model = clone(make_final_pipeline(regressor))
+
+        for set_name, indices, rows in [
+            ("TRAIN", None, None),
+            ("VALIDATION", val_idx, validation_rows),
+            ("TEST", test_idx, test_rows),
+        ]:
+            if set_name == "TRAIN":
+                X_cur = imputer.transform(X_train_raw)
+                if use_scaler:
+                    X_cur = scaler.transform(X_cur)
+                X_cur = X_cur[:, selector.support_]
+                model.fit(X_cur, y_train)
+            else:
+                X_raw = X.iloc[indices]
+                X_cur = imputer.transform(X_raw)
+                if use_scaler:
+                    X_cur = scaler.transform(X_cur)
+                X_cur = X_cur[:, selector.support_]
+                y_true = as_1d(y.iloc[indices])
+                y_pred = as_1d(model.predict(X_cur))
+                rows.append(calculate_metrics(y_true, y_pred))
+                for subject, yt, yp in zip(X.index[indices], y_true, y_pred):
+                    pred_rows.append({
+                        "split": split_id, "subject": subject, "set": set_name,
+                        "y_true": float(yt), "y_pred": float(yp),
+                    })
+
+    rankings_df = pd.DataFrame(rankings_list)
+    feature_stability = pd.DataFrame({
+        "feature": X.columns,
+        "selected_frequency": (rankings_df == 1).mean(),
+        "mean_ranking": rankings_df.mean(),
+    }).sort_values("selected_frequency", ascending=False).reset_index(drop=True)
+
+    return {
+        "validation_iterations": pd.DataFrame(validation_rows),
+        "test_iterations": pd.DataFrame(test_rows),
+        "validation_summary": summarize_metric_rows(validation_rows, "val"),
+        "test_summary": summarize_metric_rows(test_rows, "test"),
+        "predictions": pd.DataFrame(pred_rows),
+        "selected_features": list(X.columns),
+        "rfe_ranking": feature_stability,
+        "feature_stability": feature_stability,
+        "metadata": {
+            "regressor": regressor_name,
+            "use_scaler": use_scaler,
+            "rfe_mode": "split-wise",
+            "rfe_n_features": n_features,
+        },
     }
 
 
@@ -745,6 +923,8 @@ def save_excel_report(
         final_report["test_iterations"].to_excel(writer, sheet_name="test_iterations", index=False)
         selected_features_df.to_excel(writer, sheet_name="selected_features", index=False)
         final_report["rfe_ranking"].to_excel(writer, sheet_name="rfe_ranking", index=False)
+        if "feature_stability" in final_report:
+            final_report["feature_stability"].to_excel(writer, sheet_name="feature_stability", index=False)
         final_report["predictions"].to_excel(writer, sheet_name="predictions", index=False)
         splits_df.to_excel(writer, sheet_name="mmcv_splits", index=False)
 
@@ -769,6 +949,8 @@ def save_study_outputs(
     final_report["test_iterations"].to_csv(output_dir / "final_test_iterations.csv", index=False)
     final_report["predictions"].to_csv(output_dir / "final_predictions.csv", index=False)
     final_report["rfe_ranking"].to_csv(output_dir / "rfe_ranking.csv", index=False)
+    if "feature_stability" in final_report:
+        final_report["feature_stability"].to_csv(output_dir / "feature_stability.csv", index=False)
     pd.DataFrame({"feature": final_report["selected_features"]}).to_csv(
         output_dir / "selected_features.csv", index=False
     )
@@ -823,8 +1005,8 @@ def run_one_target(
         splits_opt = splits_opt[1:]  # quitar split 0 (reservado para RFE)
         n_opt = len(splits_opt)
     logger.info(
-        "Using %d splits for optimization (RFE fixed=%s)",
-        n_opt, rfe_mode == "fixed",
+        "Using %d splits for optimization (RFE=%s)",
+        n_opt, rfe_mode,
     )
 
     db_path = output_dir / f"optuna_trials_{experiment_name}.db"
@@ -846,8 +1028,20 @@ def run_one_target(
         n_trials, n_splits_opt, rfe_mode,
     )
 
-    study.optimize(
-        partial(
+    if rfe_mode == "split-wise":
+        obj_func = partial(
+            objective_regression_split_rfe,
+            X=X,
+            y=y,
+            splits=splits_opt,
+            optimize_metric=optimize_metric,
+            regressors=regressors,
+            timeout_sec=timeout_sec,
+            random_state=seed,
+            max_rfe_features=max_rfe_features,
+        )
+    else:
+        obj_func = partial(
             objective_regression,
             X=X,
             y=y,
@@ -858,7 +1052,10 @@ def run_one_target(
             random_state=seed,
             max_rfe_features=max_rfe_features,
             train_idx=train_idx,
-        ),
+        )
+
+    study.optimize(
+        obj_func,
         n_trials=n_trials,
         callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=50)],
         catch=(ValueError, FloatingPointError, np.linalg.LinAlgError, TrialTimeout),
@@ -870,16 +1067,27 @@ def run_one_target(
 
     logger.info("Best trial found (trial %d). Re-evaluating on all splits…", study.best_trial.number)
 
-    final_report = evaluate_fixed_trial(
-        params=study.best_trial.params,
-        X=X,
-        y=y,
-        splits=splits,
-        regressors=regressors,
-        random_state=seed,
-        max_rfe_features=max_rfe_features,
-        train_idx=train_idx,
-    )
+    if rfe_mode == "split-wise":
+        final_report = evaluate_fixed_trial_split_rfe(
+            params=study.best_trial.params,
+            X=X,
+            y=y,
+            splits=splits,
+            regressors=regressors,
+            random_state=seed,
+            max_rfe_features=max_rfe_features,
+        )
+    else:
+        final_report = evaluate_fixed_trial(
+            params=study.best_trial.params,
+            X=X,
+            y=y,
+            splits=splits,
+            regressors=regressors,
+            random_state=seed,
+            max_rfe_features=max_rfe_features,
+            train_idx=train_idx,
+        )
     save_study_outputs(study, output_dir, experiment_name, final_report, splits_df)
 
     val = final_report["validation_summary"]
@@ -905,8 +1113,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--window", required=True, help="Window number, e.g. 10 for W10")
     parser.add_argument("--experiment", default="raw", choices=["raw", "zscores", "rawzscore"],
                         help="Experiment: raw, zscores, or rawzscore (default: raw)")
-    parser.add_argument("--rfe", default="global", choices=["global", "fixed"],
-                        help="RFE mode: global (all data, leaky) or fixed (train of split 0, no leakage) (default: global)")
+    parser.add_argument("--rfe", default="global", choices=["global", "fixed", "split-wise"],
+                        help="RFE mode: global (all data, leaky), fixed (train of split 0, no leakage), or split-wise (RFE per split, reports feature stability) (default: global)")
     parser.add_argument("--targets", default="all", help="MOT, COG, MOT_V4, COG_V1, old, or all")
     parser.add_argument("--covar", default=None, help="Comma-separated metadata covariates")
     parser.add_argument("--optimize", default="mae", choices=sorted(LOWER_IS_BETTER | HIGHER_IS_BETTER))
