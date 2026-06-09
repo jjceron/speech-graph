@@ -1,0 +1,873 @@
+"""Optuna regression experiments with configurable RFE for speech-graph features.
+
+The model is selected only with validation metrics. Test metrics are computed
+once for the best validation trial and saved as the final report.
+
+Usage:
+    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment raw --rfe fixed --targets all
+    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment zscores --rfe global --targets MOT,COG
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+import warnings
+from functools import partial
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import optuna
+import pandas as pd
+from scipy import stats as sp_stats
+from scipy.stats import spearmanr
+from sklearn.base import clone
+from sklearn.ensemble import (
+    BaggingRegressor,
+    ExtraTreesRegressor,
+    RandomForestRegressor,
+    StackingRegressor,
+)
+from sklearn.feature_selection import RFE
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import ElasticNet, LinearRegression, QuantileRegressor, Ridge
+from sklearn.metrics import (
+    max_error,
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+    median_absolute_error,
+    r2_score,
+)
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVR, SVR
+from sklearn.tree import DecisionTreeRegressor
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.analysis import experiment_config as expcfg
+from src.analysis.linear_regression_rcv import (
+    ALL_TARGETS,
+    generate_mmcv_splits,
+)
+
+try:
+    from sklearn.metrics import d2_absolute_error_score
+except Exception:  # pragma: no cover
+    d2_absolute_error_score = None
+
+try:
+    from xgboost import XGBRegressor
+except Exception:  # pragma: no cover
+    XGBRegressor = None
+
+
+METRIC_NAMES = ["mae", "d2mae", "rmse", "mape", "r2", "median_ae", "max_error", "rho"]
+LOWER_IS_BETTER = {"mae", "rmse", "mape", "median_ae", "max_error"}
+HIGHER_IS_BETTER = {"d2mae", "r2", "rho"}
+
+DEFAULT_REGRESSORS = [
+    "LinearRegression",
+    "Ridge",
+    "ElasticNet",
+    "QuantileRegressor",
+    "SVR",
+    "RandomForestRegressor",
+    "ExtraTreesRegressor",
+    "BaggingRegressor",
+    "StackingRegressor",
+    "GaussianProcessRegressor",
+    "KNeighborsRegressor",
+    "DecisionTreeRegressor",
+    "XGBRegressor",
+]
+
+
+class TrialTimeout(Exception):
+    pass
+
+
+def as_1d(y: Any) -> np.ndarray:
+    return np.asarray(y).reshape(-1)
+
+
+def safe_d2mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """D2-MAE compares absolute error against a median baseline."""
+    if d2_absolute_error_score is not None:
+        return float(d2_absolute_error_score(y_true, y_pred))
+    denominator = np.sum(np.abs(y_true - np.median(y_true)))
+    if denominator == 0:
+        return np.nan
+    return float(1.0 - np.sum(np.abs(y_true - y_pred)) / denominator)
+
+
+def calculate_metrics(y_true: Any, y_pred: Any) -> dict[str, float]:
+    """Regression metrics used for model comparison and reporting."""
+    yt = as_1d(y_true).astype(float)
+    yp = as_1d(y_pred).astype(float)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        rho, _ = spearmanr(yt, yp)
+
+    return {
+        "mae": float(mean_absolute_error(yt, yp)),
+        "d2mae": safe_d2mae(yt, yp),
+        "rmse": float(np.sqrt(mean_squared_error(yt, yp))),
+        "mape": float(mean_absolute_percentage_error(yt, yp)),
+        "r2": float(r2_score(yt, yp)),
+        "median_ae": float(median_absolute_error(yt, yp)),
+        "max_error": float(max_error(yt, yp)),
+        "rho": float(rho) if np.isfinite(rho) else np.nan,
+    }
+
+
+def summarize_metric_rows(rows: list[dict[str, float]], suffix: str) -> dict[str, float]:
+    """Mean, standard deviation and 95% t interval per metric."""
+    df = pd.DataFrame(rows)
+    out: dict[str, float] = {f"n_splits_{suffix}": len(df)}
+
+    for metric in METRIC_NAMES:
+        values = df[metric].replace([np.inf, -np.inf], np.nan).dropna().astype(float).values
+        if len(values) == 0:
+            mean = std = ci = t_crit = dfree = np.nan
+        elif len(values) == 1:
+            mean = float(values[0])
+            std = ci = t_crit = np.nan
+            dfree = 0
+        else:
+            mean = float(np.mean(values))
+            std = float(np.std(values, ddof=1))
+            t_crit = float(sp_stats.t.ppf(0.975, df=len(values) - 1))
+            ci = float(t_crit * sp_stats.sem(values))
+            dfree = len(values) - 1
+
+        out[f"{metric}_mean_{suffix}"] = mean
+        out[f"{metric}_std_{suffix}"] = std
+        out[f"{metric}_ci_lower_{suffix}"] = mean - ci if np.isfinite(ci) else np.nan
+        out[f"{metric}_ci_upper_{suffix}"] = mean + ci if np.isfinite(ci) else np.nan
+        out[f"{metric}_samperror_{suffix}"] = ci
+        out[f"{metric}_t_critical_{suffix}"] = t_crit
+        out[f"{metric}_df_{suffix}"] = dfree
+
+    out[f"r2_below_zero_{suffix}"] = float((df["r2"] < 0).mean()) if "r2" in df else np.nan
+    return out
+
+
+def metric_to_objective(value: float, metric: str) -> float:
+    if metric in LOWER_IS_BETTER:
+        return float(value)
+    if metric in HIGHER_IS_BETTER:
+        return -float(value)
+    raise ValueError(f"Unknown optimization metric: {metric}")
+
+
+def objective_direction(metric: str) -> str:
+    return "minimize"
+
+
+def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
+    """Return the final regressor and whether SVR is non-linear."""
+    is_svr_non_linear = False
+
+    if name == "LinearRegression":
+        reg = LinearRegression()
+
+    elif name == "Ridge":
+        reg = Ridge(
+            alpha=trial.suggest_float("ridge_alpha", 1e-3, 100.0, log=True),
+            solver=trial.suggest_categorical("ridge_solver", ["auto", "svd", "lsqr", "sparse_cg"]),
+            random_state=random_state,
+        )
+
+    elif name == "ElasticNet":
+        reg = ElasticNet(
+            alpha=trial.suggest_float("elastic_alpha", 1e-4, 10.0, log=True),
+            l1_ratio=trial.suggest_float("elastic_l1_ratio", 0.0, 1.0),
+            random_state=random_state,
+            max_iter=20000,
+        )
+
+    elif name == "QuantileRegressor":
+        reg = QuantileRegressor(
+            quantile=0.5,
+            alpha=trial.suggest_float("quantile_alpha", 1e-4, 10.0, log=True),
+            solver="highs",
+        )
+
+    elif name == "SVR":
+        kernel = trial.suggest_categorical("svr_kernel", ["linear", "rbf", "poly"])
+        reg = SVR(
+            C=trial.suggest_float("svr_C", 1e-3, 100.0, log=True),
+            epsilon=trial.suggest_float("svr_epsilon", 1e-3, 10.0, log=True),
+            kernel=kernel,
+            degree=trial.suggest_int("svr_degree", 2, 5) if kernel == "poly" else 3,
+            gamma=trial.suggest_categorical("svr_gamma", ["scale", "auto"]),
+        )
+        is_svr_non_linear = kernel != "linear"
+
+    elif name == "RandomForestRegressor":
+        reg = RandomForestRegressor(
+            n_estimators=trial.suggest_int("rf_n_estimators", 50, 500),
+            max_depth=trial.suggest_int("rf_max_depth", 2, 20),
+            min_samples_split=trial.suggest_int("rf_min_samples_split", 2, 12),
+            min_samples_leaf=trial.suggest_int("rf_min_samples_leaf", 1, 5),
+            max_features=trial.suggest_categorical("rf_max_features", ["sqrt", "log2", None]),
+            random_state=random_state,
+            n_jobs=-1,
+        )
+
+    elif name == "ExtraTreesRegressor":
+        reg = ExtraTreesRegressor(
+            n_estimators=trial.suggest_int("et_n_estimators", 50, 500),
+            max_depth=trial.suggest_int("et_max_depth", 2, 20),
+            min_samples_split=trial.suggest_int("et_min_samples_split", 2, 12),
+            min_samples_leaf=trial.suggest_int("et_min_samples_leaf", 1, 5),
+            max_features=trial.suggest_categorical("et_max_features", ["sqrt", "log2", None]),
+            criterion="friedman_mse",
+            random_state=random_state,
+            n_jobs=-1,
+        )
+
+    elif name == "BaggingRegressor":
+        reg = BaggingRegressor(
+            n_estimators=trial.suggest_int("bag_n_estimators", 20, 300),
+            max_samples=trial.suggest_float("bag_max_samples", 0.5, 1.0),
+            max_features=trial.suggest_float("bag_max_features", 0.5, 1.0),
+            random_state=random_state,
+            n_jobs=-1,
+        )
+
+    elif name == "StackingRegressor":
+        final_name = trial.suggest_categorical(
+            "stack_final_estimator", ["Ridge", "RandomForestRegressor", "ExtraTreesRegressor"]
+        )
+        if final_name == "Ridge":
+            final_estimator = Ridge(random_state=random_state)
+        elif final_name == "RandomForestRegressor":
+            final_estimator = RandomForestRegressor(n_estimators=100, random_state=random_state, n_jobs=-1)
+        else:
+            final_estimator = ExtraTreesRegressor(n_estimators=100, random_state=random_state, n_jobs=-1)
+        reg = StackingRegressor(
+            estimators=[("ridge", Ridge(random_state=random_state)), ("svr", SVR(kernel="linear"))],
+            final_estimator=final_estimator,
+            cv=5,
+            n_jobs=-1,
+        )
+
+    elif name == "GaussianProcessRegressor":
+        reg = GaussianProcessRegressor(
+            alpha=trial.suggest_float("gpr_alpha", 1e-10, 1e-1, log=True),
+            random_state=random_state,
+        )
+
+    elif name == "KNeighborsRegressor":
+        reg = KNeighborsRegressor(
+            n_neighbors=trial.suggest_int("knn_n_neighbors", 1, 20),
+            weights=trial.suggest_categorical("knn_weights", ["uniform", "distance"]),
+            metric=trial.suggest_categorical("knn_metric", ["euclidean", "manhattan", "minkowski"]),
+        )
+
+    elif name == "DecisionTreeRegressor":
+        reg = DecisionTreeRegressor(
+            max_depth=trial.suggest_int("dt_max_depth", 2, 20),
+            min_samples_split=trial.suggest_int("dt_min_samples_split", 2, 20),
+            min_samples_leaf=trial.suggest_int("dt_min_samples_leaf", 1, 5),
+            random_state=random_state,
+        )
+
+    elif name == "XGBRegressor":
+        if XGBRegressor is None:
+            raise optuna.TrialPruned("xgboost is not installed")
+        reg = XGBRegressor(
+            n_estimators=trial.suggest_int("xgb_n_estimators", 50, 500),
+            max_depth=trial.suggest_int("xgb_max_depth", 2, 10),
+            learning_rate=trial.suggest_float("xgb_learning_rate", 1e-3, 0.3, log=True),
+            subsample=trial.suggest_float("xgb_subsample", 0.5, 1.0),
+            colsample_bytree=trial.suggest_float("xgb_colsample_bytree", 0.5, 1.0),
+            reg_alpha=trial.suggest_float("xgb_reg_alpha", 1e-8, 10.0, log=True),
+            reg_lambda=trial.suggest_float("xgb_reg_lambda", 1e-8, 10.0, log=True),
+            booster=trial.suggest_categorical("xgb_booster", ["gbtree", "dart", "gblinear"]),
+            objective="reg:squarederror",
+            random_state=random_state,
+            n_jobs=-1,
+        )
+
+    else:
+        raise ValueError(f"Unknown regressor: {name}")
+
+    return reg, is_svr_non_linear
+
+
+def get_rfe_estimator(
+    trial: optuna.trial.BaseTrial,
+    regressor_name: str,
+    final_regressor: Any,
+    is_svr_non_linear: bool,
+    random_state: int,
+):
+    """Use the final model for RFE when possible, otherwise use a proxy."""
+    incompatible = {
+        "KNeighborsRegressor",
+        "GaussianProcessRegressor",
+        "BaggingRegressor",
+        "StackingRegressor",
+    }
+    if regressor_name not in incompatible and not is_svr_non_linear:
+        return clone(final_regressor), {"mode": "original", "type": regressor_name}
+
+    proxy = trial.suggest_categorical("rfe_proxy_type", ["ExtraTrees", "LinearSVR"])
+    if proxy == "ExtraTrees":
+        estimator = ExtraTreesRegressor(
+            n_estimators=trial.suggest_int("rfe_proxy_et_n_estimators", 20, 150, step=10),
+            max_depth=trial.suggest_int("rfe_proxy_et_max_depth", 2, 12),
+            min_samples_split=trial.suggest_int("rfe_proxy_et_min_samples_split", 2, 12),
+            min_samples_leaf=trial.suggest_int("rfe_proxy_et_min_samples_leaf", 1, 5),
+            criterion="friedman_mse",
+            random_state=random_state,
+            n_jobs=-1,
+        )
+    else:
+        estimator = LinearSVR(
+            C=trial.suggest_float("rfe_proxy_lsvr_C", 1e-3, 10.0, log=True),
+            epsilon=trial.suggest_float("rfe_proxy_lsvr_epsilon", 1e-4, 1.0, log=True),
+            random_state=random_state,
+            max_iter=30000,
+        )
+    return estimator, {"mode": "proxy", "type": proxy}
+
+
+def fit_global_rfe(
+    X: pd.DataFrame,
+    y: pd.Series,
+    trial: optuna.trial.BaseTrial,
+    rfe_estimator: Any,
+    use_scaler: bool,
+    max_rfe_features: int | None,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Fit imputation, optional scaling and RFE before MMCV."""
+    n_candidates = X.shape[1]
+    if n_candidates < 1:
+        raise optuna.TrialPruned("No candidate features available")
+
+    upper = min(n_candidates, max_rfe_features or n_candidates)
+    lower = 1 if upper == 1 else 2
+    n_features = trial.suggest_int("rfe_n_features", lower, upper)
+
+    imputer = SimpleImputer(strategy="mean")
+    X_proc = imputer.fit_transform(X)
+
+    scaler = None
+    if use_scaler:
+        scaler = StandardScaler()
+        X_proc = scaler.fit_transform(X_proc)
+
+    selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=1)
+    selector.fit(X_proc, as_1d(y))
+
+    selected_features = X.columns[selector.support_].tolist()
+    selected_ranks = pd.DataFrame(
+        {
+            "feature": X.columns,
+            "selected": selector.support_,
+            "ranking": selector.ranking_,
+        }
+    ).sort_values(["selected", "ranking", "feature"], ascending=[False, True, True])
+
+    X_selected = pd.DataFrame(X_proc[:, selector.support_], columns=selected_features, index=X.index)
+    metadata = {
+        "n_candidate_features": int(n_candidates),
+        "rfe_n_features": int(n_features),
+        "rfe_selected_features": selected_features,
+        "rfe_ranking": selected_ranks,
+        "imputer": imputer,
+        "scaler": scaler,
+        "selector": selector,
+    }
+    return X_selected, metadata
+
+
+def make_final_pipeline(regressor: Any) -> Pipeline:
+    return Pipeline([("regressor", regressor)])
+
+
+def build_trial_artifacts(
+    trial: optuna.trial.BaseTrial,
+    X: pd.DataFrame,
+    y: pd.Series,
+    regressors: list[str],
+    random_state: int,
+    max_rfe_features: int | None,
+    train_idx: np.ndarray | None = None,
+) -> tuple[pd.DataFrame, Pipeline, dict[str, Any]]:
+    regressor_name = trial.suggest_categorical("regressor", regressors)
+    use_scaler = trial.suggest_categorical("use_scaler", [True, False])
+
+    if regressor_name in {"SVR", "KNeighborsRegressor", "GaussianProcessRegressor"}:
+        use_scaler = True
+
+    regressor, is_svr_non_linear = get_regressor(trial, regressor_name, random_state)
+    rfe_estimator, rfe_info = get_rfe_estimator(
+        trial, regressor_name, regressor, is_svr_non_linear, random_state
+    )
+
+    if train_idx is not None:
+        X_fit = X.iloc[train_idx]
+        y_fit = y.iloc[train_idx]
+    else:
+        X_fit = X
+        y_fit = y
+
+    X_model, rfe_meta = fit_global_rfe(
+        X=X_fit,
+        y=y_fit,
+        trial=trial,
+        rfe_estimator=rfe_estimator,
+        use_scaler=use_scaler,
+        max_rfe_features=max_rfe_features,
+    )
+
+    if train_idx is not None:
+        X_all_proc = rfe_meta["imputer"].transform(X)
+        if rfe_meta["scaler"] is not None:
+            X_all_proc = rfe_meta["scaler"].transform(X_all_proc)
+        X_model = pd.DataFrame(
+            X_all_proc[:, rfe_meta["selector"].support_],
+            columns=rfe_meta["rfe_selected_features"],
+            index=X.index,
+        )
+
+    pipeline = make_final_pipeline(regressor)
+    metadata = {
+        "regressor": regressor_name,
+        "use_scaler": bool(use_scaler),
+        "rfe_estimator": rfe_info,
+        **rfe_meta,
+    }
+    return X_model, pipeline, metadata
+
+
+def objective_regression(
+    trial: optuna.Trial,
+    X: pd.DataFrame,
+    y: pd.Series,
+    splits: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    optimize_metric: str,
+    regressors: list[str],
+    timeout_sec: int | None,
+    random_state: int,
+    max_rfe_features: int | None,
+    train_idx: np.ndarray | None = None,
+) -> float:
+    start = time.time()
+    X_model, pipeline, metadata = build_trial_artifacts(
+        trial=trial,
+        X=X,
+        y=y,
+        regressors=regressors,
+        random_state=random_state,
+        max_rfe_features=max_rfe_features,
+        train_idx=train_idx,
+    )
+
+    trial.set_user_attr("regressor_final", metadata["regressor"])
+    trial.set_user_attr("use_scaler_final", metadata["use_scaler"])
+    trial.set_user_attr("rfe_estimator", metadata["rfe_estimator"])
+    trial.set_user_attr("rfe_n_features", metadata["rfe_n_features"])
+    trial.set_user_attr("rfe_selected_features", metadata["rfe_selected_features"])
+
+    validation_rows: list[dict[str, float]] = []
+
+    for step, (train_idx, val_idx, _test_idx) in enumerate(splits, start=1):
+        model = clone(pipeline)
+        model.fit(X_model.iloc[train_idx], as_1d(y.iloc[train_idx]))
+        val_pred = model.predict(X_model.iloc[val_idx])
+        validation_rows.append(calculate_metrics(y.iloc[val_idx], val_pred))
+
+        partial = float(pd.DataFrame(validation_rows)[optimize_metric].mean())
+        trial.report(metric_to_objective(partial, optimize_metric), step)
+
+        if trial.should_prune():
+            trial.set_user_attr("termination_reason", "pruned")
+            raise optuna.TrialPruned()
+        if timeout_sec is not None and (time.time() - start) > timeout_sec:
+            trial.set_user_attr("termination_reason", "timeout")
+            raise optuna.TrialPruned()
+
+    validation_summary = summarize_metric_rows(validation_rows, "val")
+    for key, value in validation_summary.items():
+        trial.set_user_attr(key, value)
+    trial.set_user_attr("termination_reason", "completed")
+
+    return metric_to_objective(validation_summary[f"{optimize_metric}_mean_val"], optimize_metric)
+
+
+def evaluate_fixed_trial(
+    params: dict[str, Any],
+    X: pd.DataFrame,
+    y: pd.Series,
+    splits: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    regressors: list[str],
+    random_state: int,
+    max_rfe_features: int | None,
+    train_idx: np.ndarray | None = None,
+) -> dict[str, Any]:
+    """Evaluate the best validation configuration on validation and test splits."""
+    fixed_trial = optuna.trial.FixedTrial(params)
+    X_model, pipeline, metadata = build_trial_artifacts(
+        trial=fixed_trial,
+        X=X,
+        y=y,
+        regressors=regressors,
+        random_state=random_state,
+        max_rfe_features=max_rfe_features,
+        train_idx=train_idx,
+    )
+
+    validation_rows: list[dict[str, float]] = []
+    test_rows: list[dict[str, float]] = []
+    pred_rows: list[dict[str, Any]] = []
+
+    for split_id, (train_idx, val_idx, test_idx) in enumerate(splits):
+        model = clone(pipeline)
+        model.fit(X_model.iloc[train_idx], as_1d(y.iloc[train_idx]))
+
+        for set_name, indices, rows in [
+            ("VALIDATION", val_idx, validation_rows),
+            ("TEST", test_idx, test_rows),
+        ]:
+            pred = as_1d(model.predict(X_model.iloc[indices]))
+            truth = as_1d(y.iloc[indices])
+            rows.append(calculate_metrics(truth, pred))
+            for subject, yt, yp in zip(X_model.index[indices], truth, pred):
+                pred_rows.append(
+                    {
+                        "split": split_id,
+                        "subject": subject,
+                        "set": set_name,
+                        "y_true": float(yt),
+                        "y_pred": float(yp),
+                    }
+                )
+
+    return {
+        "validation_iterations": pd.DataFrame(validation_rows),
+        "test_iterations": pd.DataFrame(test_rows),
+        "validation_summary": summarize_metric_rows(validation_rows, "val"),
+        "test_summary": summarize_metric_rows(test_rows, "test"),
+        "predictions": pd.DataFrame(pred_rows),
+        "selected_features": metadata["rfe_selected_features"],
+        "rfe_ranking": metadata["rfe_ranking"],
+        "metadata": {k: v for k, v in metadata.items() if k not in {"imputer", "scaler", "selector", "rfe_ranking"}},
+    }
+
+
+def split_assignments(
+    X: pd.DataFrame,
+    splits: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+) -> pd.DataFrame:
+    rows = []
+    for split_id, (train_idx, val_idx, test_idx) in enumerate(splits):
+        for label, indices in [("TRAIN", train_idx), ("VALIDATION", val_idx), ("TEST", test_idx)]:
+            for idx in indices:
+                rows.append({"split": split_id, "subject": X.index[idx], "set": label})
+    return pd.DataFrame(rows)
+
+
+def encode_covariates(df: pd.DataFrame, covar_cols: list[str] | None) -> pd.DataFrame:
+    out = df.copy()
+    if not covar_cols:
+        return out
+    for col in covar_cols:
+        if col not in out.columns:
+            raise KeyError(f"Covariate not found in metadata: {col}")
+        if not pd.api.types.is_numeric_dtype(out[col]):
+            out[col] = pd.factorize(out[col])[0].astype(float)
+    return out
+
+
+def load_per_window_matrix(
+    task: int,
+    window: str,
+    experiment: str,
+    target: str,
+    metrics_dir: str | Path,
+    metadata_path: str | Path,
+    covar_cols: list[str] | None = None,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Build the per-window X/y matrix using experiment_config."""
+    full_window = f"T{task}W{window}"
+    X, y = expcfg.load_experiment_matrix(
+        experiment=experiment,
+        task=task,
+        window=int(window),
+        target=target,
+        metrics_dir=metrics_dir,
+        metadata_path=metadata_path,
+        covar_cols=covar_cols,
+    )
+    X = X.rename(columns={col: f"{col}_{full_window}" for col in X.columns})
+    return X, y
+
+
+def normalize_experiment(value: str) -> str:
+    valid = {"raw", "zscores", "rawzscore"}
+    if value.lower().strip() in valid:
+        return value.lower().strip()
+    raise ValueError(f"--experiment must be one of {valid}")
+
+
+def choose_targets(value: str) -> list[str]:
+    value = value.strip()
+    if value == "all":
+        return ALL_TARGETS
+    if value == "old":
+        return ["MOT", "COG"]
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def parse_regressors(value: str) -> list[str]:
+    if value == "default":
+        regressors = DEFAULT_REGRESSORS[:]
+    else:
+        regressors = [item.strip() for item in value.split(",") if item.strip()]
+
+    unknown = sorted(set(regressors) - set(DEFAULT_REGRESSORS))
+    if unknown:
+        raise ValueError(f"Unknown regressors: {unknown}")
+
+    if XGBRegressor is None:
+        regressors = [name for name in regressors if name != "XGBRegressor"]
+
+    if not regressors:
+        raise ValueError("No regressors available")
+    return regressors
+
+
+def save_excel_report(
+    path: Path,
+    trials_df: pd.DataFrame,
+    final_report: dict[str, Any],
+    splits_df: pd.DataFrame,
+) -> None:
+    selected_features_df = pd.DataFrame({"feature": final_report["selected_features"]})
+    final_summary = pd.DataFrame([{**final_report["validation_summary"], **final_report["test_summary"]}])
+    best_metadata = pd.DataFrame(
+        [{k: json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v
+          for k, v in final_report["metadata"].items()}]
+    )
+
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        trials_df.to_excel(writer, sheet_name="optuna_trials", index=False)
+        best_metadata.to_excel(writer, sheet_name="best_config", index=False)
+        final_summary.to_excel(writer, sheet_name="final_summary", index=False)
+        final_report["validation_iterations"].to_excel(writer, sheet_name="validation_iterations", index=False)
+        final_report["test_iterations"].to_excel(writer, sheet_name="test_iterations", index=False)
+        selected_features_df.to_excel(writer, sheet_name="selected_features", index=False)
+        final_report["rfe_ranking"].to_excel(writer, sheet_name="rfe_ranking", index=False)
+        final_report["predictions"].to_excel(writer, sheet_name="predictions", index=False)
+        splits_df.to_excel(writer, sheet_name="mmcv_splits", index=False)
+
+
+def save_study_outputs(
+    study: optuna.Study,
+    output_dir: Path,
+    experiment_name: str,
+    final_report: dict[str, Any],
+    splits_df: pd.DataFrame,
+) -> None:
+    trials_df = study.trials_dataframe()
+    trials_df.to_csv(output_dir / f"optuna_trials_{experiment_name}.csv", index=False)
+    save_excel_report(
+        output_dir / f"optuna_trials_{experiment_name}.xlsx",
+        trials_df=trials_df,
+        final_report=final_report,
+        splits_df=splits_df,
+    )
+
+    final_report["validation_iterations"].to_csv(output_dir / "final_validation_iterations.csv", index=False)
+    final_report["test_iterations"].to_csv(output_dir / "final_test_iterations.csv", index=False)
+    final_report["predictions"].to_csv(output_dir / "final_predictions.csv", index=False)
+    final_report["rfe_ranking"].to_csv(output_dir / "rfe_ranking.csv", index=False)
+    pd.DataFrame({"feature": final_report["selected_features"]}).to_csv(
+        output_dir / "selected_features.csv", index=False
+    )
+    splits_df.to_csv(output_dir / "mmcv_splits.csv", index=False)
+
+    json_payload = {
+        "best_trial_number": study.best_trial.number,
+        "best_value_internal_minimized": study.best_value,
+        "best_params": study.best_trial.params,
+        "best_metadata": final_report["metadata"],
+        "validation_summary": final_report["validation_summary"],
+        "test_summary": final_report["test_summary"],
+        "selected_features": final_report["selected_features"],
+    }
+    (output_dir / "best_trial_final_report.json").write_text(
+        json.dumps(json_payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
+
+
+def run_one_target(
+    X: pd.DataFrame,
+    y: pd.Series,
+    output_dir: Path,
+    experiment_name: str,
+    optimize_metric: str,
+    regressors: list[str],
+    n_trials: int,
+    n_iter: int,
+    seed: int,
+    timeout_sec: int | None,
+    max_rfe_features: int | None,
+    pruner_startup_trials: int,
+    pruner_warmup_steps: int,
+    rfe_mode: str = "global",
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    splits = generate_mmcv_splits(X, y, n_splits=n_iter, random_state=seed)
+    splits_df = split_assignments(X, splits)
+
+    train_idx = splits[0][0] if rfe_mode == "fixed" else None
+
+    db_path = output_dir / f"optuna_trials_{experiment_name}.db"
+    study = optuna.create_study(
+        sampler=optuna.samplers.TPESampler(seed=seed),
+        pruner=optuna.pruners.MedianPruner(
+            n_startup_trials=pruner_startup_trials,
+            n_warmup_steps=pruner_warmup_steps,
+        ),
+        study_name=f"optimizacion_{experiment_name}",
+        storage=f"sqlite:///{db_path}",
+        direction=objective_direction(optimize_metric),
+        load_if_exists=True,
+    )
+
+    study.optimize(
+        partial(
+            objective_regression,
+            X=X,
+            y=y,
+            splits=splits,
+            optimize_metric=optimize_metric,
+            regressors=regressors,
+            timeout_sec=timeout_sec,
+            random_state=seed,
+            max_rfe_features=max_rfe_features,
+            train_idx=train_idx,
+        ),
+        n_trials=n_trials,
+        catch=(ValueError, FloatingPointError, np.linalg.LinAlgError, TrialTimeout),
+    )
+
+    if study.best_trial is None:
+        raise RuntimeError("No completed trial is available")
+
+    final_report = evaluate_fixed_trial(
+        params=study.best_trial.params,
+        X=X,
+        y=y,
+        splits=splits,
+        regressors=regressors,
+        random_state=seed,
+        max_rfe_features=max_rfe_features,
+        train_idx=train_idx,
+    )
+    save_study_outputs(study, output_dir, experiment_name, final_report, splits_df)
+
+    val = final_report["validation_summary"]
+    test = final_report["test_summary"]
+    print(f"\nBest validation trial: {study.best_trial.number}")
+    print(f"RFE mode: {rfe_mode}")
+    print(f"Selected features: {len(final_report['selected_features'])}")
+    print(
+        f"VALIDATION {optimize_metric}: {val[f'{optimize_metric}_mean_val']:.6f} | "
+        f"TEST {optimize_metric}: {test[f'{optimize_metric}_mean_test']:.6f}"
+    )
+    print(f"Saved outputs in: {output_dir}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="py -m src.analysis.regression_optuna",
+        description="Optuna multi-regressor MMCV with global RFE as a required hyperparameter.",
+    )
+    parser.add_argument("--task", type=int, required=True, choices=[2, 6, 7])
+    parser.add_argument("--window", required=True, help="Window number, e.g. 10 for W10")
+    parser.add_argument("--experiment", default="raw", choices=["raw", "zscores", "rawzscore"],
+                        help="Experiment: raw, zscores, or rawzscore (default: raw)")
+    parser.add_argument("--rfe", default="global", choices=["global", "fixed"],
+                        help="RFE mode: global (all data, leaky) or fixed (train of split 0, no leakage) (default: global)")
+    parser.add_argument("--targets", default="all", help="MOT, COG, MOT_V4, COG_V1, old, or all")
+    parser.add_argument("--covar", default=None, help="Comma-separated metadata covariates")
+    parser.add_argument("--optimize", default="mae", choices=sorted(LOWER_IS_BETTER | HIGHER_IS_BETTER))
+    parser.add_argument("--regressors", default="default", help="default or comma-separated regressor names")
+    parser.add_argument("--n-trials", type=int, default=300)
+    parser.add_argument("--n-iter", type=int, default=400)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--timeout-sec", type=int, default=480)
+    parser.add_argument("--max-rfe-features", type=int, default=100)
+    parser.add_argument("--pruner-startup-trials", type=int, default=50)
+    parser.add_argument("--pruner-warmup-steps", type=int, default=10)
+    parser.add_argument("--metrics-dir", default="data/processed/metrics")
+    parser.add_argument("--metadata", default="data/raw/metadata.xlsx")
+    parser.add_argument("--output", default="outputs/regression_optuna")
+    parser.add_argument("--run-name", default=None, help="Optional experiment name suffix")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    experiment = normalize_experiment(args.experiment)
+    targets = choose_targets(args.targets)
+    regressors = parse_regressors(args.regressors)
+    covar_cols = [item.strip() for item in args.covar.split(",") if item.strip()] if args.covar else None
+
+    print("Regression Optuna experiment with RFE")
+    print(f"Task={args.task} | Window=W{args.window} | Experiment={experiment} | RFE={args.rfe} | Targets={targets}")
+    print(f"Optimization metric={args.optimize} | Trials={args.n_trials} | MMCV splits={args.n_iter}")
+    print(f"Regressors={regressors}")
+
+    for target in targets:
+        X, y = load_per_window_matrix(
+            task=args.task,
+            window=args.window,
+            experiment=experiment,
+            target=target,
+            metrics_dir=args.metrics_dir,
+            metadata_path=args.metadata,
+            covar_cols=covar_cols,
+        )
+        print(f"\nTarget={target} | Subjects={len(y)} | Candidate predictors={X.shape[1]}")
+
+        suffix = f"_{args.run_name}" if args.run_name else ""
+        experiment_name = f"task{args.task}_W{args.window}_{experiment}_{target}_rfe{args.rfe}_{args.optimize}{suffix}"
+        output_dir = Path(args.output) / f"task{args.task}" / f"W{args.window}_{experiment}" / target
+
+        run_one_target(
+            X=X,
+            y=y,
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            optimize_metric=args.optimize,
+            regressors=regressors,
+            n_trials=args.n_trials,
+            n_iter=args.n_iter,
+            seed=args.seed,
+            timeout_sec=args.timeout_sec,
+            max_rfe_features=args.max_rfe_features,
+            pruner_startup_trials=args.pruner_startup_trials,
+            pruner_warmup_steps=args.pruner_warmup_steps,
+            rfe_mode=args.rfe,
+        )
+
+    print("\nDone.")
+
+
+if __name__ == "__main__":
+    main()

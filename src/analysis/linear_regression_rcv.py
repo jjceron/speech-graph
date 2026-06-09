@@ -6,10 +6,10 @@ Uses stratified 70/20/10 splits, RidgeCV for automatic alpha selection,
 and reports metrics with 95% t-distribution confidence intervals.
 
 Usage:
-    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --type raw --all-metrics --run-name W10_allmetrics
-    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --type raw --top-k 5 --run-name W10_top5metrics
-    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --type z --all-metrics --run-name W10_z_allmetrics
-    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --type z --top-k 5 --run-name W10_z_top5metrics
+    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --experiment raw --all-metrics --run-name W10_allmetrics
+    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --experiment raw --top-k 5 --run-name W10_top5metrics
+    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --experiment zscores --all-metrics --run-name W10_zscores_allmetrics
+    py -m src.analysis.linear_regression_rcv --task 2 --window 10 --experiment rawzscore --all-metrics --run-name W10_rawzscore_allmetrics
 
 Output root (default): outputs/linear_regression/
 """
@@ -34,8 +34,9 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.analysis import experiment_config as expcfg
 from src.analysis.correlation_analysis import (
-    ITEM, _compute_targets, find_means_tables, load_feature_table,
+    _compute_targets, find_means_tables, load_feature_table,
 )
 from src.visualization.lr_metrics import plot_all_regression_figures
 from src.pipeline.speechgraph import load_metadata
@@ -51,18 +52,13 @@ ALL_TARGETS = ["MOT", "COG", "MOT_V4", "COG_V1"]
 ALPHA_GRID = np.logspace(-2, 3, 20)
 
 
-def _window_size(tag: str) -> int:
-    m = re.search(r"W(\d+)", tag)
-    return int(m.group(1)) if m else 0
-
-
 def filter_cc_features(feat_ids: list[str]) -> list[str]:
     out = []
     for fid in feat_ids:
         is_cc = fid.startswith("cc_") or fid.startswith("z_cc_")
         if is_cc:
-            tag_match = re.search(r"(T\d+W\d+)", fid)
-            if tag_match and _window_size(tag_match.group(1)) < 100:
+            tag_match = re.search(r"W(\d+)", fid)
+            if tag_match and int(tag_match.group(1)) < 100:
                 continue
         out.append(fid)
     return out
@@ -432,8 +428,8 @@ def run_mmcv_ridge(
 def run_per_window_analysis(
     task_num: int,
     window: str,
-    window_type: str,
-    meta: pd.DataFrame,
+    experiment: str,
+    metadata_path: str | Path,
     metrics_dir: Path,
     targets: list[str],
     covar_cols: list[str] | None = None,
@@ -449,70 +445,29 @@ def run_per_window_analysis(
         alphas = ALPHA_GRID
 
     full_window = f"T{task_num}W{window}"
-
-    tables = find_means_tables(metrics_dir, tasks=[task_num])
-    tables = [t for t in tables if t["tag"] == full_window and t["type"] == window_type]
-
-    if not tables:
-        print(f"  No means table found for window={full_window}, type={window_type}")
-        return []
-
-    entry = tables[0]
-    feats = load_feature_table(entry["path"])
-    merged = feats.merge(meta, left_on="file", right_on="Cod", how="inner")
-
     metric_mode = "all_metrics" if top_k is None else f"top{top_k}_metrics"
     summary_rows = []
 
     for tgt in targets:
+        X_matrix, y_series = expcfg.load_experiment_matrix(
+            experiment=experiment,
+            task=task_num,
+            window=int(window),
+            target=tgt,
+            metrics_dir=metrics_dir,
+            metadata_path=metadata_path,
+            covar_cols=covar_cols,
+        )
+        X_matrix = X_matrix.rename(
+            columns={col: f"{col}_{full_window}" for col in X_matrix.columns}
+        )
+
         print(f"\n{'='*60}")
-        print(f"Target: {tgt} | Window: W{window} | Task: {task_num} | Type: {window_type}" +
+        print(f"Target: {tgt} | Window: W{window} | Task: {task_num} | Experiment: {experiment}" +
               (f" | Covariates: {covar_cols}" if covar_cols else "") +
               f" | Mode: {metric_mode}")
         print(f"{'='*60}")
-
-        # Build full feature set (same for all_metrics and top-k — top-k selection happens inside CV loop)
-        feature_cols = [c for c in feats.columns if c != "file"]
-        if window_type == "raw":
-            feature_cols = [c for c in feature_cols if c in METRICS_OF_INTEREST]
-        else:
-            feature_cols = [
-                c for c in feature_cols
-                if c.startswith("z_") and c.replace("z_", "") in METRICS_OF_INTEREST
-            ]
-
-        feat_ids = [f"{c}_{full_window}" for c in feature_cols]
-        feat_ids = filter_cc_features(feat_ids)
-        if not feat_ids:
-            print(f"  No valid features after filtering. Skipping {tgt}.")
-            continue
-
-        # Build predictor matrix
-        n_subjects_before = len(merged)
-        X_list = []
-        for fid in feat_ids:
-            base_feat = fid.replace(f"_{full_window}", "")
-            ser = merged.set_index("file")[base_feat].rename(fid)
-            X_list.append(ser)
-
-        X = pd.concat(X_list, axis=1)
-        y = merged.set_index("file")[tgt]
-
-        if covar_cols:
-            covar_df = merged[["file"] + covar_cols].drop_duplicates(subset="file")
-            covar_df = covar_df.set_index("file")
-            X = X.join(covar_df, how="left")
-
-        # Align and drop NaN
-        combined = X.join(y, how="inner").dropna()
-        if len(combined) < 20:
-            print(f"  Only {len(combined)} valid subjects (< 20). Skipping.")
-            continue
-
-        y_series = combined[tgt]
-        X_matrix = combined.drop(columns=[tgt])
-
-        print(f"  Subjects: {len(combined)} (out of {n_subjects_before} with metrics)")
+        print(f"  Subjects: {len(y_series)}")
         print(f"  Predictors ({X_matrix.shape[1]}): {list(X_matrix.columns)}")
 
         # Generate MMCV splits (stratified by target quintiles)
@@ -541,7 +496,7 @@ def run_per_window_analysis(
         df_splits = pd.DataFrame(split_records)
 
         task_str = f"task{task_num}"
-        exp_root = run_dir = output_root / task_str / (run_name or f"W{window}_{window_type}_{metric_mode}")
+        exp_root = run_dir = output_root / task_str / (run_name or f"W{window}_{experiment}_{metric_mode}")
         run_dir = exp_root / tgt
         run_dir.mkdir(parents=True, exist_ok=True)
         figs_dir = run_dir / "figures"
@@ -568,9 +523,9 @@ def run_per_window_analysis(
         summary_rows.append({
             "target": tgt,
             "window": full_window,
-            "feature_type": window_type,
+            "experiment": experiment,
             "covariates": ", ".join(covar_cols) if covar_cols else "",
-            "n_subjects": len(combined),
+            "n_subjects": len(y_series),
             "n_candidate_predictors": X_matrix.shape[1],
             "n_selected_per_split": top_k if top_k is not None else X_matrix.shape[1],
             "predictors": ", ".join(X_matrix.columns),
@@ -680,7 +635,7 @@ def run_per_window_analysis(
 
 def run_analysis(
     target: str = "all",
-    ftype: str = "all",
+    experiment: str = "raw",
     feature_list: str | None = None,
     window: str | None = None,
     task: int | None = None,
@@ -703,10 +658,6 @@ def run_analysis(
         alphas = ALPHA_GRID
     covar_cols = [c.strip() for c in covar.split(",") if c.strip()] if covar else None
 
-    print("Loading metadata...")
-    meta = load_metadata(metadata_path)
-    meta = _compute_targets(meta)
-
     # Determine targets
     if target == "all":
         targets = ALL_TARGETS
@@ -714,8 +665,6 @@ def run_analysis(
         targets = ["MOT", "COG"]
     else:
         targets = [t.strip() for t in target.split(",")]
-
-    ftype_filter = ftype
 
     if window is not None:
         # Per-window mode
@@ -729,8 +678,8 @@ def run_analysis(
         summary_rows = run_per_window_analysis(
             task_num=task,
             window=window,
-            window_type=ftype_filter,
-            meta=meta,
+            experiment=experiment,
+            metadata_path=metadata_path,
             metrics_dir=Path(metrics_dir),
             targets=targets,
             covar_cols=covar_cols,
@@ -744,12 +693,16 @@ def run_analysis(
         return
 
     # Legacy modes: feature-list or corr-dir
+    print("Loading metadata...")
+    meta = load_metadata(metadata_path)
+    meta = _compute_targets(meta)
+
     print("Loading metric tables...")
     all_data = load_all_features(Path(metrics_dir), meta, ftype_filter="all")
     raw_df = all_data.get("raw", pd.DataFrame())
     z_df = all_data.get("z", pd.DataFrame())
 
-    ftypes = ["raw", "z"] if ftype == "all" else [ftype]
+    ftypes = {"raw": ["raw"], "zscores": ["z"], "rawzscore": ["raw", "z"]}[experiment]
     summary_rows = []
 
     if feature_list is not None:
@@ -993,8 +946,8 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated target(s): MOT, COG, MOT_V4, COG_V1, old, or all (default: all)",
     )
     parser.add_argument(
-        "--type", default="raw", choices=["raw", "z"],
-        help="Feature type: raw or z (default: raw)",
+        "--experiment", default="raw", choices=["raw", "zscores", "rawzscore"],
+        help="Feature experiment: 'raw', 'zscores', or 'rawzscore' (default: raw)",
     )
     parser.add_argument(
         "--all-metrics", action="store_true",
@@ -1067,7 +1020,7 @@ def main() -> None:
 
     run_analysis(
         target=args.targets,
-        ftype=args.type,
+        experiment=args.experiment,
         feature_list=args.feature_list,
         window=args.window,
         task=args.task,
