@@ -93,7 +93,8 @@ def compute_z_scores(
             continue
         mean = sum(values) / len(values)
         std = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
-        z[f"z_{m}"] = 0.0 if std == 0 else (base - mean) / std
+        z_score = 0.0 if std < 1e-10 else (base - mean) / std
+        z[f"z_{m}"] = max(-10.0, min(10.0, z_score))
     return z
 
 
