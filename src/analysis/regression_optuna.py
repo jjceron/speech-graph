@@ -98,12 +98,12 @@ FAST_REGRESSORS = [
     "Ridge",
     "ElasticNet",
     "QuantileRegressor",
-    "SVR",
+    # "SVR",
     "RandomForestRegressor",
     "ExtraTreesRegressor",
     "KNeighborsRegressor",
     "DecisionTreeRegressor",
-    "XGBRegressor",
+    # "XGBRegressor",
 ]
 
 
@@ -287,7 +287,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
 
     elif name == "RandomForestRegressor":
         reg = RandomForestRegressor(
-            n_estimators=trial.suggest_int("rf_n_estimators", 50, 500),
+            n_estimators=trial.suggest_int("rf_n_estimators", 50, 250),
             max_depth=trial.suggest_int("rf_max_depth", 2, 20),
             min_samples_split=trial.suggest_int("rf_min_samples_split", 2, 12),
             min_samples_leaf=trial.suggest_int("rf_min_samples_leaf", 1, 5),
@@ -298,7 +298,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
 
     elif name == "ExtraTreesRegressor":
         reg = ExtraTreesRegressor(
-            n_estimators=trial.suggest_int("et_n_estimators", 50, 500),
+            n_estimators=trial.suggest_int("et_n_estimators", 50, 250),
             max_depth=trial.suggest_int("et_max_depth", 2, 20),
             min_samples_split=trial.suggest_int("et_min_samples_split", 2, 12),
             min_samples_leaf=trial.suggest_int("et_min_samples_leaf", 1, 5),
@@ -366,7 +366,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             colsample_bytree=trial.suggest_float("xgb_colsample_bytree", 0.5, 1.0),
             reg_alpha=trial.suggest_float("xgb_reg_alpha", 1e-8, 10.0, log=True),
             reg_lambda=trial.suggest_float("xgb_reg_lambda", 1e-8, 10.0, log=True),
-            booster=trial.suggest_categorical("xgb_booster", ["gbtree", "dart", "gblinear"]),
+            booster=trial.suggest_categorical("xgb_booster", ["gbtree", "gblinear"]),
             objective="reg:squarederror",
             random_state=random_state,
             n_jobs=-1,
@@ -398,7 +398,7 @@ def get_rfe_estimator(
     proxy = trial.suggest_categorical("rfe_proxy_type", ["ExtraTrees", "LinearSVR"])
     if proxy == "ExtraTrees":
         estimator = ExtraTreesRegressor(
-            n_estimators=trial.suggest_int("rfe_proxy_et_n_estimators", 20, 150, step=10),
+            n_estimators=trial.suggest_int("rfe_proxy_et_n_estimators", 20, 80, step=10),
             max_depth=trial.suggest_int("rfe_proxy_et_max_depth", 2, 12),
             min_samples_split=trial.suggest_int("rfe_proxy_et_min_samples_split", 2, 12),
             min_samples_leaf=trial.suggest_int("rfe_proxy_et_min_samples_leaf", 1, 5),
