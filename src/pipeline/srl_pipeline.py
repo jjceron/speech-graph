@@ -82,13 +82,18 @@ def process_single_subject(
     clean_func: str = "clean_text",
     lowercase: bool = True,
     include_speakers: tuple[str, ...] = ("spk_1",),
+    task: int | None = None,
 ) -> list[dict] | None:
     """Process one transcript: load, clean, run SRL.
 
     Returns:
         List of per-sentence SRL results, or None if no activity found.
     """
-    activities = load_transcript_txt(transcript_path, include_speakers=include_speakers)
+    spk_first_only = task is not None and task in {6, 7}
+    activities = load_transcript_txt(
+        transcript_path, include_speakers=include_speakers,
+        spk_first_only=spk_first_only,
+    )
     act = None
     for a in activities:
         if a["name"] == activity_name:
@@ -207,6 +212,7 @@ def run_pipeline(
                 filepath, activity_name,
                 clean_func=clean_func, lowercase=lowercase,
                 include_speakers=include_speakers,
+                task=task,
             )
 
             if sentence_results is None:
