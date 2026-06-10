@@ -33,8 +33,7 @@ data/**
 outputs/**
 
 !outputs/
-!outputs/correlations/
-!outputs/correlations/**
+
 
 !outputs/linear_regression/
 !outputs/linear_regression/**

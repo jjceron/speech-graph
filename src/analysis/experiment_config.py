@@ -11,12 +11,64 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.analysis.correlation_analysis import (
-    _compute_targets,
-    find_means_tables,
-    load_feature_table,
-)
 from src.pipeline.speechgraph import load_metadata
+
+
+ITEM = {
+    "MOT_V4": ["8.", "13.", "16.", "21.", "23."],
+    "COG_V1": ["3.", "6."],
+}
+
+
+def _compute_targets(meta: pd.DataFrame) -> pd.DataFrame:
+    """Add MOT_V4 and COG_V1 columns to metadata."""
+    meta = meta.copy()
+    meta["MOT_V4"] = meta[ITEM["MOT_V4"]].sum(axis=1)
+    meta["COG_V1"] = meta[ITEM["COG_V1"]].sum(axis=1)
+    return meta
+
+
+def find_means_tables(metrics_dir: Path, tasks: list[int] | None = None) -> list[dict]:
+    records = []
+    for task_dir in sorted(metrics_dir.iterdir()):
+        if not task_dir.is_dir() or not task_dir.name.startswith("Task"):
+            continue
+        task_num = int(task_dir.name.replace("Task", ""))
+        if tasks is not None and task_num not in tasks:
+            continue
+        for fpath in sorted(task_dir.iterdir()):
+            name = fpath.name
+            if "means_params_table" in name:
+                is_z = name.startswith("z_")
+                tag = name.replace("z_means_params_table", "").replace("means_params_table", "").replace(".txt", "")
+                records.append({
+                    "path": fpath,
+                    "task": task_num,
+                    "tag": tag,
+                    "type": "z" if is_z else "raw",
+                })
+    return records
+
+
+def load_feature_table(
+    path: Path,
+    z_metrics: list[str] | None = None,
+) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    mapping = {}
+    for col in df.columns:
+        if col == "file":
+            continue
+        if col.startswith("z_"):
+            mapping[col] = col
+        else:
+            mapping[col] = col
+    df = df.rename(columns=mapping)
+    df["file"] = df["file"].apply(lambda x: Path(str(x)).stem)
+    for suffix in ("_CorrEtiq", "-CorrEtiq", " CorrEtiq"):
+        df["file"] = df["file"].str.replace(suffix, "", regex=False)
+    df["file"] = df["file"].str.strip()
+    return df
 
 
 EXPERIMENTS = {

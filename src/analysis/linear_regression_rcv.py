@@ -35,7 +35,7 @@ from sklearn.preprocessing import StandardScaler
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.analysis import experiment_config as expcfg
-from src.analysis.correlation_analysis import (
+from src.analysis.experiment_config import (
     _compute_targets, find_means_tables, load_feature_table,
 )
 from src.visualization.lr_metrics import plot_all_regression_figures
