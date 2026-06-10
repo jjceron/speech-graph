@@ -30,12 +30,8 @@ data/**
 !data/processed/metrics/**/*.txt
 
 #### Output files
-outputs/**
-
 !outputs/
-
-!outputs/regression_optuna/
-!outputs/regression_optuna/**
+!outputs/**
 
 
 
