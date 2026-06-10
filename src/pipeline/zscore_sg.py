@@ -131,10 +131,22 @@ def save_results(
     print(f"  Saved: {median_path.name} ({len(median_df)} subjects)")
 
 
+def resolve_step(step_str: str, window_size: int) -> int:
+    """Resolve step to integer: '1' -> 1, '50%' or '50percent' -> max(1, window * 50 // 100)."""
+    s = step_str.strip().lower()
+    if s.endswith("%"):
+        pct = int(s[:-1].strip())
+        return max(1, window_size * pct // 100)
+    if s.endswith("percent"):
+        pct = int(s[:-7].strip())
+        return max(1, window_size * pct // 100)
+    return int(s)
+
+
 def run_pipeline(
     task: int,
     windows: list[int],
-    step: int = 1,
+    step: str = "1",
     n_random: int = 100,
     seed: int = 42,
     transcripts_dir: str | Path = "data/raw/transcripts",
@@ -156,7 +168,7 @@ def run_pipeline(
 
     print(f"Task {task}: {activity_name}")
     print(f"Windows: {windows}")
-    print(f"Step: {step}")
+    print(f"Step raw: {step}")
     print(f"N random: {n_random}")
     print(f"Seed: {seed}")
     print(f"Transcripts: {len(transcript_files)} files")
@@ -164,7 +176,8 @@ def run_pipeline(
     print()
 
     for window_size in windows:
-        print(f"--- Window W{window_size} ---")
+        resolved = resolve_step(step, window_size)
+        print(f"--- Window W{window_size} (step={resolved}) ---")
         rows = []
         processed = 0
 
@@ -175,7 +188,7 @@ def run_pipeline(
 
             filepath = os.path.join(transcripts_dir, filename)
             result = process_single_subject(
-                filepath, activity_name, window_size, step, n_random, seed, include_speakers
+                filepath, activity_name, window_size, resolved, n_random, seed, include_speakers
             )
             if result is None:
                 continue
@@ -209,8 +222,8 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated window sizes (e.g. 10,20,30,40)",
     )
     parser.add_argument(
-        "--step", type=int, default=1,
-        help="Step size for sliding window (default: 1)",
+        "--step", type=str, default="1",
+        help="Step size for sliding window: integer (e.g. 1) or percentage (e.g. 50%% or 50percent) (default: 1)",
     )
     parser.add_argument(
         "--n-random", type=int, default=100,
