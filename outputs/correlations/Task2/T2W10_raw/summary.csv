@@ -1,0 +1,2 @@
+type,mean_abs_r_MOT,mean_abs_partial_MOT,mean_abs_r_COG,mean_abs_partial_COG,mean_abs_r_MOT_V4,mean_abs_partial_MOT_V4,mean_abs_r_COG_V1,mean_abs_partial_COG_V1
+raw,0.0405,0.043,0.062,0.0511,0.0423,0.0443,0.0756,0.0704
