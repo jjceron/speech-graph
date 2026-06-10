@@ -4,3 +4,7 @@ networkx
 scipy
 openpyxl
 matplotlib
+stanza
+nltk
+transformers
+torch
