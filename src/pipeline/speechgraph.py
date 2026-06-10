@@ -1,9 +1,9 @@
 """Speech graph pipeline: extract metrics per task per window.
 
 Usage:
-    py -m src1.pipeline.speechgraph --task 2 --slide_window 10,20,30,40
-    py -m src1.pipeline.speechgraph --task 6 --slide_window 30,40,50,150,200
-    py -m src1.pipeline.speechgraph --task 7 --slide_window 20,30,40,50
+    py -m src1.pipeline.speechgraph --task 2 --windows 10,20,30,40
+    py -m src1.pipeline.speechgraph --task 6 --windows 30,40,50,150,200
+    py -m src1.pipeline.speechgraph --task 7 --windows 20,30,40,50
 """
 
 from __future__ import annotations
@@ -162,10 +162,22 @@ def save_activity_text(
 
 # --- Main ---
 
+def resolve_step(step_str: str, window_size: int) -> int:
+    """Resolve step to integer: '1' -> 1, '50%' or '50percent' -> max(1, window * 50 // 100)."""
+    s = step_str.strip().lower()
+    if s.endswith("%"):
+        pct = int(s[:-1].strip())
+        return max(1, window_size * pct // 100)
+    if s.endswith("percent"):
+        pct = int(s[:-7].strip())
+        return max(1, window_size * pct // 100)
+    return int(s)
+
+
 def run_pipeline(
     task: int,
     windows: list[int],
-    step: int = 1,
+    step: str = "1",
     transcripts_dir: str | Path = "data/raw/transcripts",
     metadata_path: str | Path = "data/raw/metadata.xlsx",
     output_dir: str | Path = "data/processed/metrics",
@@ -187,7 +199,7 @@ def run_pipeline(
 
     print(f"Task {task}: {activity_name}")
     print(f"Windows: {windows}")
-    print(f"Step: {step}")
+    print(f"Step raw: {step}")
     print(f"Transcripts: {len(transcript_files)} files")
     print(f"Subjects in metadata: {len(subject_codes)}")
     print()
@@ -195,12 +207,13 @@ def run_pipeline(
     if save_processed_text:
         print("Saving processed texts...")
         saved = 0
+        step0 = resolve_step(step, windows[0])
         for filename in transcript_files:
             subject_code = get_subject_code(filename)
             if subject_code not in subject_codes:
                 continue
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, windows[0], step, include_speakers)
+            result = process_single_subject(filepath, activity_name, windows[0], step0, include_speakers)
             if result is not None:
                 _, segments, _ = result
                 save_activity_text(segments, task, subject_code)
@@ -209,7 +222,8 @@ def run_pipeline(
         print()
 
     for window_size in windows:
-        print(f"--- Window W{window_size} ---")
+        resolved = resolve_step(step, window_size)
+        print(f"--- Window W{window_size} (step={resolved}) ---")
         rows = []
         processed = 0
 
@@ -219,7 +233,7 @@ def run_pipeline(
                 continue
 
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, window_size, step, include_speakers)
+            result = process_single_subject(filepath, activity_name, window_size, resolved, include_speakers)
             if result is None:
                 continue
 
@@ -251,12 +265,12 @@ def parse_args() -> argparse.Namespace:
         help="Activity number to process (2, 6, or 7)",
     )
     parser.add_argument(
-        "--slide_window", type=str, required=True,
+        "--windows", type=str, required=True,
         help="Comma-separated window sizes (e.g. 10,20,30,40)",
     )
     parser.add_argument(
-        "--step", type=int, default=1,
-        help="Step size for sliding window (default: 1)",
+        "--step", type=str, default="1",
+        help="Step size for sliding window: integer (e.g. 1) or percentage (e.g. 50%% or 50percent) (default: 1)",
     )
     parser.add_argument(
         "--transcripts-dir", default="data/raw/transcripts",
@@ -283,7 +297,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    windows = [int(w.strip()) for w in args.slide_window.split(",")]
+    windows = [int(w.strip()) for w in args.windows.split(",")]
     speakers = tuple(s.strip() for s in args.include_speakers.split(","))
 
     run_pipeline(
