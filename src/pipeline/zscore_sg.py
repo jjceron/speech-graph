@@ -62,8 +62,10 @@ def process_single_subject(
     n_random: int,
     seed: int,
     include_speakers: tuple[str, ...] = ("spk_1",),
+    task: int | None = None,
 ) -> list[dict] | None:
-    activities = load_transcript_txt(transcript_path, include_speakers=include_speakers)
+    spk_first_only = task is not None and task in {6, 7}
+    activities = load_transcript_txt(transcript_path, include_speakers=include_speakers, spk_first_only=spk_first_only)
     act = None
     for a in activities:
         if a["name"] == activity_name:
@@ -188,7 +190,7 @@ def run_pipeline(
 
             filepath = os.path.join(transcripts_dir, filename)
             result = process_single_subject(
-                filepath, activity_name, window_size, resolved, n_random, seed, include_speakers
+                filepath, activity_name, window_size, resolved, n_random, seed, include_speakers, task=task
             )
             if result is None:
                 continue

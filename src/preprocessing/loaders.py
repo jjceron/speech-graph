@@ -93,12 +93,15 @@ def load_simple_txt(filepath: str | Path) -> str:
 def parse_transcript(
     filepath: str | Path,
     include_speakers: Iterable[str] = ("spk_1",),
+    spk_first_only: bool = False,
 ) -> Transcript:
     """Parse a transcript .txt file (data/raw/transcripts/*-CorrEtiq.txt).
 
     Args:
         filepath: Path to the transcript file.
         include_speakers: Speaker IDs whose lines to include.
+        spk_first_only: If True, keep only the first consecutive block of
+            lines for each included speaker (the first intervention).
 
     Returns:
         Transcript object with parsed activities.
@@ -118,6 +121,7 @@ def parse_transcript(
     include_set = {s.strip().lower() for s in include_speakers}
     current: Activity | None = None
     current_speaker: str | None = None
+    first_done: set[str] = set()
 
     for raw_line in lines:
         line = raw_line.strip()
@@ -135,6 +139,7 @@ def parse_transcript(
                 end_time=act_match.group(3),
             )
             current_speaker = None
+            first_done.clear()
             continue
 
         spk_match = _SPEAKER_RE.match(line)
@@ -145,12 +150,17 @@ def parse_transcript(
             if current is None:
                 current = Activity(name="UNSEGMENTED", start_time=None, end_time=None)
             if speaker_id in include_set:
-                current.raw_lines.append(spk_match.group(2))
+                if spk_first_only and speaker_id in first_done:
+                    pass
+                else:
+                    first_done.add(speaker_id)
+                    current.raw_lines.append(spk_match.group(2))
             continue
 
         if current is not None and current_speaker in include_set:
             if not _STRUCTURAL_RE.match(line):
-                current.raw_lines.append(line)
+                if not (spk_first_only and current_speaker in first_done):
+                    current.raw_lines.append(line)
 
     if current is not None:
         transcript.activities.append(current)
@@ -161,12 +171,13 @@ def parse_transcript(
 def load_transcript_txt(
     filepath: str | Path,
     include_speakers: Iterable[str] = ("spk_1",),
+    spk_first_only: bool = False,
 ) -> list[dict]:
     """Load a transcript file and return activities as list of dicts.
 
     Each dict: {'name', 'start_time', 'end_time', 'text'}
     """
-    transcript = parse_transcript(filepath, include_speakers=include_speakers)
+    transcript = parse_transcript(filepath, include_speakers=include_speakers, spk_first_only=spk_first_only)
     return [
         {
             "name": act.name,
