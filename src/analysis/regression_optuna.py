@@ -284,7 +284,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
 
     elif name == "RandomForestRegressor":
         reg = RandomForestRegressor(
-            n_estimators=trial.suggest_int("rf_n_estimators", 50, 250),
+            n_estimators=trial.suggest_int("rf_n_estimators", 50, 500),
             max_depth=trial.suggest_int("rf_max_depth", 2, 20),
             min_samples_split=trial.suggest_int("rf_min_samples_split", 2, 12),
             min_samples_leaf=trial.suggest_int("rf_min_samples_leaf", 1, 5),
@@ -295,7 +295,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
 
     elif name == "ExtraTreesRegressor":
         reg = ExtraTreesRegressor(
-            n_estimators=trial.suggest_int("et_n_estimators", 50, 250),
+            n_estimators=trial.suggest_int("et_n_estimators", 50, 500),
             max_depth=trial.suggest_int("et_max_depth", 2, 20),
             min_samples_split=trial.suggest_int("et_min_samples_split", 2, 12),
             min_samples_leaf=trial.suggest_int("et_min_samples_leaf", 1, 5),
@@ -438,7 +438,7 @@ def fit_global_rfe(
         scaler = StandardScaler()
         X_proc = scaler.fit_transform(X_proc)
 
-    step = max(1, n_candidates // 4)
+    step = max(1, n_candidates // 10)
     selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step)
     selector.fit(X_proc, as_1d(y))
 
@@ -478,10 +478,12 @@ def build_trial_artifacts(
     train_idx: np.ndarray | None = None,
 ) -> tuple[pd.DataFrame, Pipeline, dict[str, Any]]:
     regressor_name = trial.suggest_categorical("regressor", regressors)
-    use_scaler = trial.suggest_categorical("use_scaler", [True, False])
 
-    if regressor_name in {"SVR", "KNeighborsRegressor", "GaussianProcessRegressor"}:
+    force_scaler = {"SVR", "KNeighborsRegressor", "GaussianProcessRegressor"}
+    if regressor_name in force_scaler:
         use_scaler = True
+    else:
+        use_scaler = trial.suggest_categorical("use_scaler", [True, False])
 
     regressor, is_svr_non_linear = get_regressor(trial, regressor_name, random_state)
     rfe_estimator, rfe_info = get_rfe_estimator(
@@ -593,9 +595,12 @@ def objective_regression_split_rfe(
     start = time.time()
 
     regressor_name = trial.suggest_categorical("regressor", regressors)
-    use_scaler = trial.suggest_categorical("use_scaler", [True, False])
-    if regressor_name in {"SVR", "KNeighborsRegressor", "GaussianProcessRegressor"}:
+
+    force_scaler = {"SVR", "KNeighborsRegressor", "GaussianProcessRegressor"}
+    if regressor_name in force_scaler:
         use_scaler = True
+    else:
+        use_scaler = trial.suggest_categorical("use_scaler", [True, False])
 
     regressor, is_svr_non_linear = get_regressor(trial, regressor_name, random_state)
 
@@ -628,7 +633,7 @@ def objective_regression_split_rfe(
         rfe_estimator, _ = get_rfe_estimator(
             trial, regressor_name, regressor, is_svr_non_linear, random_state
         )
-        step_size = max(1, n_candidates // 4)
+        step_size = max(1, n_candidates // 10)
         selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step_size)
         selector.fit(X_tr, y_train)
 
