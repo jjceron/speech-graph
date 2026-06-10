@@ -13,9 +13,9 @@
 | Experiment | MOT | COG | MOT_V4 | COG_V1 | Status |
 |-----------|-----|-----|--------|--------|--------|
 | **W10_raw_fixed** | done | done | done | done | complete |
-| **W10_zscores_fixed** | done | — | — | — | partial (1/4) |
+| **W10_zscores_fixed** | done | — | — | — | partial |
 | **W10_rawzscore_fixed** | — | — | — | — | pending |
-| **W20_raw_fixed** | done | — | — | — | partial (1/4) |
+| **W20_raw_fixed** | done | — | — | — | partial |
 | **W20_zscores_fixed** | — | — | — | — | pending |
 | **W20_rawzscore_fixed** | — | — | — | — | pending |
 | **W30_raw_fixed** | — | — | — | — | pending |
@@ -25,7 +25,9 @@
 | **W40_zscores_fixed** | — | — | — | — | pending |
 | **W40_rawzscore_fixed** | — | — | — | — | pending |
 
-## Completed: W10_raw_fixed
+## Results
+
+### W10_raw_fixed (complete)
 
 | Target | R2_test | rho_test | % R2 < 0 | Best Model | Selected Features |
 |--------|---------|----------|----------|------------|------------------|
@@ -34,8 +36,6 @@
 | MOT_V4 | 0.002 | 0.083 | 53% | QuantileRegressor | pe, atd, density, diameter, asp |
 | COG | -0.013 | — | 94% | QuantileRegressor | lsc, atd, density, diameter, asp |
 
-### Best Model Details
-
 | Target | Trial | Regressor | RFE n | MAE_val | RMSE_val |
 |--------|-------|-----------|-------|---------|----------|
 | COG_V1 | 227 | QuantileRegressor (alpha=0.0006) | 3 | 1.005 | 1.312 |
@@ -43,11 +43,15 @@
 | MOT_V4 | 259 | QuantileRegressor (alpha=0.0058) | 5 | 2.814 | 3.678 |
 | COG | 9 | QuantileRegressor (alpha=5.18) | 5 | 1.743 | 2.199 |
 
-## Completed: W10_zscores_fixed (partial)
+### W10_zscores_fixed (partial: MOT only)
 
 | Target | R2_test | rho_test | % R2 < 0 | Best Model | Selected Features |
 |--------|---------|----------|----------|------------|------------------|
 | MOT | 0.023 | 0.145 | 33% | ElasticNet (alpha=0.02, l1=0.38) | z_pe, z_l3 |
+
+### W20_raw_fixed (partial: MOT only)
+
+Pending completion.
 
 ## Key Findings
 
