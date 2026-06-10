@@ -1,0 +1,170 @@
+15:27:40 | INFO     | ============================================================
+15:27:40 | INFO     | Regression Optuma experiment with RFE
+15:27:40 | INFO     | ============================================================
+15:27:40 | INFO     | Task=2 | Window=W10 | Experiment=raw | RFE=global | Targets=['MOT', 'COG', 'MOT_V4', 'COG_V1']
+15:27:40 | INFO     | Optimization metric=mae | Trials=300 | MMCV splits=400 (opt=100)
+15:27:40 | INFO     | Regressors=['LinearRegression', 'Ridge', 'ElasticNet', 'QuantileRegressor', 'SVR', 'RandomForestRegressor', 'ExtraTreesRegressor', 'KNeighborsRegressor', 'DecisionTreeRegressor', 'XGBRegressor']
+15:27:40 | INFO     | Fast mode: ON (excluye Bagging, Stacking, GPR)
+15:27:40 | INFO     | ------------------------------------------------------------
+15:27:40 | INFO     | Loading data for target=MOT
+15:27:40 | INFO     | Target=MOT | Subjects=240 | Candidate predictors=13
+15:27:40 | INFO     | Generating 400 MMCV splits…
+15:27:41 | INFO     | MMCV splits generated (400 train/val/test triples)
+15:27:41 | INFO     | Using 100 splits for optimization (RFE fixed=False)
+15:27:42 | INFO     | Starting optimization: 300 trials, 100 splits per trial, RFE=global
+15:27:42 | INFO     | ============================================================
+15:27:42 | INFO     | Regression Optuma experiment with RFE
+15:27:42 | INFO     | ============================================================
+15:27:42 | INFO     | Task=2 | Window=W10 | Experiment=raw | RFE=fixed | Targets=['MOT', 'COG', 'MOT_V4', 'COG_V1']
+15:27:42 | INFO     | Optimization metric=mae | Trials=300 | MMCV splits=400 (opt=100)
+15:27:42 | INFO     | Regressors=['LinearRegression', 'Ridge', 'ElasticNet', 'QuantileRegressor', 'SVR', 'RandomForestRegressor', 'ExtraTreesRegressor', 'KNeighborsRegressor', 'DecisionTreeRegressor', 'XGBRegressor']
+15:27:42 | INFO     | Fast mode: ON (excluye Bagging, Stacking, GPR)
+15:27:42 | INFO     | ------------------------------------------------------------
+15:27:42 | INFO     | Loading data for target=MOT
+15:27:42 | INFO     | Target=MOT | Subjects=240 | Candidate predictors=13
+15:27:42 | INFO     | Generating 400 MMCV splits…
+15:27:43 | INFO     | MMCV splits generated (400 train/val/test triples)
+15:27:43 | INFO     | Using 99 splits for optimization (RFE fixed=True)
+15:27:43 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
+15:47:16 | INFO     | ============================================================
+15:47:16 | INFO     | Regression Optuma experiment with RFE
+15:47:16 | INFO     | ============================================================
+15:47:16 | INFO     | Task=2 | Window=W10 | Experiment=raw | RFE=split-wise | Targets=['MOT', 'COG', 'MOT_V4', 'COG_V1']
+15:47:16 | INFO     | Optimization metric=mae | Trials=300 | MMCV splits=400 (opt=100)
+15:47:16 | INFO     | Regressors=['LinearRegression', 'Ridge', 'ElasticNet', 'QuantileRegressor', 'SVR', 'RandomForestRegressor', 'ExtraTreesRegressor', 'KNeighborsRegressor', 'DecisionTreeRegressor', 'XGBRegressor']
+15:47:16 | INFO     | Fast mode: ON (excluye Bagging, Stacking, GPR)
+15:47:16 | INFO     | ------------------------------------------------------------
+15:47:16 | INFO     | Loading data for target=MOT
+15:47:16 | INFO     | Target=MOT | Subjects=240 | Candidate predictors=13
+15:47:16 | INFO     | Generating 400 MMCV splits…
+15:47:17 | INFO     | MMCV splits generated (400 train/val/test triples)
+15:47:17 | INFO     | Using 100 splits for optimization (RFE=split-wise)
+15:47:17 | INFO     | Starting optimization: 300 trials, 100 splits per trial, RFE=split-wise
+15:56:27 | INFO     | Trial   51/300 | best: 6.328981 (trial 46) | elapsed: 28m43s | remaining: 2h20m16s
+16:04:46 | INFO     | Trial   51/300 | best: 6.412847 (trial 33) | elapsed: 37m00s | remaining: 3h00m40s
+16:10:41 | INFO     | Trial  101/300 | best: 6.299628 (trial 89) | elapsed: 42m55s | remaining: 1h24m35s
+16:12:28 | INFO     | Trial  101/300 | best: 6.327546 (trial 96) | elapsed: 44m44s | remaining: 1h28m09s
+16:18:14 | INFO     | Trial  151/300 | best: 6.299628 (trial 89) | elapsed: 50m28s | remaining: 49m47s
+16:24:06 | INFO     | Trial  201/300 | best: 6.299628 (trial 89) | elapsed: 56m20s | remaining: 27m45s
+16:31:09 | INFO     | Trial  151/300 | best: 6.327490 (trial 143) | elapsed: 1h03m25s | remaining: 1h02m35s
+16:34:01 | INFO     | Trial  251/300 | best: 6.299628 (trial 89) | elapsed: 1h06m15s | remaining: 12m56s
+16:42:41 | INFO     | Best trial found (trial 89). Re-evaluating on all splits…
+16:43:38 | INFO     | Best validation trial: 89
+16:43:38 | INFO     | RFE mode: fixed | Selected features: 5
+16:43:38 | INFO     | VALIDATION mae: 6.377256 | TEST mae: 6.347862
+16:43:38 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_fixed/MOT
+16:43:38 | INFO     | ------------------------------------------------------------
+16:43:38 | INFO     | Loading data for target=COG
+16:43:38 | INFO     | Target=COG | Subjects=240 | Candidate predictors=13
+16:43:38 | INFO     | Generating 400 MMCV splits…
+16:43:39 | INFO     | MMCV splits generated (400 train/val/test triples)
+16:43:39 | INFO     | Using 99 splits for optimization (RFE fixed=True)
+16:43:39 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
+16:52:10 | INFO     | Trial  201/300 | best: 6.327187 (trial 183) | elapsed: 1h24m26s | remaining: 41m35s
+16:56:13 | INFO     | Trial   51/300 | best: 1.726448 (trial 24) | elapsed: 12m32s | remaining: 1h01m12s
+16:58:39 | INFO     | Trial  101/300 | best: 1.726448 (trial 24) | elapsed: 14m58s | remaining: 29m30s
+17:00:14 | INFO     | Trial  151/300 | best: 1.726448 (trial 24) | elapsed: 16m33s | remaining: 16m19s
+17:02:01 | INFO     | Trial  201/300 | best: 1.726448 (trial 24) | elapsed: 18m20s | remaining: 9m01s
+17:18:48 | INFO     | Trial  251/300 | best: 1.726448 (trial 24) | elapsed: 35m06s | remaining: 6m51s
+17:22:26 | INFO     | Best trial found (trial 24). Re-evaluating on all splits…
+17:22:38 | INFO     | Best validation trial: 24
+17:22:38 | INFO     | RFE mode: fixed | Selected features: 12
+17:22:38 | INFO     | VALIDATION mae: 1.743265 | TEST mae: 1.717917
+17:22:38 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_fixed/COG
+17:22:38 | INFO     | ------------------------------------------------------------
+17:22:38 | INFO     | Loading data for target=MOT_V4
+17:22:38 | INFO     | Target=MOT_V4 | Subjects=240 | Candidate predictors=13
+17:22:38 | INFO     | Generating 400 MMCV splits…
+17:22:39 | INFO     | MMCV splits generated (400 train/val/test triples)
+17:22:39 | INFO     | Using 99 splits for optimization (RFE fixed=True)
+17:22:39 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
+17:26:47 | INFO     | Trial  251/300 | best: 6.327187 (trial 183) | elapsed: 1h59m03s | remaining: 23m14s
+17:29:02 | INFO     | Trial   51/300 | best: 2.816534 (trial 46) | elapsed: 6m20s | remaining: 30m57s
+17:30:41 | INFO     | Trial  101/300 | best: 2.814691 (trial 62) | elapsed: 7m59s | remaining: 15m45s
+17:32:04 | INFO     | Trial  151/300 | best: 2.803269 (trial 123) | elapsed: 9m22s | remaining: 9m15s
+17:41:52 | INFO     | Trial  201/300 | best: 2.803269 (trial 123) | elapsed: 19m10s | remaining: 9m26s
+17:43:09 | INFO     | Trial  251/300 | best: 2.803269 (trial 123) | elapsed: 20m27s | remaining: 3m59s
+17:47:37 | INFO     | Best trial found (trial 123). Re-evaluating on all splits…
+17:47:48 | INFO     | Best validation trial: 123
+17:47:48 | INFO     | RFE mode: fixed | Selected features: 2
+17:47:48 | INFO     | VALIDATION mae: 2.805270 | TEST mae: 2.770141
+17:47:48 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_fixed/MOT_V4
+17:47:48 | INFO     | ------------------------------------------------------------
+17:47:48 | INFO     | Loading data for target=COG_V1
+17:47:48 | INFO     | Target=COG_V1 | Subjects=240 | Candidate predictors=13
+17:47:48 | INFO     | Generating 400 MMCV splits…
+17:47:49 | INFO     | MMCV splits generated (400 train/val/test triples)
+17:47:49 | INFO     | Using 99 splits for optimization (RFE fixed=True)
+17:47:49 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
+17:48:26 | INFO     | Best trial found (trial 183). Re-evaluating on all splits…
+17:51:34 | INFO     | Best validation trial: 183
+17:51:34 | INFO     | RFE mode: global | Selected features: 5
+17:51:34 | INFO     | VALIDATION mae: 6.367754 | TEST mae: 6.335760
+17:51:34 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_global/MOT
+17:51:34 | INFO     | ------------------------------------------------------------
+17:51:34 | INFO     | Loading data for target=COG
+17:51:34 | INFO     | Target=COG | Subjects=240 | Candidate predictors=13
+17:51:34 | INFO     | Generating 400 MMCV splits…
+17:51:35 | INFO     | MMCV splits generated (400 train/val/test triples)
+17:51:35 | INFO     | Using 100 splits for optimization (RFE fixed=False)
+17:51:35 | INFO     | Starting optimization: 300 trials, 100 splits per trial, RFE=global
+18:09:26 | INFO     | Trial   51/300 | best: 1.000582 (trial 47) | elapsed: 21m35s | remaining: 1h45m23s
+18:22:06 | INFO     | Trial   51/300 | best: 1.726735 (trial 12) | elapsed: 30m28s | remaining: 2h28m46s
+18:24:52 | INFO     | Trial  101/300 | best: 1.000442 (trial 86) | elapsed: 37m00s | remaining: 1h12m55s
+18:25:36 | INFO     | Trial  101/300 | best: 1.726735 (trial 12) | elapsed: 33m57s | remaining: 1h06m54s
+18:27:37 | INFO     | Trial  151/300 | best: 1.726735 (trial 12) | elapsed: 35m59s | remaining: 35m30s
+18:28:17 | INFO     | Trial  151/300 | best: 1.000442 (trial 86) | elapsed: 40m26s | remaining: 39m54s
+18:43:15 | INFO     | Trial  201/300 | best: 1.726735 (trial 12) | elapsed: 51m36s | remaining: 25m25s
+18:44:59 | INFO     | Trial  201/300 | best: 1.000442 (trial 86) | elapsed: 57m07s | remaining: 28m08s
+18:45:26 | INFO     | Trial  251/300 | best: 1.726735 (trial 12) | elapsed: 53m48s | remaining: 10m30s
+18:47:28 | INFO     | Best trial found (trial 12). Re-evaluating on all splits…
+18:47:41 | INFO     | Best validation trial: 12
+18:47:41 | INFO     | RFE mode: global | Selected features: 11
+18:47:41 | INFO     | VALIDATION mae: 1.743265 | TEST mae: 1.717917
+18:47:41 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_global/COG
+18:47:41 | INFO     | ------------------------------------------------------------
+18:47:41 | INFO     | Loading data for target=MOT_V4
+18:47:41 | INFO     | Target=MOT_V4 | Subjects=240 | Candidate predictors=13
+18:47:41 | INFO     | Generating 400 MMCV splits…
+18:47:42 | INFO     | MMCV splits generated (400 train/val/test triples)
+18:47:42 | INFO     | Using 100 splits for optimization (RFE fixed=False)
+18:47:42 | INFO     | Starting optimization: 300 trials, 100 splits per trial, RFE=global
+18:47:45 | INFO     | Trial  251/300 | best: 1.000442 (trial 86) | elapsed: 59m53s | remaining: 11m41s
+18:50:02 | INFO     | Best trial found (trial 86). Re-evaluating on all splits…
+18:50:14 | INFO     | Best validation trial: 86
+18:50:14 | INFO     | RFE mode: fixed | Selected features: 3
+18:50:14 | INFO     | VALIDATION mae: 1.004595 | TEST mae: 1.024837
+18:50:14 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_fixed/COG_V1
+18:50:14 | INFO     | ============================================================
+18:50:14 | INFO     | ALL TARGETS COMPLETE
+18:50:14 | INFO     | ============================================================
+18:52:25 | INFO     | Trial   51/300 | best: 2.827125 (trial 33) | elapsed: 4m40s | remaining: 22m49s
+19:01:17 | INFO     | Trial  101/300 | best: 2.818423 (trial 75) | elapsed: 13m32s | remaining: 26m41s
+19:02:19 | INFO     | Trial  151/300 | best: 2.817001 (trial 104) | elapsed: 14m34s | remaining: 14m22s
+19:03:45 | INFO     | Trial  201/300 | best: 2.810981 (trial 200) | elapsed: 15m59s | remaining: 7m52s
+19:05:02 | INFO     | Trial  251/300 | best: 2.806252 (trial 247) | elapsed: 17m17s | remaining: 3m22s
+19:06:10 | INFO     | Best trial found (trial 284). Re-evaluating on all splits…
+19:06:20 | INFO     | Best validation trial: 284
+19:06:20 | INFO     | RFE mode: global | Selected features: 2
+19:06:20 | INFO     | VALIDATION mae: 2.801775 | TEST mae: 2.764488
+19:06:20 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_global/MOT_V4
+19:06:20 | INFO     | ------------------------------------------------------------
+19:06:20 | INFO     | Loading data for target=COG_V1
+19:06:20 | INFO     | Target=COG_V1 | Subjects=240 | Candidate predictors=13
+19:06:20 | INFO     | Generating 400 MMCV splits…
+19:06:21 | INFO     | MMCV splits generated (400 train/val/test triples)
+19:06:21 | INFO     | Using 100 splits for optimization (RFE fixed=False)
+19:06:21 | INFO     | Starting optimization: 300 trials, 100 splits per trial, RFE=global
+19:10:22 | INFO     | Trial   51/300 | best: 1.010531 (trial 3) | elapsed: 3m59s | remaining: 19m28s
+19:13:17 | INFO     | Trial  101/300 | best: 0.999141 (trial 81) | elapsed: 6m54s | remaining: 13m36s
+19:17:27 | INFO     | Trial  151/300 | best: 0.998656 (trial 112) | elapsed: 11m04s | remaining: 10m55s
+19:19:12 | INFO     | Trial  201/300 | best: 0.998656 (trial 112) | elapsed: 12m49s | remaining: 6m18s
+19:21:18 | INFO     | Trial  251/300 | best: 0.998656 (trial 112) | elapsed: 14m55s | remaining: 2m54s
+19:23:34 | INFO     | Best trial found (trial 112). Re-evaluating on all splits…
+19:23:45 | INFO     | Best validation trial: 112
+19:23:45 | INFO     | RFE mode: global | Selected features: 3
+19:23:45 | INFO     | VALIDATION mae: 1.004011 | TEST mae: 1.023971
+19:23:45 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_global/COG_V1
+19:23:45 | INFO     | ============================================================
+19:23:45 | INFO     | ALL TARGETS COMPLETE
+19:23:45 | INFO     | ============================================================
