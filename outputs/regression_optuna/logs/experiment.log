@@ -1,0 +1,15 @@
+14:41:34 | INFO     | ============================================================
+14:41:34 | INFO     | Regression Optuma experiment with RFE
+14:41:34 | INFO     | ============================================================
+14:41:34 | INFO     | Task=2 | Window=W10 | Experiment=raw | RFE=fixed | Targets=['MOT', 'COG', 'MOT_V4', 'COG_V1']
+14:41:34 | INFO     | Optimization metric=mae | Trials=300 | MMCV splits=400 (opt=100)
+14:41:34 | INFO     | Regressors=['LinearRegression', 'ElasticNet', 'QuantileRegressor', 'RandomForestRegressor', 'ExtraTreesRegressor', 'KNeighborsRegressor', 'DecisionTreeRegressor']
+14:41:34 | INFO     | Fast mode: ON (excluye Bagging, Stacking, GPR)
+14:41:34 | INFO     | ------------------------------------------------------------
+14:41:34 | INFO     | Loading data for target=MOT
+14:41:34 | INFO     | Target=MOT | Subjects=240 | Candidate predictors=13
+14:41:34 | INFO     | Generating 400 MMCV splits…
+14:41:35 | INFO     | MMCV splits generated (400 train/val/test triples)
+14:41:35 | INFO     | Using 99 splits for optimization (RFE=fixed)
+14:41:35 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
+14:51:34 | INFO     | Trial   51/300 | best: 6.386256 (trial 22) | elapsed: 9m56s | remaining: 48m33s
