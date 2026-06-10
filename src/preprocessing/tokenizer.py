@@ -5,8 +5,9 @@ from __future__ import annotations
 import re
 from collections.abc import Collection
 from functools import lru_cache
-
 import stanza
+
+
 
 from .annotations import BREAK_TOKEN, normalize_annotations_text
 
@@ -84,7 +85,7 @@ def clean_text_all(
 @lru_cache(maxsize=2)
 def _get_stanza_pipeline(lang: str = "es") -> stanza.Pipeline:
     return stanza.Pipeline(
-        lang=lang, processors="tokenize,pos", verbose=False, use_gpu=False,
+        lang=lang, processors="tokenize,pos,lemma", verbose=False, use_gpu=False,
     )
 
 
@@ -93,7 +94,10 @@ def filter_pos(
     lang: str = "es",
     keep_tags: Collection[str] | None = None,
 ) -> list[str]:
-    """Filter tokens keeping only those with desired POS tags using stanza."""
+    """Filter tokens keeping only those with desired POS tags using stanza.
+
+    Tokens that pass the filter are returned lemmatized.
+    """
     if keep_tags is None:
         keep_tags = _POS_KEEP_DEFAULT
     if not tokens:
@@ -103,20 +107,19 @@ def filter_pos(
     text = " ".join(tokens)
     doc = nlp(text)
 
-    stanza_words: list[tuple[str, str]] = []
+    stanza_words: list[tuple[str, str, str]] = []
     for sent in doc.sentences:
         for word in sent.words:
-            stanza_words.append((word.text, word.upos))
+            stanza_words.append((word.text, word.upos, word.lemma))
 
     if len(stanza_words) != len(tokens):
         return tokens
 
     return [
-        token
-        for token, (_, upos) in zip(tokens, stanza_words)
+        lemma if lemma else token
+        for token, (_, upos, lemma) in zip(tokens, stanza_words)
         if upos in keep_tags
     ]
-
 
 def tokenize_segments(
     text: str,
