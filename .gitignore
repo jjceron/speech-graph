@@ -29,6 +29,8 @@ data/**
 outputs/**
 !outputs/correlations/
 !outputs/linear_regression/
+!outputs/regression_optuna/
+
 
 
 #### OS and editor files
