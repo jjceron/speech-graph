@@ -1,0 +1,14 @@
+feature,selected,ranking
+asp_T2W30,True,1
+atd_T2W30,True,1
+density_T2W30,True,1
+diameter_T2W30,True,1
+l1_T2W30,True,1
+l2_T2W30,True,1
+l3_T2W30,True,1
+lcc_T2W30,True,1
+lsc_T2W30,True,1
+pe_T2W30,True,1
+re_T2W30,True,1
+edges_T2W30,False,2
+nodes_T2W30,False,2
