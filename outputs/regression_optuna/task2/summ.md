@@ -13,9 +13,9 @@
 | Experiment | MOT | COG | MOT_V4 | COG_V1 | Status |
 |-----------|-----|-----|--------|--------|--------|
 | **W10_raw_fixed** | done | done | done | done | complete |
-| **W10_zscores_fixed** | done | — | — | — | partial |
+| **W10_zscores_fixed** | done | done | done | — | partial (3/4) |
 | **W10_rawzscore_fixed** | — | — | — | — | pending |
-| **W20_raw_fixed** | done | — | — | — | partial |
+| **W20_raw_fixed** | done | done | — | — | partial (2/4) |
 | **W20_zscores_fixed** | — | — | — | — | pending |
 | **W20_rawzscore_fixed** | — | — | — | — | pending |
 | **W30_raw_fixed** | — | — | — | — | pending |
@@ -43,15 +43,20 @@
 | MOT_V4 | 259 | QuantileRegressor (alpha=0.0058) | 5 | 2.814 | 3.678 |
 | COG | 9 | QuantileRegressor (alpha=5.18) | 5 | 1.743 | 2.199 |
 
-### W10_zscores_fixed (partial: MOT only)
+### W10_zscores_fixed (partial: MOT, COG, MOT_V4)
 
 | Target | R2_test | rho_test | % R2 < 0 | Best Model | Selected Features |
 |--------|---------|----------|----------|------------|------------------|
 | MOT | 0.023 | 0.145 | 33% | ElasticNet (alpha=0.02, l1=0.38) | z_pe, z_l3 |
+| COG | _to be synced_ | | | | |
+| MOT_V4 | _to be synced_ | | | | |
 
-### W20_raw_fixed (partial: MOT only)
+### W20_raw_fixed (partial: MOT, COG)
 
-Pending completion.
+| Target | R2_test | rho_test | % R2 < 0 | Best Model | Selected Features |
+|--------|---------|----------|----------|------------|------------------|
+| MOT | _to be synced_ | | | | |
+| COG | _to be synced_ | | | | |
 
 ## Key Findings
 
