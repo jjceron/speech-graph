@@ -31,9 +31,9 @@ data/**
 
 #### Output files
 outputs/**
+
 !outputs/
-!outputs/linear_regression/
-!outputs/linear_regression/**
+
 !outputs/regression_optuna/
 !outputs/regression_optuna/**
 
