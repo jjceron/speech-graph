@@ -438,7 +438,7 @@ def fit_global_rfe(
         scaler = StandardScaler()
         X_proc = scaler.fit_transform(X_proc)
 
-    step = max(1, n_candidates // 10)
+    step = max(1, n_candidates // 6)
     selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step)
     selector.fit(X_proc, as_1d(y))
 
@@ -633,7 +633,7 @@ def objective_regression_split_rfe(
         rfe_estimator, _ = get_rfe_estimator(
             trial, regressor_name, regressor, is_svr_non_linear, random_state
         )
-        step_size = max(1, n_candidates // 10)
+        step_size = max(1, n_candidates // 6)
         selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step_size)
         selector.fit(X_tr, y_train)
 
@@ -762,7 +762,7 @@ def evaluate_fixed_trial_split_rfe(
         rfe_estimator, _ = get_rfe_estimator(
             fixed_trial, regressor_name, regressor, is_svr_non_linear, random_state
         )
-        step_size = max(1, n_candidates // 4)
+        step_size = max(1, n_candidates // 6)
         selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step_size)
         selector.fit(X_tr, y_train)
 
