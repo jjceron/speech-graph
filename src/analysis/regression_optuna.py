@@ -95,15 +95,12 @@ DEFAULT_REGRESSORS = [
 
 FAST_REGRESSORS = [
     "LinearRegression",
-    "Ridge",
     "ElasticNet",
     "QuantileRegressor",
-    # "SVR",
     "RandomForestRegressor",
     "ExtraTreesRegressor",
     "KNeighborsRegressor",
     "DecisionTreeRegressor",
-    # "XGBRegressor",
 ]
 
 

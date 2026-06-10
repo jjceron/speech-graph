@@ -65,12 +65,14 @@ def process_single_subject(
     window_size: int,
     step: int,
     include_speakers: tuple[str, ...] = ("spk_1",),
+    task: int | None = None,
 ) -> tuple[list[dict], list[list[str]], list[str]] | None:
     """Process one subject for one activity and one window size.
 
     Returns (window_rows, segments, flat_tokens), or None if not found.
     """
-    activities = load_transcript_txt(transcript_path, include_speakers=include_speakers)
+    spk_first_only = task is not None and task in {6, 7}
+    activities = load_transcript_txt(transcript_path, include_speakers=include_speakers, spk_first_only=spk_first_only)
     act = None
     for a in activities:
         if a["name"] == activity_name:
@@ -213,7 +215,7 @@ def run_pipeline(
             if subject_code not in subject_codes:
                 continue
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, windows[0], step0, include_speakers)
+            result = process_single_subject(filepath, activity_name, windows[0], step0, include_speakers, task=task)
             if result is not None:
                 _, segments, _ = result
                 save_activity_text(segments, task, subject_code)
@@ -233,7 +235,7 @@ def run_pipeline(
                 continue
 
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, window_size, resolved, include_speakers)
+            result = process_single_subject(filepath, activity_name, window_size, resolved, include_speakers, task=task)
             if result is None:
                 continue
 
