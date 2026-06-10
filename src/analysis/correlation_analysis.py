@@ -23,14 +23,9 @@ from scipy.stats import spearmanr
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.analysis.experiment_config import get_experiment_feature_names
 from src.pipeline.speechgraph import load_metadata
 from src.visualization.corr_metrics import plot_correlation_heatmaps
-
-
-METRICS_OF_INTEREST = [
-    "nodes", "edges", "re", "pe", "l1", "l2", "l3",
-    "lcc", "lsc", "atd", "density", "diameter", "asp", "cc",
-]
 
 # New targets derived from BIS-11 items
 ITEM = {
@@ -95,7 +90,7 @@ def run_correlation_analysis(
     metadata_path: str | Path = "data/raw/metadata.xlsx",
     output_dir: str | Path = "outputs/06_correlations",
     tasks: list[int] | None = None,
-    ftype_filter: str = "all",
+    experiment: str = "raw",
     adj_var: str = "School year",
     window: str | None = None,
 ) -> None:
@@ -114,11 +109,13 @@ def run_correlation_analysis(
         print("No means tables found.")
         return
 
-    if ftype_filter != "all":
-        tables = [t for t in tables if t["type"] == ftype_filter]
-        if not tables:
-            print(f"No tables found for type '{ftype_filter}'.")
-            return
+    if experiment == "raw":
+        tables = [t for t in tables if t["type"] == "raw"]
+    elif experiment == "zscores":
+        tables = [t for t in tables if t["type"] == "z"]
+    if not tables:
+        print(f"No tables found for experiment '{experiment}'.")
+        return
 
     if window is not None:
         tables = [t for t in tables if t["tag"] == window]
@@ -128,7 +125,7 @@ def run_correlation_analysis(
 
     task_str = f"tasks {tasks}" if tasks else "all tasks"
     window_str = f", window='{window}'" if window else ""
-    print(f"Processing: {task_str}, type='{ftype_filter}'{window_str}")
+    print(f"Processing: {task_str}, experiment='{experiment}'{window_str}")
     print(f"Found {len(tables)} means tables ({sum(1 for t in tables if t['type']=='raw')} raw, {sum(1 for t in tables if t['type']=='z')} z)")
 
     print(f"Targets: {TARGETS}")
@@ -151,11 +148,13 @@ def run_correlation_analysis(
         feats = load_feature_table(path)
         merged = feats.merge(meta, left_on="file", right_on="Cod", how="inner")
 
+        window_int = int(tag.split("W")[1])
+        exp_features = get_experiment_feature_names(experiment, window_int)
         feature_cols = [c for c in feats.columns if c != "file"]
         if ftype == "raw":
-            feature_cols = [c for c in feature_cols if c in METRICS_OF_INTEREST]
+            feature_cols = [c for c in feature_cols if c in exp_features and not c.startswith("z_")]
         else:
-            feature_cols = [c for c in feature_cols if c.startswith("z_") and c.replace("z_", "") in METRICS_OF_INTEREST]
+            feature_cols = [c for c in feature_cols if c in exp_features and c.startswith("z_")]
 
         for col in feature_cols:
             valid = merged[col].notna()
@@ -325,13 +324,12 @@ def main() -> None:
             output_dir = f"outputs/correlations/task{task_str}_{exp_str}"
         print(f"Auto output: {output_dir}")
 
-    ftype_map = {"raw": "raw", "zscores": "z", "rawzscore": "all"}
     run_correlation_analysis(
         metrics_dir=args.metrics_dir,
         metadata_path=args.metadata,
         output_dir=output_dir,
         tasks=tasks,
-        ftype_filter=ftype_map[args.experiment],
+        experiment=args.experiment,
         adj_var=args.adj_var,
         window=args.window,
     )
