@@ -5,3 +5,7 @@ scipy
 openpyxl
 matplotlib
 shap
+stanza
+nltk
+transformers
+torch
