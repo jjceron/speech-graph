@@ -5,7 +5,7 @@ Saves z_params_table, z_means, z_median alongside raw metrics.
 Usage:
     py -m src.pipeline.zscore_sg --task 2 --windows 10,20,30,40 --n_random 100
     py -m src.pipeline.zscore_sg --task 7 --windows 20,30,40,50 --n_random 100
-    py -m src.pipeline.zscore_sg --task 6 --windows 30,40,50,150,200 --n_random 100
+    py -m src.pipeline.zscore_sg --task 6 --windows 30,40,50,150,160,170,180,190,200 --n_random 100
 """
 
 from __future__ import annotations
