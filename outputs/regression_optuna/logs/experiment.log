@@ -13,3 +13,34 @@
 14:41:35 | INFO     | Using 99 splits for optimization (RFE=fixed)
 14:41:35 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
 14:51:34 | INFO     | Trial   51/300 | best: 6.386256 (trial 22) | elapsed: 9m56s | remaining: 48m33s
+14:58:27 | INFO     | Trial  101/300 | best: 6.346891 (trial 72) | elapsed: 16m50s | remaining: 33m10s
+15:03:45 | INFO     | Trial  151/300 | best: 6.346401 (trial 138) | elapsed: 22m08s | remaining: 21m51s
+15:11:09 | INFO     | Trial  201/300 | best: 6.346288 (trial 184) | elapsed: 29m32s | remaining: 14m32s
+15:18:08 | INFO     | Trial  251/300 | best: 6.346165 (trial 230) | elapsed: 36m30s | remaining: 7m07s
+15:23:07 | INFO     | Best trial found (trial 230). Re-evaluating on all splits…
+15:24:06 | INFO     | Best validation trial: 230
+15:24:06 | INFO     | RFE mode: fixed | Selected features: 3
+15:24:06 | INFO     | VALIDATION mae: 6.387885 | TEST mae: 6.357966
+15:24:06 | INFO     | Saved outputs in: outputs/regression_optuna/task2/W10_raw_fixed/MOT
+15:24:06 | INFO     | ------------------------------------------------------------
+15:24:06 | INFO     | Loading data for target=COG
+15:24:06 | INFO     | Target=COG | Subjects=240 | Candidate predictors=13
+15:24:06 | INFO     | Generating 400 MMCV splits…
+15:24:06 | INFO     | MMCV splits generated (400 train/val/test triples)
+15:24:06 | INFO     | Using 99 splits for optimization (RFE=fixed)
+15:24:07 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
+16:01:09 | INFO     | ============================================================
+16:01:09 | INFO     | Regression Optuma experiment with RFE
+16:01:09 | INFO     | ============================================================
+16:01:09 | INFO     | Task=2 | Window=W10 | Experiment=zscores | RFE=fixed | Targets=['MOT', 'COG', 'MOT_V4', 'COG_V1']
+16:01:09 | INFO     | Optimization metric=mae | Trials=300 | MMCV splits=400 (opt=100)
+16:01:09 | INFO     | Regressors=['LinearRegression', 'ElasticNet', 'QuantileRegressor', 'RandomForestRegressor', 'ExtraTreesRegressor', 'KNeighborsRegressor', 'DecisionTreeRegressor']
+16:01:09 | INFO     | Fast mode: ON (excluye Bagging, Stacking, GPR)
+16:01:09 | INFO     | ------------------------------------------------------------
+16:01:09 | INFO     | Loading data for target=MOT
+16:01:10 | INFO     | Target=MOT | Subjects=240 | Candidate predictors=9
+16:01:10 | INFO     | Generating 400 MMCV splits…
+16:01:10 | INFO     | MMCV splits generated (400 train/val/test triples)
+16:01:10 | INFO     | Using 99 splits for optimization (RFE=fixed)
+16:01:11 | INFO     | Starting optimization: 300 trials, 99 splits per trial, RFE=fixed
+16:06:21 | INFO     | Trial   51/300 | best: 6.495936 (trial 45) | elapsed: 5m07s | remaining: 25m01s
