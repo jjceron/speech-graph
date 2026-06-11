@@ -41,15 +41,14 @@ col4.metric("Total scenarios", f"{len(reports)}")
 
 st.markdown("---")
 
-st.subheader("🏆 Top 5 by R² test")
-
 rows = []
 for (w, e, t), r in reports.items():
     ts = r.get("test_summary", {})
     bp = r.get("best_params", {})
     feat = r.get("selected_features", [])
     rows.append({
-        "R²": ts.get("r2_mean_test", 0),
+        "sort_key": ts.get("r2_mean_test", 0),
+        "sort_key_mae": ts.get("mae_mean_test", 999),
         "Window": f"W{w}",
         "Experiment": e,
         "Target": t,
@@ -60,8 +59,21 @@ for (w, e, t), r in reports.items():
         "Features": ", ".join(feat) if feat else "-",
     })
 
+col_view, col_metric = st.columns(2)
+with col_view:
+    view_mode = st.radio("View", ["Top 5", "All Results"], horizontal=True)
+with col_metric:
+    sort_metric = st.selectbox("Sort by", ["R²", "MAE"], index=0)
+
 if rows:
-    df = pd.DataFrame(rows).sort_values("R²", ascending=False).head(5).drop(columns=["R²"])
+    df = pd.DataFrame(rows)
+    if sort_metric == "R²":
+        df = df.sort_values("sort_key", ascending=False).drop(columns=["sort_key", "sort_key_mae"])
+    else:
+        df = df.sort_values("sort_key_mae", ascending=True).drop(columns=["sort_key", "sort_key_mae"])
+    if view_mode == "Top 5":
+        df = df.head(5)
+    st.subheader(f"{'Top 5' if view_mode == 'Top 5' else 'All'} Results — by {sort_metric}")
     st.dataframe(df, use_container_width=True, hide_index=True)
 
 st.markdown("---")
