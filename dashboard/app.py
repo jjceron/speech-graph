@@ -32,17 +32,12 @@ tot_possible = len(get_windows()) * len(get_experiments()) if get_windows() else
 st.sidebar.success(f"**{len(completed)} / {tot_possible}** experiments complete")
 st.sidebar.markdown("---")
 
-st.sidebar.markdown(
-    """
-**Navigation**
-- 🏠 [Overview](#overview)
-- 📊 [Cross-Experiment](/Cross_Experiment)
-- 📈 [Distributions](/Distributions)
-- 🔬 [Features](/Features)
-- ⚙️ [Optimization](/Optimization)
-- 👤 [Subjects](/Subjects)
-"""
-)
+st.sidebar.page_link("app.py", label="Overview", icon="🏠")
+st.sidebar.page_link("pages/2_comparison.py", label="Comparison", icon="📊")
+st.sidebar.page_link("pages/3_distributions.py", label="Distributions", icon="📈")
+st.sidebar.page_link("pages/4_features.py", label="Features", icon="🔬")
+st.sidebar.page_link("pages/5_optimization.py", label="Optimization", icon="⚙️")
+st.sidebar.page_link("pages/6_subjects.py", label="Subjects", icon="👤")
 
 st.title("📊 SpeechGraph Regression Dashboard")
 st.markdown(f"#### Task {get_task()} — Optuna Regression Results (W10–W40)")
