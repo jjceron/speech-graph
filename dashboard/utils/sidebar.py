@@ -20,7 +20,7 @@ def render_sidebar() -> None:
 """,
         unsafe_allow_html=True,
     )
-    st.sidebar.title("📊 SpeechGraph")
+    st.sidebar.title("SpeechGraph")
 
     tasks = list_tasks()
     current_task = get_task()
