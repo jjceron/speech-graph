@@ -2,89 +2,147 @@
 
 Usage:
     py -m scripts.plot_regression_results --task 2 --window 10 --experiment raw --target MOT
-    py -m scripts.plot_regression_results --task 2 --window 20 --experiment rawzscore --target all
-    py -m scripts.plot_regression_results --task 2 --window 10 --experiment zscores --target COG_V1 --val
+    py -m scripts.plot_regression_results --task 2 --window 20 --experiment rawzscore --target COG_V1
+    py -m scripts.plot_regression_results --task 2 --window 10 --experiment zscores --target all --val
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.stats import gaussian_kde, spearmanr
+from scipy.stats import spearmanr
 
 BASE_DIR = Path("outputs/regression_optuna")
 ALL_TARGETS = ["MOT", "COG", "MOT_V4", "COG_V1"]
+BINS = 30
+ALPHA = 0.65
 
+
+# ── helpers ───────────────────────────────────────────────────────
 
 def _load_csv(task: int, window: str, experiment: str, rfe: str, target: str, csv_name: str) -> pd.DataFrame | None:
     path = BASE_DIR / f"task{task}" / f"W{window}_{experiment}_{rfe}" / target / csv_name
     if not path.exists():
-        print(f"  [SKIP] File not found: {path}")
+        print(f"  [SKIP] {path.name} not found")
         return None
     return pd.read_csv(path)
 
 
-def _make_tag(task: int, window: str, experiment: str, target: str, set_name: str) -> str:
-    return f"T{task}W{window}_{experiment}_{target}_{set_name}"
+def _show_all() -> None:
+    """Show all collected figures at once, then wait for user."""
+    if plt.get_fignums():
+        plt.show(block=False)
+        plt.pause(0.3)
 
 
-# ── plot functions ────────────────────────────────────────────────
+def _clean_rho(col: pd.Series) -> pd.Series:
+    return col.dropna()[np.isfinite(col.dropna())]
 
-def plot_r2(df: pd.DataFrame, tag: str) -> None:
-    r2 = df["r2"].dropna().values
-    if len(r2) == 0:
+
+# ── plot: side-by-side val vs test ────────────────────────────────
+
+def plot_val_test_comparison(val_df: pd.DataFrame, test_df: pd.DataFrame, tag: str) -> None:
+    metrics = [
+        ("R²", "r2", "steelblue", "crimson"),
+        ("MAE", "mae", "seagreen", "darkred"),
+        ("ρ", "rho", "mediumpurple", "darkorange"),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+
+    for ax, (label, col, c_val, c_test) in zip(axes, metrics):
+        v = val_df[col].dropna().values
+        t = test_df[col].dropna().values
+        if col == "rho":
+            v = v[np.isfinite(v)]
+            t = t[np.isfinite(t)]
+        if len(v) == 0 or len(t) == 0:
+            ax.set_title(f"{label} — no data")
+            continue
+
+        lo = min(v.min(), t.min())
+        hi = max(v.max(), t.max())
+        bins = np.linspace(lo, hi, BINS + 1)
+
+        ax.hist(v, bins=bins, color=c_val, alpha=ALPHA, label=f"Val mean={v.mean():.4f}", edgecolor="white")
+        ax.hist(t, bins=bins, color=c_test, alpha=ALPHA, label=f"Test mean={t.mean():.4f}", edgecolor="white")
+        ax.axvline(0, color="gray", linestyle=":", alpha=0.5, linewidth=1) if label == "R²" else None
+        ax.set_xlabel(label)
+        ax.set_ylabel("Splits")
+        ax.set_title(f"{label} — val vs test")
+        ax.legend(fontsize=7)
+        ax.grid(axis="y", alpha=0.25)
+
+    fig.suptitle(tag, fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+
+# ── plot: scatter val vs test (per split) ─────────────────────────
+
+def plot_val_test_scatter(val_df: pd.DataFrame, test_df: pd.DataFrame, tag: str) -> None:
+    r2_v = val_df["r2"].dropna().values
+    r2_t = test_df["r2"].dropna().values
+    min_len = min(len(r2_v), len(r2_t))
+    if min_len < 10:
+        print("  [SKIP] Scatter — too few splits")
         return
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.hist(r2, bins=40, color="steelblue", edgecolor="white", alpha=0.85)
-    ax.axvline(r2.mean(), color="crimson", linestyle="--", linewidth=2, label=f"Mean = {r2.mean():.4f}")
-    ax.axvline(0, color="gray", linestyle=":", linewidth=1, alpha=0.7)
-    ax.set_xlabel("R²")
-    ax.set_ylabel("Iterations")
-    ax.set_title(f"R² distribution — {tag}")
-    ax.legend(fontsize=9)
-    ax.grid(axis="y", alpha=0.3)
+    r2_v, r2_t = r2_v[:min_len], r2_t[:min_len]
+
+    fig, ax = plt.subplots(figsize=(5.5, 5.5))
+    ax.scatter(r2_v, r2_t, s=8, alpha=0.4, color="steelblue")
+
+    lim = min(r2_v.min(), r2_t.min()), max(r2_v.max(), r2_t.max())
+    ax.plot(lim, lim, "r--", linewidth=1, alpha=0.6, label="Identity")
+    ax.axhline(0, color="gray", linestyle=":", alpha=0.4, linewidth=0.8)
+    ax.axvline(0, color="gray", linestyle=":", alpha=0.4, linewidth=0.8)
+
+    ax.set_xlabel("R² validation")
+    ax.set_ylabel("R² test")
+    ax.set_title(f"R² val vs test — {tag}")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.25)
+    ax.set_aspect("equal")
     fig.tight_layout()
-    fig.show()
 
 
-def plot_mae(df: pd.DataFrame, tag: str) -> None:
-    mae = df["mae"].dropna().values
-    if len(mae) == 0:
+# ── plot: test distributions (used when --val is OFF) ─────────────
+
+def _hist_single(ax, values, color, xlabel, title, vline_zero=False):
+    if len(values) == 0:
+        ax.set_title(f"{title} — no data")
         return
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.hist(mae, bins=40, color="seagreen", edgecolor="white", alpha=0.85)
-    ax.axvline(mae.mean(), color="darkred", linestyle="--", linewidth=2, label=f"Mean = {mae.mean():.4f}")
-    ax.set_xlabel("MAE")
-    ax.set_ylabel("Iterations")
-    ax.set_title(f"MAE distribution — {tag}")
-    ax.legend(fontsize=9)
-    ax.grid(axis="y", alpha=0.3)
-    fig.tight_layout()
-    fig.show()
+    ax.hist(values, bins=BINS, color=color, edgecolor="white", alpha=0.85)
+    ax.axvline(values.mean(), color="crimson", linestyle="--", linewidth=2, label=f"Mean={values.mean():.4f}")
+    if vline_zero:
+        ax.axvline(0, color="gray", linestyle=":", alpha=0.6, linewidth=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Splits")
+    ax.set_title(title)
+    ax.legend(fontsize=8)
+    ax.grid(axis="y", alpha=0.25)
 
 
-def plot_rho(df: pd.DataFrame, tag: str) -> None:
-    rho = df["rho"].dropna().values
-    rho = rho[np.isfinite(rho)]
-    if len(rho) == 0:
-        print(f"  [SKIP] ρ plot — no valid ρ values for {tag}")
-        return
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.hist(rho, bins=40, color="mediumpurple", edgecolor="white", alpha=0.85)
-    ax.axvline(rho.mean(), color="darkred", linestyle="--", linewidth=2, label=f"Mean = {rho.mean():.4f}")
-    ax.set_xlabel("Spearman ρ")
-    ax.set_ylabel("Iterations")
-    ax.set_title(f"Spearman ρ distribution — {tag}")
-    ax.legend(fontsize=9)
-    ax.grid(axis="y", alpha=0.3)
-    fig.tight_layout()
-    fig.show()
+def plot_test_distributions(test_df: pd.DataFrame, tag: str) -> None:
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
 
+    r2 = test_df["r2"].dropna().values
+    _hist_single(axes[0], r2, "steelblue", "R²", "R² distribution", vline_zero=True)
+
+    mae = test_df["mae"].dropna().values
+    _hist_single(axes[1], mae, "seagreen", "MAE", "MAE distribution")
+
+    rho = _clean_rho(test_df["rho"])
+    _hist_single(axes[2], rho, "mediumpurple", "Spearman ρ", "ρ distribution")
+
+    fig.suptitle(tag, fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+
+# ── plot: observed vs predicted (fast, no KDE) ────────────────────
 
 def plot_obs_vs_pred(pred_df: pd.DataFrame, tag: str) -> None:
     y_true = pred_df["y_true"].values
@@ -94,71 +152,55 @@ def plot_obs_vs_pred(pred_df: pd.DataFrame, tag: str) -> None:
 
     r_s, _ = spearmanr(y_true, y_pred)
 
-    fig, ax = plt.subplots(figsize=(6, 6))
-
-    try:
-        xy = np.vstack([y_true, y_pred])
-        z = gaussian_kde(xy)(xy)
-        idx = z.argsort()
-        ax.scatter(y_true[idx], y_pred[idx], c=z[idx], s=15, cmap="viridis", alpha=0.6)
-    except Exception:
-        ax.scatter(y_true, y_pred, s=15, alpha=0.5, color="steelblue")
+    fig, ax = plt.subplots(figsize=(5.5, 5.5))
+    ax.scatter(y_true, y_pred, s=5, alpha=0.2, color="steelblue", rasterized=True)
 
     lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
-    ax.plot(lims, lims, "r--", linewidth=1.5, alpha=0.7, label="Identity")
-
+    ax.plot(lims, lims, "r--", linewidth=1.2, alpha=0.6, label="Identity")
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
     ax.set_title(f"Observed vs Predicted — {tag}")
-    ax.text(0.05, 0.95, f"Spearman ρ = {r_s:.4f}", transform=ax.transAxes, fontsize=10,
+    ax.text(0.05, 0.95, f"Spearman ρ = {r_s:.4f}", transform=ax.transAxes, fontsize=9,
             verticalalignment="top", bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
-    ax.legend(fontsize=9)
-    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.25)
     ax.set_aspect("equal")
     fig.tight_layout()
-    fig.show()
 
 
-# ── main ──────────────────────────────────────────────────────────
+# ── per-target runner ─────────────────────────────────────────────
 
 def run_target(task: int, window: str, experiment: str, rfe: str, target: str, show_val: bool) -> None:
-    print(f"\n{'='*60}")
-    print(f"  Target: {target}")
-    print(f"  Config: task{task} / W{window} / {experiment} / {rfe}")
-    print(f"{'='*60}")
+    print(f"\n{'='*56}")
+    print(f"  T{task} | W{window} | {experiment} | {target}")
+    print(f"{'='*56}")
 
-    # Test
     test_df = _load_csv(task, window, experiment, rfe, target, "final_test_iterations.csv")
-    if test_df is not None and len(test_df) > 0:
-        tag = _make_tag(task, window, experiment, target, "test")
-        print(f"  Test splits: {len(test_df)}")
-        plot_r2(test_df, tag)
-        plot_mae(test_df, tag)
-        plot_rho(test_df, tag)
-    else:
-        print(f"  [SKIP] No test data for {target}")
+    if test_df is None or len(test_df) == 0:
+        print("  [SKIP] No test data")
+        return
 
-    # Validation (optional)
+    tag = f"T{task}W{window}_{experiment}_{target}"
+    print(f"  Test splits: {len(test_df)}")
+
     if show_val:
         val_df = _load_csv(task, window, experiment, rfe, target, "final_validation_iterations.csv")
         if val_df is not None and len(val_df) > 0:
-            tag = _make_tag(task, window, experiment, target, "val")
-            print(f"  Validation splits: {len(val_df)}")
-            plot_r2(val_df, tag)
-            plot_mae(val_df, tag)
-            plot_rho(val_df, tag)
+            print(f"  Val splits:   {len(val_df)}")
+            plot_val_test_comparison(val_df, test_df, tag)
+            plot_val_test_scatter(val_df, test_df, tag)
+    else:
+        plot_test_distributions(test_df, tag)
 
-    # Observed vs Predicted (from predictions CSV)
     pred_df = _load_csv(task, window, experiment, rfe, target, "final_predictions.csv")
     if pred_df is not None and len(pred_df) > 0:
-        tag = _make_tag(task, window, experiment, target, "pred")
-        print(f"  Predictions: {len(pred_df)} rows")
         plot_obs_vs_pred(pred_df, tag)
-    else:
-        print(f"  [SKIP] No predictions for {target}")
 
-    input("  Press Enter to continue to next target...")
+    _show_all()
+    input("  Press Enter -> next target")
 
+
+# ── entry point ───────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot regression optuna results from CSV files.")
@@ -167,7 +209,7 @@ def main() -> None:
     parser.add_argument("--experiment", default="raw", choices=["raw", "zscores", "rawzscore"])
     parser.add_argument("--rfe", default="fixed", choices=["fixed", "global", "split-wise"])
     parser.add_argument("--target", default="all", help="Target name or 'all'")
-    parser.add_argument("--val", action="store_true", help="Also show validation distribution plots")
+    parser.add_argument("--val", action="store_true", help="Show val vs test comparison instead of test-only")
     args = parser.parse_args()
 
     targets = ALL_TARGETS if args.target == "all" else [args.target]
