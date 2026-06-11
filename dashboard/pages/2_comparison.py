@@ -73,21 +73,14 @@ with tab_all:
 
     df = pd.DataFrame(all_rows)
 
-    row1_left, row1_right = st.columns(2)
-    with row1_left:
-        fig_r2_test = bar_r2_comparison(df, "r2", "R² test [IC 95%]")
-        st.plotly_chart(fig_r2_test, use_container_width=True)
-    with row1_right:
-        fig_r2_val = bar_r2_comparison(df, "r2", "R² validation [IC 95%]", suffix="_val")
-        st.plotly_chart(fig_r2_val, use_container_width=True)
-
-    row2_left, row2_right = st.columns(2)
-    with row2_left:
-        fig_mae_test = bar_r2_comparison(df, "mae", "MAE test [IC 95%]")
-        st.plotly_chart(fig_mae_test, use_container_width=True)
-    with row2_right:
-        fig_mae_val = bar_r2_comparison(df, "mae", "MAE validation [IC 95%]", suffix="_val")
-        st.plotly_chart(fig_mae_val, use_container_width=True)
+    fig_r2_test = bar_r2_comparison(df, "r2", "R² test [IC 95%]")
+    st.plotly_chart(fig_r2_test, use_container_width=True)
+    fig_r2_val = bar_r2_comparison(df, "r2", "R² validation [IC 95%]", suffix="_val")
+    st.plotly_chart(fig_r2_val, use_container_width=True)
+    fig_mae_test = bar_r2_comparison(df, "mae", "MAE test [IC 95%]")
+    st.plotly_chart(fig_mae_test, use_container_width=True)
+    fig_mae_val = bar_r2_comparison(df, "mae", "MAE validation [IC 95%]", suffix="_val")
+    st.plotly_chart(fig_mae_val, use_container_width=True)
 
 with tab_single:
     avail_targets = get_targets()
