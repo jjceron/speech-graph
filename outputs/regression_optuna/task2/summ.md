@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|
 | **W10_raw_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 | **W10_zscores_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
-| **W10_rawzscore_fixed** | ✅ | ✅ | ⬜ | ⬜ | partial (2/4) |
+| **W10_rawzscore_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 | **W20_raw_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
 | **W20_zscores_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
 | **W20_rawzscore_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
@@ -65,19 +65,21 @@
 
 ---
 
-### W10_rawzscore_fixed (partial: 2/4)
+### W10_rawzscore_fixed (complete)
 
 | Target | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
 |---|---|---|---|---|---|
 | **MOT** | 0.000 [-0.010, 0.011] | 0.160 [0.140, 0.179] | 46% | KNeighborsRegressor | pe, diameter, asp, z_l3 |
 | **COG** | -0.013 [-0.015, -0.012] | — | 94% | QuantileRegressor (α=5.1826) | z_pe, z_l1, z_l2, z_l3, z_lsc, z_density, z_diameter, z_asp |
-| MOT_V4 | — | — | — | — | — |
-| COG_V1 | — | — | — | — | — |
+| **MOT_V4** | 0.005 [-0.001, 0.012] | 0.103 [0.083, 0.123] | 48% | QuantileRegressor (α=0.0019) | pe, z_l2 |
+| **COG_V1** | 0.042 [0.035, 0.050] | 0.232 [0.212, 0.252] | 25% | QuantileRegressor (α=0.0005) | nodes, edges, lcc |
 
 | Target | Trial | Best Model | RFE n | MAE_val | RMSE_val | R²_val [IC 95%] | ρ_val [IC 95%] | MAE_test | RMSE_test | R²_test [IC 95%] | ρ_test [IC 95%] |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | MOT | 184 | KNeighborsRegressor | 4 | 6.405 | 7.724 | 0.001 [-0.007, 0.008] | 0.161 [0.148, 0.173] | 6.346 | 7.644 | 0.000 [-0.010, 0.011] | 0.160 [0.140, 0.179] |
 | COG | 9 | QuantileRegressor (α=5.1826) | 8 | 1.743 | 2.268 | -0.011 [-0.012, -0.009] | — | 1.718 | 2.215 | -0.013 [-0.015, -0.012] | — |
+| MOT_V4 | 232 | QuantileRegressor (α=0.0019) | 2 | 2.809 | 3.476 | 0.001 [-0.004, 0.006] | 0.116 [0.102, 0.129] | 2.774 | 3.431 | 0.005 [-0.001, 0.012] | 0.103 [0.083, 0.123] |
+| COG_V1 | 137 | QuantileRegressor (α=0.0005) | 3 | 1.005 | 1.313 | 0.045 [0.040, 0.050] | 0.231 [0.219, 0.243] | 1.025 | 1.324 | 0.042 [0.035, 0.050] | 0.232 [0.212, 0.252] |
 
 ---
 
