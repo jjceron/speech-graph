@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 from utils.loader import list_completed, ALL_TARGETS, load_predictions, load_best_report
 
 st.set_page_config(page_title="Subjects", page_icon="👤", layout="wide")

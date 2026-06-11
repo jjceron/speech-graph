@@ -89,15 +89,11 @@ with tab2:
             t = test_df[col_name].dropna().values
             if col_name == "rho":
                 t = t[np.isfinite(t)]
-            if len(v) > 0 and len(t) > 0:
-                lo = min(v.min(), t.min())
-                hi = max(v.max(), t.max())
-                bins = np.linspace(lo, hi, 31)
             fig = go.Figure()
             if len(v) > 0:
-                fig.add_trace(go.Histogram(x=v, bins=bins if len(v) > 0 else 30, name=f"Val ({v.mean():.4f})", marker_color=color, opacity=0.6))
+                fig.add_trace(go.Histogram(x=v, nbinsx=30, name=f"Val ({v.mean():.4f})", marker_color=color, opacity=0.6))
             if len(t) > 0:
-                fig.add_trace(go.Histogram(x=t, bins=bins if len(t) > 0 else 30, name=f"Test ({t.mean():.4f})", marker_color=color, opacity=0.6))
+                fig.add_trace(go.Histogram(x=t, nbinsx=30, name=f"Test ({t.mean():.4f})", marker_color=color, opacity=0.6))
             fig.update_layout(title=f"{label} — val vs test", barmode="overlay", template="plotly_white", height=300)
             if label in ("R²",):
                 fig.add_vline(x=0, line_dash="dot", line_color="gray", opacity=0.4)
