@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.loader import list_completed, ALL_TARGETS, load_all_reports, load_best_report, list_tasks, get_task, set_task, WINDOWS, EXPERIMENTS
+from utils.loader import list_completed, load_all_reports, load_best_report, list_tasks, get_task, set_task, get_windows, get_experiments, get_targets
 from utils.plots import forest_plot, TARGET_COLORS
 import pandas as pd
 import plotly.graph_objects as go
@@ -28,7 +28,8 @@ st.sidebar.markdown(f"### Regression Optuna — Task {get_task()}")
 st.sidebar.markdown("---")
 
 completed = list_completed()
-st.sidebar.success(f"**{len(completed)} / {len(WINDOWS) * len(EXPERIMENTS)}** experiments complete")
+tot_possible = len(get_windows()) * len(get_experiments()) if get_windows() else 0
+st.sidebar.success(f"**{len(completed)} / {tot_possible}** experiments complete")
 st.sidebar.markdown("---")
 
 st.sidebar.markdown(

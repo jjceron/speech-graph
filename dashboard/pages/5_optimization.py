@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-from utils.loader import list_completed, ALL_TARGETS, load_optuna_trials, load_best_report
+from utils.loader import list_completed, get_targets, load_optuna_trials, load_best_report
 from utils.plots import optimization_history, model_selection_bar, optuna_parallel_coords
 
 st.set_page_config(page_title="Optimization", page_icon="⚙️", layout="wide")
@@ -20,7 +20,7 @@ with col_e:
     exps = [e for w, e in completed if w == window]
     experiment = st.selectbox("Experiment", exps, index=0, key="opt_e")
 with col_t:
-    target = st.selectbox("Target", ALL_TARGETS, index=0, key="opt_t")
+    target = st.selectbox("Target", get_targets(), index=0, key="opt_t")
 
 trials = load_optuna_trials(window, experiment, target)
 if trials is None:
