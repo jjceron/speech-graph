@@ -1,5 +1,6 @@
 import streamlit as st
 import numpy as np
+import plotly.graph_objects as go
 from utils.loader import list_completed, ALL_TARGETS, load_optuna_trials, load_best_report
 from utils.plots import optimization_history, model_selection_bar, optuna_parallel_coords
 
