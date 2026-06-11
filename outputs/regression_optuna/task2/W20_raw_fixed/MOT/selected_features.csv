@@ -1,12 +1,8 @@
 feature
 nodes_T2W20
-edges_T2W20
-re_T2W20
-pe_T2W20
 l1_T2W20
 l2_T2W20
 lcc_T2W20
 lsc_T2W20
-atd_T2W20
 density_T2W20
-asp_T2W20
+diameter_T2W20
