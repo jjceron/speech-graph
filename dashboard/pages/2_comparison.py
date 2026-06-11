@@ -24,14 +24,34 @@ completed = list_completed()
 tab_all, tab_single, tab_scenario = st.tabs(["All Scenarios", "By Target", "Scenario Explorer"])
 
 with tab_all:
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        all_targets = get_targets()
+        selected_targets = st.multiselect(
+            "Targets", options=all_targets, default=all_targets, key="all_targets"
+        )
+    with col_f2:
+        all_exps = get_experiments()
+        selected_exps = st.multiselect(
+            "Experiments",
+            options=all_exps,
+            default=all_exps,
+            format_func=lambda x: EXPERIMENT_LABELS.get(x, x),
+            key="all_exps",
+        )
+
     reports = load_all_reports()
     all_rows = []
     for (w, e, t), r in reports.items():
+        if t not in selected_targets or e not in selected_exps:
+            continue
         vs = r.get("validation_summary", {})
         ts = r.get("test_summary", {})
         all_rows.append({
             "label": f"W{w} {e}  {t}",
             "target": t,
+            "window": w,
+            "experiment": e,
             "r2_mean": ts.get("r2_mean_test", 0),
             "r2_lower": ts.get("r2_ci_lower_test", 0),
             "r2_upper": ts.get("r2_ci_upper_test", 0),
@@ -46,16 +66,10 @@ with tab_all:
             "mae_val_upper": vs.get("mae_ci_upper_val"),
         })
     if not all_rows:
-        st.warning("No data available.")
+        st.warning("No data for the selected filters.")
         st.stop()
 
     df = pd.DataFrame(all_rows)
-
-    st.info(
-        "Bars show mean metric with 95% CI whiskers. "
-        "Values to the right of the red line (R²=0) indicate scenarios that outperform the mean baseline. "
-        "If the entire CI is > 0, the scenario is statistically significant at alpha=0.05."
-    )
 
     row1_left, row1_right = st.columns(2)
     with row1_left:
