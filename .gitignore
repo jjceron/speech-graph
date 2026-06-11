@@ -40,3 +40,4 @@ Thumbs.db
 .idea/temp/
 *.db
 tmp/
+outputs/regression_optuna/logs/
