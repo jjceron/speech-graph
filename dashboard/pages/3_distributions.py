@@ -111,12 +111,13 @@ with tab2:
 
 with tab3:
     if pred_df is not None and len(pred_df) > 0:
-        test_preds = pred_df[pred_df["set"] == "TEST"]
-        if len(test_preds) > 0:
-            fig = scatter_obs_vs_pred(test_preds["y_true"].values, test_preds["y_pred"].values)
+        set_choice = st.selectbox("Set", ["TEST", "VAL"], index=0)
+        subset = pred_df[pred_df["set"] == set_choice]
+        if len(subset) > 0:
+            fig = scatter_obs_vs_pred(subset, set_name=set_choice)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No test predictions available.")
+            st.info(f"No {set_choice} predictions available.")
     else:
         st.info("No predictions data available.")
 
