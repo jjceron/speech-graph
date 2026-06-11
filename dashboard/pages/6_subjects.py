@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from utils.loader import list_completed, ALL_TARGETS, load_predictions, load_best_report
+from utils.loader import list_completed, get_targets, load_predictions, load_best_report
 
 st.set_page_config(page_title="Subjects", page_icon="👤", layout="wide")
 st.title("👤 Per-Subject Analysis")
@@ -20,7 +20,7 @@ with col_e:
     exps = [e for w, e in completed if w == window]
     experiment = st.selectbox("Experiment", exps, index=0, key="sub_e")
 with col_t:
-    target = st.selectbox("Target", ALL_TARGETS, index=0, key="sub_t")
+    target = st.selectbox("Target", get_targets(), index=0, key="sub_t")
 
 pred_df = load_predictions(window, experiment, target)
 if pred_df is None or len(pred_df) == 0:

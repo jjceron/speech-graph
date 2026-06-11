@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -8,9 +9,6 @@ import pandas as pd
 import streamlit as st
 
 BASE_DIR = Path(__file__).resolve().parents[2] / "outputs" / "regression_optuna"
-ALL_TARGETS = ["MOT", "COG", "MOT_V4", "COG_V1"]
-EXPERIMENTS = ["raw", "zscores", "rawzscore"]
-WINDOWS = ["10", "20", "30", "40"]
 
 
 def get_task() -> int:
@@ -33,8 +31,58 @@ def list_tasks() -> list[int]:
     return sorted(tasks) if tasks else [2]
 
 
-def _exp_dir(window: str, experiment: str) -> Path:
-    return BASE_DIR / f"task{get_task()}" / f"W{window}_{experiment}_fixed"
+def _exp_dir(window: str, experiment: str, task: int | None = None) -> Path:
+    if task is None:
+        task = get_task()
+    return BASE_DIR / f"task{task}" / f"W{window}_{experiment}_fixed"
+
+
+def get_windows(task: int | None = None) -> list[str]:
+    if task is None:
+        task = get_task()
+    task_dir = BASE_DIR / f"task{task}"
+    if not task_dir.exists():
+        return []
+    windows = set()
+    for d in task_dir.iterdir():
+        if d.is_dir():
+            m = re.match(r"W(\d+)_", d.name)
+            if m:
+                windows.add(m.group(1))
+    return sorted(windows, key=int)
+
+
+def get_experiments(task: int | None = None) -> list[str]:
+    if task is None:
+        task = get_task()
+    task_dir = BASE_DIR / f"task{task}"
+    if not task_dir.exists():
+        return []
+    experiments = set()
+    for d in task_dir.iterdir():
+        if d.is_dir():
+            m = re.match(r"W\d+_(.+)_fixed", d.name)
+            if m:
+                experiments.add(m.group(1))
+    return sorted(experiments)
+
+
+def get_targets(task: int | None = None, window: str | None = None, experiment: str | None = None) -> list[str]:
+    if task is None:
+        task = get_task()
+    if window is not None and experiment is not None:
+        exp_dir = _exp_dir(window, experiment, task=task)
+        if exp_dir.exists():
+            return sorted([d.name for d in exp_dir.iterdir() if d.is_dir()])
+    targets = set()
+    for w in get_windows(task=task):
+        for e in get_experiments(task=task):
+            d = _exp_dir(w, e, task=task)
+            if d.exists():
+                for sub in d.iterdir():
+                    if sub.is_dir():
+                        targets.add(sub.name)
+    return sorted(targets)
 
 
 def has_experiment(window: str, experiment: str) -> bool:
@@ -42,12 +90,15 @@ def has_experiment(window: str, experiment: str) -> bool:
 
 
 def list_completed() -> list[tuple[str, str]]:
+    task = get_task()
+    targets = get_targets(task=task)
+    if not targets:
+        return []
     completed = []
-    for w in WINDOWS:
-        for e in EXPERIMENTS:
-            if has_experiment(w, e) and all(
-                (_exp_dir(w, e) / t).exists() for t in ALL_TARGETS
-            ):
+    for w in get_windows(task=task):
+        for e in get_experiments(task=task):
+            exp_dir = _exp_dir(w, e, task=task)
+            if exp_dir.exists() and all((exp_dir / t).exists() for t in targets):
                 completed.append((w, e))
     return completed
 
@@ -115,9 +166,10 @@ def load_selected_features(window: str, experiment: str, target: str) -> list[st
 
 
 def load_all_reports() -> dict[tuple[str, str, str], dict]:
+    task = get_task()
     reports = {}
     for w, e in list_completed():
-        for t in ALL_TARGETS:
+        for t in get_targets(task=task, window=w, experiment=e):
             r = load_best_report(w, e, t)
             if r:
                 reports[(w, e, t)] = r

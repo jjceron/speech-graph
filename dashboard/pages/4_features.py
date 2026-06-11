@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.loader import list_completed, ALL_TARGETS, load_rfe_ranking, load_selected_features, load_best_report
+from utils.loader import list_completed, get_targets, load_rfe_ranking, load_selected_features, load_best_report
 from utils.plots import rfe_ranking_chart
 
 st.set_page_config(page_title="Features", page_icon="🔬", layout="wide")
@@ -19,7 +19,7 @@ with col_e:
     exps = [e for w, e in completed if w == window]
     experiment = st.selectbox("Experiment", exps, index=0, key="feat_e")
 with col_t:
-    target = st.selectbox("Target", ALL_TARGETS, index=0, key="feat_t")
+    target = st.selectbox("Target", get_targets(), index=0, key="feat_t")
 
 st.subheader(f"W{window} — {experiment} — {target}")
 
@@ -48,7 +48,7 @@ st.subheader("Feature Comparison Across Experiments")
 
 all_rows = []
 for w, e in completed:
-    for t in ALL_TARGETS:
+    for t in get_targets():
         report = load_best_report(w, e, t)
         if report:
             feat = report.get("selected_features", [])

@@ -3,12 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 from utils.loader import (
     list_completed,
-    ALL_TARGETS,
     load_best_report,
-    EXPERIMENTS,
-    WINDOWS,
     load_all_reports,
     get_task,
+    get_targets,
+    get_experiments,
+    get_windows,
 )
 from utils.plots import (
     bar_r2_comparison,
@@ -53,7 +53,8 @@ with tab_all:
     )
 
 with tab_single:
-    target = st.selectbox("Target", ALL_TARGETS, index=0)
+    avail_targets = get_targets()
+    target = st.selectbox("Target", avail_targets, index=0)
 
     rows = []
     for w, e in completed:
@@ -135,7 +136,8 @@ with tab_scenario:
 
     col_s1, col_s2, col_s3 = st.columns([1, 1, 1])
     with col_s1:
-        scenario_target = st.selectbox("Target", ALL_TARGETS, index=0, key="scenario_t")
+        avail_targets = get_targets()
+        scenario_target = st.selectbox("Target", avail_targets, index=0, key="scenario_t")
     with col_s2:
         avail_exps = sorted(set(e for _, e in completed))
         selected_exps = st.multiselect(

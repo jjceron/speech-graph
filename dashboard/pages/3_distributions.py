@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-from utils.loader import list_completed, ALL_TARGETS, EXPERIMENTS, WINDOWS, load_best_report
+from utils.loader import list_completed, get_targets, get_experiments, get_windows, load_best_report
 from utils.plots import scatter_obs_vs_pred, scatter_r2_val_vs_test, hist_metric, residual_plot, target_distribution_plot
 from utils.loader import load_test_iterations, load_val_iterations, load_predictions
 
@@ -21,7 +21,7 @@ with col_e:
     exps = [e for w, e in completed if w == window]
     experiment = st.selectbox("Experiment", exps, index=0)
 with col_t:
-    target = st.selectbox("Target", ALL_TARGETS, index=0)
+    target = st.selectbox("Target", get_targets(), index=0)
 
 test_df = load_test_iterations(window, experiment, target)
 val_df = load_val_iterations(window, experiment, target)
