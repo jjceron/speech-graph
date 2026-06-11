@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.loader import list_completed, ALL_TARGETS, load_all_reports, load_best_report
+from utils.loader import list_completed, ALL_TARGETS, load_all_reports, load_best_report, list_tasks, get_task, set_task, WINDOWS, EXPERIMENTS
 from utils.plots import forest_plot, TARGET_COLORS
 import pandas as pd
 import plotly.graph_objects as go
@@ -12,11 +12,23 @@ st.set_page_config(
 )
 
 st.sidebar.title("📊 SpeechGraph")
-st.sidebar.markdown("### Regression Optuna — Task 2")
+
+tasks = list_tasks()
+current_task = get_task()
+avail_tasks = [t for t in tasks] if tasks else [current_task]
+selected_task = st.sidebar.selectbox(
+    "Task", avail_tasks, index=avail_tasks.index(current_task) if current_task in avail_tasks else 0
+)
+if selected_task != current_task:
+    set_task(selected_task)
+    st.cache_data.clear()
+    st.rerun()
+
+st.sidebar.markdown(f"### Regression Optuna — Task {get_task()}")
 st.sidebar.markdown("---")
 
 completed = list_completed()
-st.sidebar.success(f"**{len(completed)} / 12** experiments complete")
+st.sidebar.success(f"**{len(completed)} / {len(WINDOWS) * len(EXPERIMENTS)}** experiments complete")
 st.sidebar.markdown("---")
 
 st.sidebar.markdown(
@@ -32,12 +44,12 @@ st.sidebar.markdown(
 )
 
 st.title("📊 SpeechGraph Regression Dashboard")
-st.markdown("#### Task 2 — Optuna Regression Results (W10–W40)")
+st.markdown(f"#### Task {get_task()} — Optuna Regression Results (W10–W40)")
 
 reports = load_all_reports()
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Experiments complete", f"{len(completed)}/12")
+col1.metric("Experiments complete", f"{len(completed)}/{len(WINDOWS) * len(EXPERIMENTS)}")
 
 best_r2 = -999
 best_label = ""
@@ -102,4 +114,4 @@ if all_data:
     st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
-st.caption("Data from `outputs/regression_optuna/task2/` — Last updated: see git log")
+st.caption(f"Data from `outputs/regression_optuna/task{get_task()}/` — Last updated: see git log")

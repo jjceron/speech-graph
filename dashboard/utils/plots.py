@@ -228,41 +228,60 @@ def model_selection_bar(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def optuna_parallel_coords(df: pd.DataFrame, params: list[str]) -> go.Figure:
+def optuna_parallel_coords(df: pd.DataFrame, params: list[str], top_k: int = 100) -> go.Figure:
     dfp = df.dropna(subset=["value"]).copy()
+    if len(dfp) == 0:
+        return go.Figure()
+
+    if top_k < len(dfp):
+        dfp = dfp.nsmallest(top_k, "value")
+
     dims = []
     for p in params:
         if p in dfp.columns:
-            col = dfp[p].copy()
+            col = dfp[p]
+            label = p.replace("params_", "")
             if col.dtype == "object":
+                codes, labels = pd.factorize(col)
                 dims.append(
-                    go.parcats.Dimension(
-                        label=p.replace("params_", ""),
-                        values=col,
+                    dict(
+                        label=label,
+                        values=codes,
+                        tickvals=list(range(len(labels))),
+                        ticktext=[str(l) for l in labels],
                     )
                 )
             else:
+                sorted_col = col.dropna()
+                if len(sorted_col) == 0:
+                    continue
+                cmin, cmax = float(sorted_col.min()), float(sorted_col.max())
                 dims.append(
-                    go.parcats.Dimension(
-                        label=p.replace("params_", ""),
+                    dict(
+                        label=label,
                         values=col,
+                        range=[cmin, cmax],
                     )
                 )
+
     if not dims:
         return go.Figure()
-    dims.append(
-        go.parcats.Dimension(
-            label="Objective (MAE)",
-            values=dfp["value"],
-        )
-    )
+
     fig = go.Figure(
-        go.Parcats(
+        go.Parcoords(
             dimensions=dims,
-            line=dict(color=dfp["value"], colorscale="Viridis_r", showscale=True),
+            line=dict(
+                color=dfp["value"],
+                colorscale="Viridis_r",
+                showscale=True,
+                colorbar=dict(title="MAE val"),
+            ),
         )
     )
-    fig.update_layout(title="Parallel Coordinates — Hyperparameters vs Objective", height=600)
+    fig.update_layout(
+        title=f"Parallel Coordinates — Top {top_k} of {len(df.dropna(subset=['value']))} Trials",
+        height=600,
+    )
     return fig
 
 
@@ -347,4 +366,50 @@ def target_distribution_plot(y_true: np.ndarray, mae: float, rmse: float) -> go.
         template="plotly_white",
         height=350,
     )
+    return fig
+
+
+EXPERIMENT_COLORS = {"raw": "#1f77b4", "zscores": "#ff7f0e", "rawzscore": "#2ca02c"}
+
+
+def metric_comparison_chart(
+    df: pd.DataFrame,
+    metric: str,
+    metric_label: str,
+    title: str,
+    show_hline_zero: bool = False,
+    color_col: str = "experiment",
+) -> go.Figure:
+    fig = go.Figure()
+    for exp in df[color_col].unique():
+        edf = df[df[color_col] == exp].sort_values("label")
+        fig.add_trace(
+            go.Bar(
+                name=EXPERIMENT_LABELS.get(exp, exp),
+                x=edf["label"],
+                y=edf[f"{metric}_mean"],
+                error_y=dict(
+                    type="data",
+                    symmetric=False,
+                    array=edf[f"{metric}_upper"] - edf[f"{metric}_mean"],
+                    arrayminus=edf[f"{metric}_mean"] - edf[f"{metric}_lower"],
+                    visible=True,
+                    thickness=1.2,
+                    width=3,
+                ),
+                marker_color=EXPERIMENT_COLORS.get(exp, "#333"),
+                opacity=0.85,
+            )
+        )
+    fig.update_layout(
+        title=title,
+        xaxis_title="Scenario",
+        yaxis_title=metric_label,
+        barmode="group",
+        template="plotly_white",
+        height=400,
+        legend_title="Experiment",
+    )
+    if show_hline_zero:
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
     return fig

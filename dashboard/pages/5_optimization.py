@@ -123,14 +123,25 @@ with tab3:
         "params_use_scaler": "Scaler",
     }
     available = [k for k in param_options if k in trials.columns and trials[k].nunique() > 1]
-    selected_params = st.multiselect(
-        "Select hyperparameters for parallel coordinates",
-        options=available,
-        default=[k for k in ["params_regressor", "params_rfe_n_features", "params_use_scaler"] if k in available],
-        format_func=lambda x: param_options.get(x, x),
-    )
+    col_pc1, col_pc2 = st.columns([3, 1])
+    with col_pc1:
+        selected_params = st.multiselect(
+            "Select hyperparameters for parallel coordinates",
+            options=available,
+            default=[k for k in ["params_regressor", "params_rfe_n_features", "params_use_scaler"] if k in available],
+            format_func=lambda x: param_options.get(x, x),
+        )
+    with col_pc2:
+        n_trials = len(trials.dropna(subset=["value"]))
+        top_k = st.slider(
+            "Top K trials",
+            min_value=min(30, n_trials),
+            max_value=n_trials,
+            value=min(100, n_trials),
+            step=10,
+        )
     if selected_params:
-        fig_pc = optuna_parallel_coords(trials, selected_params)
+        fig_pc = optuna_parallel_coords(trials, selected_params, top_k=top_k)
         st.plotly_chart(fig_pc, use_container_width=True)
     else:
         st.info("Select at least one parameter to display.")
