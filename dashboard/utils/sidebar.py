@@ -12,6 +12,14 @@ from utils.loader import (
 
 
 def render_sidebar() -> None:
+    st.markdown(
+        """
+<style>
+[data-testid="stSidebarNav"] { display: none; }
+</style>
+""",
+        unsafe_allow_html=True,
+    )
     st.sidebar.title("📊 SpeechGraph")
 
     tasks = list_tasks()
