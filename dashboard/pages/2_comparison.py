@@ -12,10 +12,7 @@ from utils.loader import (
 )
 from utils.plots import (
     bar_r2_comparison,
-    forest_plot,
     metric_comparison_chart,
-    TARGET_COLORS,
-    EXPERIMENT_COLORS,
     EXPERIMENT_LABELS,
 )
 
@@ -28,29 +25,53 @@ tab_all, tab_single, tab_scenario = st.tabs(["All Scenarios", "By Target", "Scen
 
 with tab_all:
     reports = load_all_reports()
-    all_data = []
+    all_rows = []
     for (w, e, t), r in reports.items():
+        vs = r.get("validation_summary", {})
         ts = r.get("test_summary", {})
-        r2_mean = ts.get("r2_mean_test", 0)
-        if r2_mean is None:
-            continue
-        all_data.append({
-            "label": f"W{w} {e:<10} {t}",
-            "r2_mean": r2_mean,
+        all_rows.append({
+            "label": f"W{w} {e}  {t}",
+            "target": t,
+            "r2_mean": ts.get("r2_mean_test", 0),
             "r2_lower": ts.get("r2_ci_lower_test", 0),
             "r2_upper": ts.get("r2_ci_upper_test", 0),
-            "color": TARGET_COLORS.get(t, "#333"),
+            "r2_val_mean": vs.get("r2_mean_val"),
+            "r2_val_lower": vs.get("r2_ci_lower_val"),
+            "r2_val_upper": vs.get("r2_ci_upper_val"),
+            "mae_mean": ts.get("mae_mean_test"),
+            "mae_lower": ts.get("mae_ci_lower_test"),
+            "mae_upper": ts.get("mae_ci_upper_test"),
+            "mae_val_mean": vs.get("mae_mean_val"),
+            "mae_val_lower": vs.get("mae_ci_lower_val"),
+            "mae_val_upper": vs.get("mae_ci_upper_val"),
         })
-    if all_data:
-        all_data.sort(key=lambda x: x["r2_mean"])
-        fig = forest_plot(all_data)
-        st.plotly_chart(fig, use_container_width=True)
+    if not all_rows:
+        st.warning("No data available.")
+        st.stop()
+
+    df = pd.DataFrame(all_rows)
 
     st.info(
-        "Each dot shows R² test with 95% CI. "
-        "Dots to the right of the red line (R²=0) indicate scenarios that outperform the mean baseline. "
-        "If the entire CI is > 0, the scenario is statistically significant at α=0.05."
+        "Bars show mean metric with 95% CI whiskers. "
+        "Values to the right of the red line (R²=0) indicate scenarios that outperform the mean baseline. "
+        "If the entire CI is > 0, the scenario is statistically significant at alpha=0.05."
     )
+
+    row1_left, row1_right = st.columns(2)
+    with row1_left:
+        fig_r2_test = bar_r2_comparison(df, "r2", "R² test [IC 95%]")
+        st.plotly_chart(fig_r2_test, use_container_width=True)
+    with row1_right:
+        fig_r2_val = bar_r2_comparison(df, "r2", "R² validation [IC 95%]", suffix="_val")
+        st.plotly_chart(fig_r2_val, use_container_width=True)
+
+    row2_left, row2_right = st.columns(2)
+    with row2_left:
+        fig_mae_test = bar_r2_comparison(df, "mae", "MAE test [IC 95%]")
+        st.plotly_chart(fig_mae_test, use_container_width=True)
+    with row2_right:
+        fig_mae_val = bar_r2_comparison(df, "mae", "MAE validation [IC 95%]", suffix="_val")
+        st.plotly_chart(fig_mae_val, use_container_width=True)
 
 with tab_single:
     avail_targets = get_targets()
