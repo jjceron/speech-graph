@@ -16,7 +16,7 @@ render_sidebar()
 
 completed = list_completed()
 
-st.title("📊 SpeechGraph Regression Dashboard")
+st.title("SpeechGraph Regression Dashboard")
 st.markdown(f"#### Task {get_task()} — Optuna Regression Results (W10–W40)")
 
 reports = load_all_reports()
