@@ -136,8 +136,8 @@ All W40 experiments (raw, zscores, rawzscore) are pending.
 
 3. **Zscores underperform vs raw**: W10 zscores only show signal for MOT (R² ≈ 0.02, similar to raw). COG, MOT_V4, COG_V1 all yield R² ≤ 0.
 
-4. **Rawzscore (combined) does not improve**: W10 rawzscore results are comparable to raw alone — no benefit from adding both feature sets.
+4. **Rawzscore (combined) does not improve over raw alone**: W10 rawzscore results are comparable to raw — COG_V1 preserves its signal (R² ≈ 0.04, ρ ≈ 0.23) while MOT, COG remain weak and MOT_V4 stays noise.
 
-5. **COG and MOT_V4 are noise**: All experiments yield R² ≈ 0 or negative, with >50% of splits failing.
+5. **COG and MOT_V4 perform as noise**: All experiments yield R² ≈ 0 or negative for both targets. MOT_V4 shows 48–100% failing splits depending on feature set; COG consistently >90%.
 
-6. **Overall**, speech-graph features explain at most ~4% of the variance in impulsivity scores. The only consistent signal is COG_V1 with raw features.
+6. **Overall**, speech-graph features explain at most ~4% of the variance in impulsivity scores. The only consistent signal is COG_V1, robust across raw and rawzscore feature sets.
