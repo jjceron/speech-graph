@@ -45,7 +45,7 @@ st.markdown(f"#### Task {get_task()} — Optuna Regression Results (W10–W40)")
 reports = load_all_reports()
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Experiments complete", f"{len(completed)}/{len(WINDOWS) * len(EXPERIMENTS)}")
+col1.metric("Experiments complete", f"{len(completed)}/{len(get_windows()) * len(get_experiments())}")
 
 best_r2 = -999
 best_label = ""

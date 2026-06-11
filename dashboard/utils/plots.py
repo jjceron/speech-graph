@@ -80,17 +80,38 @@ def hist_metric(values: np.ndarray, label: str, color: str, bins: int = 40) -> g
     return fig
 
 
-def scatter_obs_vs_pred(y_true: np.ndarray, y_pred: np.ndarray) -> go.Figure:
-    rho, _ = spearmanr(y_true, y_pred)
-    lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
+def scatter_obs_vs_pred(pred_df: pd.DataFrame, set_name: str = "TEST") -> go.Figure:
+    subj_stats = pred_df.groupby("subject")[["y_true", "y_pred"]].agg(["mean", "std"])
+    subj_stats.columns = ["y_true_mean", "y_true_std", "y_pred_mean", "y_pred_std"]
+    subj_stats = subj_stats.reset_index()
+
+    y_true_mean = subj_stats["y_true_mean"].values
+    y_pred_mean = subj_stats["y_pred_mean"].values
+
+    hover_text = []
+    for _, row in subj_stats.iterrows():
+        hover_text.append(
+            f"<b>{row['subject']}</b><br>"
+            f"y_true: {row['y_true_mean']:.5f} ± {row['y_true_std']:.5f}<br>"
+            f"y_pred: {row['y_pred_mean']:.5f} ± {row['y_pred_std']:.5f}"
+        )
+
+    rho, _ = spearmanr(y_true_mean, y_pred_mean)
+    margin = (y_true_mean.max() - y_true_mean.min()) * 0.05 or 1
+    lim_min = min(y_true_mean.min(), y_pred_mean.min()) - margin
+    lim_max = max(y_true_mean.max(), y_pred_mean.max()) + margin
+    lims = [lim_min, lim_max]
+
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=y_true,
-            y=y_pred,
+            x=y_true_mean,
+            y=y_pred_mean,
             mode="markers",
-            marker=dict(size=3, opacity=0.3, color="steelblue"),
-            name="Predictions",
+            marker=dict(size=6, opacity=0.7, color="steelblue"),
+            name=f"{set_name} (per subject)",
+            text=hover_text,
+            hoverinfo="text",
         )
     )
     fig.add_trace(
@@ -103,9 +124,9 @@ def scatter_obs_vs_pred(y_true: np.ndarray, y_pred: np.ndarray) -> go.Figure:
         )
     )
     fig.update_layout(
-        title=f"Observed vs Predicted (Spearman ρ = {rho:.4f})",
-        xaxis_title="Observed",
-        yaxis_title="Predicted",
+        title=f"Observed vs Predicted — {set_name} (Spearman ρ = {rho:.4f})",
+        xaxis_title="Observed (mean per subject)",
+        yaxis_title="Predicted (mean per subject)",
         template="plotly_white",
         height=500,
         width=500,
