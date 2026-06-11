@@ -235,12 +235,10 @@ def optuna_parallel_coords(df: pd.DataFrame, params: list[str]) -> go.Figure:
         if p in dfp.columns:
             col = dfp[p].copy()
             if col.dtype == "object":
-                codes, _ = pd.factorize(col)
                 dims.append(
                     go.parcats.Dimension(
                         label=p.replace("params_", ""),
                         values=col,
-                        tickvals=col.unique().tolist(),
                     )
                 )
             else:
@@ -287,5 +285,66 @@ def residual_plot(y_true: np.ndarray, y_pred: np.ndarray) -> go.Figure:
         yaxis_title="Residual",
         template="plotly_white",
         height=400,
+    )
+    return fig
+
+
+def forest_plot(all_data: list[dict]) -> go.Figure:
+    fig = go.Figure()
+    for row in all_data:
+        ci_low = row["r2_mean"] - row["r2_lower"]
+        ci_high = row["r2_upper"] - row["r2_mean"]
+        fig.add_trace(
+            go.Scatter(
+                x=[row["r2_mean"]],
+                y=[row["label"]],
+                mode="markers",
+                marker=dict(size=8, color=row.get("color", "#1f77b4")),
+                error_x=dict(
+                    type="data",
+                    symmetric=False,
+                    array=[ci_high],
+                    arrayminus=[ci_low],
+                    visible=True,
+                    thickness=1.5,
+                    width=5,
+                ),
+                showlegend=False,
+            )
+        )
+    fig.add_vline(x=0, line_dash="dash", line_color="red", line_width=1.5, opacity=0.7)
+    fig.add_annotation(x=0, y=1.02, yref="paper", text="Null (R²=0)", showarrow=False, font=dict(color="red", size=10))
+    fig.update_layout(
+        title="All Scenarios — R² test [IC 95%]",
+        xaxis_title="R² test",
+        template="plotly_white",
+        height=max(400, 30 * len(all_data)),
+        margin=dict(l=250),
+    )
+    return fig
+
+
+def target_distribution_plot(y_true: np.ndarray, mae: float, rmse: float) -> go.Figure:
+    mean_val = float(y_true.mean())
+    std_val = float(y_true.std())
+    fig = go.Figure()
+    fig.add_trace(
+        go.Histogram(
+            x=y_true,
+            nbinsx=40,
+            marker_color="#1f77b4",
+            opacity=0.75,
+            name="Target",
+        )
+    )
+    fig.add_vline(x=mean_val, line_dash="dash", line_color="red", line_width=2)
+    fig.add_vline(x=mean_val - mae, line_dash="dot", line_color="green", line_width=1.5)
+    fig.add_vline(x=mean_val + mae, line_dash="dot", line_color="green", line_width=1.5)
+    fig.update_layout(
+        title=f"Target Distribution (μ={mean_val:.3f}, σ={std_val:.3f})",
+        xaxis_title="Target value",
+        yaxis_title="Frequency",
+        template="plotly_white",
+        height=350,
     )
     return fig

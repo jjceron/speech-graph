@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 from utils.loader import list_completed, ALL_TARGETS, EXPERIMENTS, WINDOWS, load_best_report
-from utils.plots import scatter_obs_vs_pred, scatter_r2_val_vs_test, hist_metric, residual_plot
+from utils.plots import scatter_obs_vs_pred, scatter_r2_val_vs_test, hist_metric, residual_plot, target_distribution_plot
 from utils.loader import load_test_iterations, load_val_iterations, load_predictions
 
 st.set_page_config(page_title="Distributions", page_icon="📈", layout="wide")
@@ -41,7 +41,7 @@ if report:
         f"**R² test:** {report['test_summary']['r2_mean_test']:.4f} [{report['test_summary']['r2_ci_lower_test']:.4f}, {report['test_summary']['r2_ci_upper_test']:.4f}]"
     )
 
-tab1, tab2, tab3, tab4 = st.tabs(["Test Distributions", "Val vs Test", "Obs vs Pred", "Residuals"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Test Distributions", "Val vs Test", "Obs vs Pred", "Residuals", "Target Distribution"])
 
 with tab1:
     col1, col2, col3 = st.columns(3)
@@ -126,6 +126,27 @@ with tab4:
         if len(test_preds) > 0:
             fig = residual_plot(test_preds["y_true"].values, test_preds["y_pred"].values)
             st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No test predictions available.")
+    else:
+        st.info("No predictions data available.")
+
+with tab5:
+    if pred_df is not None and len(pred_df) > 0:
+        test_preds = pred_df[pred_df["set"] == "TEST"]
+        if len(test_preds) > 0:
+            y_true = test_preds["y_true"].values
+            mae_val = float(test_df["mae"].mean()) if test_df is not None else 0
+            rmse_val = float(test_df["rmse"].mean()) if test_df is not None else 0
+            fig = target_distribution_plot(y_true, mae_val, rmse_val)
+            st.plotly_chart(fig, use_container_width=True)
+            tmin, tmax = y_true.min(), y_true.max()
+            tmean, tstd = y_true.mean(), y_true.std()
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Target range", f"{tmin:.3f} – {tmax:.3f}")
+            col2.metric("Target mean ± std", f"{tmean:.3f} ± {tstd:.3f}")
+            col3.metric("MAE (% of range)", f"{mae_val:.3f} ({mae_val/(tmax-tmin)*100:.1f}%)")
+            col4.metric("RMSE (% of range)", f"{rmse_val:.3f} ({rmse_val/(tmax-tmin)*100:.1f}%)")
         else:
             st.info("No test predictions available.")
     else:
