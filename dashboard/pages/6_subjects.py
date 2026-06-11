@@ -3,8 +3,10 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from utils.loader import list_completed, get_targets, load_predictions, load_best_report
+from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Subjects", page_icon="👤", layout="wide")
+render_sidebar()
 st.title("👤 Per-Subject Analysis")
 
 completed = list_completed()
