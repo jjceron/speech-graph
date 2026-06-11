@@ -15,7 +15,7 @@
 | **W10_raw_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 | **W10_zscores_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 | **W10_rawzscore_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
-| **W20_raw_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
+| **W20_raw_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 | **W20_zscores_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
 | **W20_rawzscore_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
 | **W30_raw_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
@@ -83,14 +83,21 @@
 
 ---
 
-### W20_raw_fixed (pending)
+### W20_raw_fixed (complete)
 
 | Target | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
 |---|---|---|---|---|---|
-| MOT | — | — | — | — | — |
-| COG | — | — | — | — | — |
-| MOT_V4 | — | — | — | — | — |
-| COG_V1 | — | — | — | — | — |
+| **MOT** | -0.021 [-0.032, -0.011] | 0.117 [0.097, 0.137] | 55% | KNeighborsRegressor (k=16) | nodes, edges, re, pe, l1, l2, lcc, lsc, atd, density, asp |
+| **COG** | -0.013 [-0.015, -0.011] | — | 93.5% | QuantileRegressor (α=5.1826) | lsc, atd, density, diameter, asp |
+| **MOT_V4** | -0.003 [-0.013, 0.006] | 0.140 [0.121, 0.160] | 48.75% | KNeighborsRegressor (k=20) | nodes, re, pe, l1, l2, l3, lsc, asp |
+| **COG_V1** | 0.041 [0.034, 0.048] | 0.250 [0.231, 0.269] | 20.25% | QuantileRegressor (α=0.0012) | nodes, edges, l2, lcc |
+
+| Target | Trial | Best Model | RFE n | MAE_val | RMSE_val | R²_val [IC 95%] | ρ_val [IC 95%] | MAE_test | RMSE_test | R²_test [IC 95%] | ρ_test [IC 95%] |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MOT | 86 | KNeighborsRegressor (k=16) | 11 | 6.477 | 7.753 | -0.008 [-0.015, -0.002] | 0.139 [0.127, 0.151] | 6.493 | 7.763 | -0.021 [-0.032, -0.011] | 0.117 [0.097, 0.137] |
+| COG | 9 | QuantileRegressor (α=5.1826) | 5 | 1.726 | 2.254 | -0.016 [-0.017, -0.015] | — | 1.701 | 2.191 | -0.013 [-0.015, -0.011] | — |
+| MOT_V4 | 187 | KNeighborsRegressor (k=20) | 8 | 2.805 | 3.451 | -0.003 [-0.009, 0.003] | 0.140 [0.128, 0.152] | 2.876 | 3.525 | -0.003 [-0.013, 0.006] | 0.140 [0.121, 0.160] |
+| COG_V1 | 297 | QuantileRegressor (α=0.0012) | 4 | 0.986 | 1.306 | 0.035 [0.030, 0.040] | 0.237 [0.224, 0.250] | 0.970 | 1.298 | 0.041 [0.034, 0.048] | 0.250 [0.231, 0.269] |
 
 ---
 
@@ -132,40 +139,44 @@ All W40 experiments (raw, zscores, rawzscore) are pending.
 
 ### MOT
 
-| Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
-|---|---|---|---|---|---|
-| **raw** | 0.017 [0.004, 0.031] | 0.197 [0.178, 0.216] | 43% | ExtraTreesRegressor | pe, l3, diameter |
-| **zscores** | 0.023 [0.015, 0.032] | 0.145 [0.126, 0.165] | 33% | ElasticNet | z_pe, z_l3 |
-| **rawzscore** | 0.000 [-0.010, 0.011] | 0.160 [0.140, 0.179] | 46% | KNeighborsRegressor | pe, diameter, asp, z_l3 |
+| Window | Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
+|---|---|---|---|---|---|---|
+| **W10** | raw | 0.017 [0.004, 0.031] | 0.197 [0.178, 0.216] | 43% | ExtraTreesRegressor | pe, l3, diameter |
+| **W10** | zscores | 0.023 [0.015, 0.032] | 0.145 [0.126, 0.165] | 33% | ElasticNet | z_pe, z_l3 |
+| **W10** | rawzscore | 0.000 [-0.010, 0.011] | 0.160 [0.140, 0.179] | 46% | KNeighborsRegressor | pe, diameter, asp, z_l3 |
+| **W20** | raw | -0.021 [-0.032, -0.011] | 0.117 [0.097, 0.137] | 55% | KNeighborsRegressor (k=16) | nodes, edges, re, pe, l1, l2, lcc, lsc, atd, density, asp |
 
-- Zscores produce the highest R² (0.023) and lowest failure rate (33%). Rawzscore eliminates the signal (R²≈0).
+- At W10, zscores produce the highest R² (0.023) and lowest failure rate (33%), while rawzscore eliminates signal (R²≈0). At W20, raw signal turns negative (R²=−0.021, 55% failure), suggesting the weak W10 signal does not generalise across windows.
 
 ### COG
 
-| Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
-|---|---|---|---|---|---|
-| **raw** | -0.013 [-0.015, -0.012] | — | 94% | QuantileRegressor (α=5.1826) | lsc, atd, density, diameter, asp |
-| **zscores** | -0.013 [-0.015, -0.012] | — | 94% | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
-| **rawzscore** | -0.013 [-0.015, -0.012] | — | 94% | QuantileRegressor (α=5.1826) | z_pe, z_l1, z_l2, z_l3, z_lsc, z_density, z_diameter, z_asp |
+| Window | Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
+|---|---|---|---|---|---|---|
+| **W10** | raw | -0.013 [-0.015, -0.012] | — | 94% | QuantileRegressor (α=5.1826) | lsc, atd, density, diameter, asp |
+| **W10** | zscores | -0.013 [-0.015, -0.012] | — | 94% | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
+| **W10** | rawzscore | -0.013 [-0.015, -0.012] | — | 94% | QuantileRegressor (α=5.1826) | z_pe, z_l1, z_l2, z_l3, z_lsc, z_density, z_diameter, z_asp |
+| **W20** | raw | -0.013 [-0.015, -0.011] | — | 93.5% | QuantileRegressor (α=5.1826) | lsc, atd, density, diameter, asp |
 
-- R² is consistently negative (≈ -0.013) across all experiments. ρ is not computable. >90% of splits fail across all feature sets.
+- R² is consistently negative (≈ −0.013) across all experiments and windows. ρ is not computable. >90% of splits fail across all configurations. The results are nearly identical between W10 and W20, confirming no predictive signal.
 
 ### MOT_V4
 
-| Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
-|---|---|---|---|---|---|
-| **raw** | 0.002 [-0.004, 0.007] | 0.083 [0.063, 0.103] | 52% | QuantileRegressor (α=0.0058) | pe, atd, density, diameter, asp |
-| **zscores** | -0.031 [-0.032, -0.029] | — | 100% | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
-| **rawzscore** | 0.005 [-0.001, 0.012] | 0.103 [0.083, 0.123] | 48% | QuantileRegressor (α=0.0019) | pe, z_l2 |
+| Window | Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
+|---|---|---|---|---|---|---|
+| **W10** | raw | 0.002 [-0.004, 0.007] | 0.083 [0.063, 0.103] | 52% | QuantileRegressor (α=0.0058) | pe, atd, density, diameter, asp |
+| **W10** | zscores | -0.031 [-0.032, -0.029] | — | 100% | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
+| **W10** | rawzscore | 0.005 [-0.001, 0.012] | 0.103 [0.083, 0.123] | 48% | QuantileRegressor (α=0.0019) | pe, z_l2 |
+| **W20** | raw | -0.003 [-0.013, 0.006] | 0.140 [0.121, 0.160] | 48.75% | KNeighborsRegressor (k=20) | nodes, re, pe, l1, l2, l3, lsc, asp |
 
-- R² hovers near zero across all experiments (raw: 0.002, zscores: -0.031, rawzscore: 0.005). Zscores produce 100% failing splits; raw and rawzscore are near chance level.
+- R² hovers near zero across all experiments and windows (W10 raw: 0.002, W10 zscores: −0.031, W10 rawzscore: 0.005, W20 raw: −0.003). Zscores produce 100% failing splits at W10. Despite the model shifting from QuantileRegressor to KNN at W20, ρ improves (0.083 → 0.140) but R² remains at chance level.
 
 ### COG_V1
 
-| Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
-|---|---|---|---|---|---|
-| **raw** | 0.043 [0.035, 0.050] | 0.230 [0.210, 0.250] | 24% | QuantileRegressor (α=0.0006) | nodes, edges, lcc |
-| **zscores** | -0.004 [-0.004, -0.003] | — | 82% | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
-| **rawzscore** | 0.042 [0.035, 0.050] | 0.232 [0.212, 0.252] | 25% | QuantileRegressor (α=0.0005) | nodes, edges, lcc |
+| Window | Experiment | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | Best Model | Selected Features |
+|---|---|---|---|---|---|---|
+| **W10** | raw | 0.043 [0.035, 0.050] | 0.230 [0.210, 0.250] | 24% | QuantileRegressor (α=0.0006) | nodes, edges, lcc |
+| **W10** | zscores | -0.004 [-0.004, -0.003] | — | 82% | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
+| **W10** | rawzscore | 0.042 [0.035, 0.050] | 0.232 [0.212, 0.252] | 25% | QuantileRegressor (α=0.0005) | nodes, edges, lcc |
+| **W20** | raw | 0.041 [0.034, 0.048] | 0.250 [0.231, 0.269] | 20.25% | QuantileRegressor (α=0.0012) | nodes, edges, l2, lcc |
 
-- COG_V1 is the only target with positive R² across raw and rawzscore (≈0.04), with ρ≈0.23 and ~24–25% failing splits. The signal is lost with zscores alone (R²≈−0.004, 82% failure). Selected features (nodes, edges, lcc) are identical for raw and rawzscore.
+- COG_V1 is the only target with positive R² across raw and rawzscore at W10 (≈0.04) and raw at W20 (R²=0.041). ρ improves from W10 (0.230) to W20 (0.250), and failing splits decrease (24% → 20.25%). The signal is lost with zscores alone (R²≈−0.004, 82% failure). Selected features at W10 (nodes, edges, lcc) expand to include l2 at W20, but the core set (nodes, edges, lcc) is conserved.
