@@ -11,34 +11,37 @@ EXPERIMENT_LABELS = {"raw": "Raw (13)", "zscores": "Z-scores (9)", "rawzscore": 
 
 
 def bar_r2_comparison(
-    df, metric: str = "r2", title: str = "R² test [IC 95%]"
+    df, metric: str = "r2", title: str = "R² test [IC 95%]", suffix: str = ""
 ) -> go.Figure:
     fig = go.Figure()
     for target in df["target"].unique():
         tdf = df[df["target"] == target]
+        mean_col = f"{metric}{suffix}_mean"
+        upper_col = f"{metric}{suffix}_upper"
+        lower_col = f"{metric}{suffix}_lower"
         fig.add_trace(
             go.Bar(
                 name=target,
                 x=tdf["label"],
-                y=tdf[f"{metric}_mean"],
+                y=tdf[mean_col],
                 error_y=dict(
                     type="data",
                     symmetric=False,
-                    array=tdf[f"{metric}_upper"] - tdf[f"{metric}_mean"],
-                    arrayminus=tdf[f"{metric}_mean"] - tdf[f"{metric}_lower"],
+                    array=tdf[upper_col] - tdf[mean_col],
+                    arrayminus=tdf[mean_col] - tdf[lower_col],
                     visible=True,
                     thickness=1,
                     width=3,
                 ),
                 marker_color=TARGET_COLORS.get(target, "#333"),
-                text=tdf[f"{metric}_mean"].round(3).astype(str),
+                text=tdf[mean_col].round(3).astype(str),
                 textposition="outside",
             )
         )
     fig.update_layout(
         title=title,
         xaxis_title="Window — Experiment",
-        yaxis_title=metric.upper(),
+        yaxis_title=title.split(" ")[0],
         barmode="group",
         template="plotly_white",
         height=400,

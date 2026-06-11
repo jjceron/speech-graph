@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.loader import list_completed, load_all_reports, load_best_report, list_tasks, get_task, set_task, get_windows, get_experiments, get_targets
-from utils.plots import forest_plot, TARGET_COLORS
+from utils.plots import TARGET_COLORS
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -86,28 +86,6 @@ for (w, e, t), r in reports.items():
 if rows:
     df = pd.DataFrame(rows).sort_values("R²", ascending=False).head(5).drop(columns=["R²"])
     st.dataframe(df, use_container_width=True, hide_index=True)
-
-st.markdown("---")
-st.subheader("📈 All Scenarios — Forest Plot")
-
-all_data = []
-for (w, e, t), r in reports.items():
-    ts = r.get("test_summary", {})
-    r2_mean = ts.get("r2_mean_test", 0)
-    if r2_mean is None:
-        continue
-    all_data.append({
-        "label": f"W{w} {e:<10} {t}",
-        "r2_mean": r2_mean,
-        "r2_lower": ts.get("r2_ci_lower_test", 0),
-        "r2_upper": ts.get("r2_ci_upper_test", 0),
-        "color": TARGET_COLORS.get(t, "#333"),
-    })
-
-if all_data:
-    all_data.sort(key=lambda x: x["r2_mean"])
-    fig = forest_plot(all_data)
-    st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
 st.caption(f"Data from `outputs/regression_optuna/task{get_task()}/` — Last updated: see git log")
