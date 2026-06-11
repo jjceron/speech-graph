@@ -59,6 +59,61 @@ with col2:
     st.markdown("**Bottom 20 subjects by R² (worst predicted)**")
     st.dataframe(subject_r2, use_container_width=True, hide_index=True)
 
+st.subheader("Target Variable Distribution by Subject")
+
+subj_true = test_preds.groupby("subject")["y_true"].mean()
+
+fig_hist = go.Figure()
+fig_hist.add_trace(go.Histogram(
+    x=subj_true.values,
+    nbinsx=40,
+    marker_color="#1f77b4",
+    opacity=0.75,
+    name="Subjects",
+    showlegend=False,
+))
+fig_hist.add_trace(go.Scatter(
+    x=subj_true.values,
+    y=[0] * len(subj_true),
+    mode="markers",
+    marker=dict(symbol="line-ns-open", size=10, color="gray", opacity=0.5),
+    name="Each subject",
+    showlegend=False,
+    hovertemplate="%{x:.2f}<extra></extra>",
+))
+
+mean_val = float(subj_true.mean())
+fig_hist.add_vline(
+    x=mean_val, line_dash="dash", line_color="red", line_width=2,
+    annotation_text=f"Mean = {mean_val:.2f}",
+    annotation_position="top right",
+)
+
+subj_list = sorted(subj_true.index)
+highlight_subj = st.selectbox(
+    "Highlight subject on histogram",
+    [f"{s} (μ={subj_true[s]:.2f})" for s in subj_list],
+    key="subj_highlight",
+)
+if highlight_subj:
+    subj_id = highlight_subj.split(" (")[0]
+    subj_val = float(subj_true[subj_id])
+    fig_hist.add_vline(
+        x=subj_val, line_dash="dash", line_color="green", line_width=2,
+        annotation_text=subj_id.split("-")[-1][:8],
+        annotation_position="top left",
+    )
+
+fig_hist.update_layout(
+    title=f"{target} distribution across subjects",
+    xaxis_title=target,
+    yaxis_title="Number of subjects",
+    template="plotly_white",
+    height=400,
+    bargap=0.05,
+)
+st.plotly_chart(fig_hist, use_container_width=True)
+
 st.subheader("Per-Subject Error Distribution")
 test_preds["error"] = test_preds["y_pred"] - test_preds["y_true"]
 box_data = test_preds[["subject", "error"]].copy()
