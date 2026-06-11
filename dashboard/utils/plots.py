@@ -19,32 +19,35 @@ def bar_r2_comparison(
         mean_col = f"{metric}{suffix}_mean"
         upper_col = f"{metric}{suffix}_upper"
         lower_col = f"{metric}{suffix}_lower"
+        ci_upper = tdf[upper_col] - tdf[mean_col]
+        ci_lower = tdf[mean_col] - tdf[lower_col]
         fig.add_trace(
-            go.Bar(
+            go.Scatter(
                 name=target,
                 x=tdf["label"],
                 y=tdf[mean_col],
+                mode="markers+text",
                 error_y=dict(
                     type="data",
                     symmetric=False,
-                    array=tdf[upper_col] - tdf[mean_col],
-                    arrayminus=tdf[mean_col] - tdf[lower_col],
+                    array=ci_upper,
+                    arrayminus=ci_lower,
                     visible=True,
-                    thickness=1,
-                    width=3,
+                    thickness=1.5,
+                    width=5,
                 ),
-                marker_color=TARGET_COLORS.get(target, "#333"),
+                marker=dict(size=8, color=TARGET_COLORS.get(target, "#333")),
                 text=tdf[mean_col].round(3).astype(str),
-                textposition="outside",
+                textposition="top center",
+                textfont=dict(size=9),
             )
         )
     fig.update_layout(
         title=title,
         xaxis_title="Window — Experiment",
         yaxis_title=title.split(" ")[0],
-        barmode="group",
         template="plotly_white",
-        height=400,
+        height=450,
         legend_title="Target",
     )
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
