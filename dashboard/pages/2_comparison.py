@@ -8,15 +8,23 @@ from utils.loader import (
     EXPERIMENTS,
     WINDOWS,
     load_all_reports,
+    get_task,
 )
-from utils.plots import bar_r2_comparison, forest_plot, TARGET_COLORS
+from utils.plots import (
+    bar_r2_comparison,
+    forest_plot,
+    metric_comparison_chart,
+    TARGET_COLORS,
+    EXPERIMENT_COLORS,
+    EXPERIMENT_LABELS,
+)
 
 st.set_page_config(page_title="Cross-Experiment", page_icon="📊", layout="wide")
-st.title("📊 Cross-Experiment Comparison")
+st.title(f"📊 Cross-Experiment Comparison — Task {get_task()}")
 
 completed = list_completed()
 
-tab_all, tab_single = st.tabs(["All Scenarios", "By Target"])
+tab_all, tab_single, tab_scenario = st.tabs(["All Scenarios", "By Target", "Scenario Explorer"])
 
 with tab_all:
     reports = load_all_reports()
@@ -119,3 +127,118 @@ with tab_single:
         **Insight:** MOT shows weak, inconsistent signal. W10 zscores (R² ≈ 0.023) and W20 zscores (R² ≈ 0.031)
         are the best performers. Raw features turn negative at W20.
         """)
+
+with tab_scenario:
+    if not completed:
+        st.warning("No completed experiments for this task.")
+        st.stop()
+
+    col_s1, col_s2, col_s3 = st.columns([1, 1, 1])
+    with col_s1:
+        scenario_target = st.selectbox("Target", ALL_TARGETS, index=0, key="scenario_t")
+    with col_s2:
+        avail_exps = sorted(set(e for _, e in completed))
+        selected_exps = st.multiselect(
+            "Experiments",
+            options=avail_exps,
+            default=avail_exps,
+            format_func=lambda x: EXPERIMENT_LABELS.get(x, x),
+        )
+    with col_s3:
+        avail_wins = sorted(set(w for w, _ in completed), key=int)
+        selected_wins = st.multiselect(
+            "Windows",
+            options=avail_wins,
+            default=avail_wins,
+        )
+
+    scenario_rows = []
+    for w, e in completed:
+        if e not in selected_exps or w not in selected_wins:
+            continue
+        r = load_best_report(w, e, scenario_target)
+        if not r:
+            continue
+        vs = r.get("validation_summary", {})
+        ts = r.get("test_summary", {})
+        bp = r.get("best_params", {})
+        feat = r.get("selected_features", [])
+        scenario_rows.append({
+            "label": f"W{w} {e}",
+            "window": w,
+            "experiment": e,
+            "target": scenario_target,
+            "r2_mean_val": vs.get("r2_mean_val"),
+            "r2_lower_val": vs.get("r2_ci_lower_val"),
+            "r2_upper_val": vs.get("r2_ci_upper_val"),
+            "r2_mean_test": ts.get("r2_mean_test"),
+            "r2_lower_test": ts.get("r2_ci_lower_test"),
+            "r2_upper_test": ts.get("r2_ci_upper_test"),
+            "mae_mean_val": vs.get("mae_mean_val"),
+            "mae_lower_val": vs.get("mae_ci_lower_val"),
+            "mae_upper_val": vs.get("mae_ci_upper_val"),
+            "mae_mean_test": ts.get("mae_mean_test"),
+            "mae_lower_test": ts.get("mae_ci_lower_test"),
+            "mae_upper_test": ts.get("mae_ci_upper_test"),
+            "model": bp.get("regressor", "?"),
+            "n_features": len(feat),
+            "pct_below": ts.get("r2_below_zero_test", 0) * 100,
+        })
+
+    if not scenario_rows:
+        st.warning("No data for the selected filters.")
+        st.stop()
+
+    sdf = pd.DataFrame(scenario_rows)
+
+    st.subheader("Scenario Comparison Table")
+    display_cols = {
+        "label": "Scenario",
+        "r2_mean_test": "R² test",
+        "r2_lower_test": "R² lower",
+        "r2_upper_test": "R² upper",
+        "mae_mean_test": "MAE test",
+        "mae_lower_test": "MAE lower",
+        "mae_upper_test": "MAE upper",
+        "r2_mean_val": "R² val",
+        "mae_mean_val": "MAE val",
+        "model": "Model",
+        "n_features": "N Feat",
+        "pct_below": "% R²<0",
+    }
+    display_df = sdf[list(display_cols.keys())].rename(columns=display_cols)
+    display_df["R² test"] = display_df["R² test"].round(4)
+    display_df["MAE test"] = display_df["MAE test"].round(3)
+    display_df["R² val"] = display_df["R² val"].round(4)
+    display_df["MAE val"] = display_df["MAE val"].round(3)
+    display_df["% R²<0"] = display_df["% R²<0"].round(1).astype(str) + "%"
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.subheader("Metrics Overview — Validation & Test")
+
+    row1_left, row1_right = st.columns(2)
+    with row1_left:
+        fig_r2_val = metric_comparison_chart(
+            sdf, "r2_val", "R²", f"R² validation — {scenario_target}",
+            show_hline_zero=True,
+        )
+        st.plotly_chart(fig_r2_val, use_container_width=True)
+    with row1_right:
+        fig_r2_test = metric_comparison_chart(
+            sdf, "r2_test", "R²", f"R² test — {scenario_target}",
+            show_hline_zero=True,
+        )
+        st.plotly_chart(fig_r2_test, use_container_width=True)
+
+    row2_left, row2_right = st.columns(2)
+    with row2_left:
+        fig_mae_val = metric_comparison_chart(
+            sdf, "mae_val", "MAE", f"MAE validation — {scenario_target}",
+        )
+        st.plotly_chart(fig_mae_val, use_container_width=True)
+    with row2_right:
+        fig_mae_test = metric_comparison_chart(
+            sdf, "mae_test", "MAE", f"MAE test — {scenario_target}",
+        )
+        st.plotly_chart(fig_mae_test, use_container_width=True)

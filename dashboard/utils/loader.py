@@ -8,14 +8,33 @@ import pandas as pd
 import streamlit as st
 
 BASE_DIR = Path(__file__).resolve().parents[2] / "outputs" / "regression_optuna"
-TASK = 2
 ALL_TARGETS = ["MOT", "COG", "MOT_V4", "COG_V1"]
 EXPERIMENTS = ["raw", "zscores", "rawzscore"]
 WINDOWS = ["10", "20", "30", "40"]
 
 
+def get_task() -> int:
+    return st.session_state.get("task", 2)
+
+
+def set_task(task: int) -> None:
+    st.session_state.task = task
+
+
+def list_tasks() -> list[int]:
+    tasks = []
+    if BASE_DIR.exists():
+        for d in BASE_DIR.iterdir():
+            if d.is_dir() and d.name.startswith("task"):
+                try:
+                    tasks.append(int(d.name.replace("task", "")))
+                except ValueError:
+                    pass
+    return sorted(tasks) if tasks else [2]
+
+
 def _exp_dir(window: str, experiment: str) -> Path:
-    return BASE_DIR / f"task{TASK}" / f"W{window}_{experiment}_fixed"
+    return BASE_DIR / f"task{get_task()}" / f"W{window}_{experiment}_fixed"
 
 
 def has_experiment(window: str, experiment: str) -> bool:
@@ -81,7 +100,7 @@ def load_rfe_ranking(window: str, experiment: str, target: str) -> pd.DataFrame 
 @st.cache_data
 def load_optuna_trials(window: str, experiment: str, target: str) -> pd.DataFrame | None:
     exp_dir = _exp_dir(window, experiment) / target
-    for f in exp_dir.glob("optuna_trials_task2_*.csv"):
+    for f in exp_dir.glob(f"optuna_trials_task{get_task()}_*.csv"):
         return pd.read_csv(f)
     return None
 
