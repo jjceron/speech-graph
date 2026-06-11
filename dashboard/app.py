@@ -1,9 +1,8 @@
 import streamlit as st
-from utils.loader import list_completed, load_all_reports, load_best_report, get_task, get_windows, get_experiments, get_targets
+from utils.loader import list_completed, load_all_reports, load_best_report, get_task, get_windows, get_experiments, get_targets, EXPECTED_WINDOWS, EXPECTED_EXPERIMENTS
 from utils.plots import TARGET_COLORS
 from utils.sidebar import render_sidebar
 import pandas as pd
-import plotly.graph_objects as go
 
 st.set_page_config(
     page_title="SpeechGraph — Regression Dashboard",
@@ -16,28 +15,34 @@ render_sidebar()
 
 completed = list_completed()
 
-st.title("SpeechGraph Regression Dashboard")
+st.title("📊 SpeechGraph Regression Dashboard")
 st.markdown(f"#### Task {get_task()} — Optuna Regression Results (W10–W40)")
 
 reports = load_all_reports()
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Experiments complete", f"{len(completed)}/{len(get_windows()) * len(get_experiments())}")
+col1.metric("Experiments complete", f"{len(completed)}/{len(EXPECTED_WINDOWS) * len(EXPECTED_EXPERIMENTS)}")
 
 best_r2 = -999
 best_label = ""
+best_mae = 999
+best_mae_label = ""
 for (w, e, t), r in reports.items():
     ts = r.get("test_summary", {})
     r2 = ts.get("r2_mean_test", -999)
+    mae = ts.get("mae_mean_test", 999)
     if r2 is not None and r2 > best_r2:
         best_r2 = r2
         best_label = f"W{w} {e} {t}"
+    if mae is not None and mae < best_mae:
+        best_mae = mae
+        best_mae_label = f"W{w} {e} {t}"
 col2.metric("Best R²", f"{best_r2:.4f}", delta=best_label)
+col3.metric("Best MAE", f"{best_mae:.3f}", delta=best_mae_label)
 
 r2_vals = [r["test_summary"].get("r2_mean_test", -999) for r in reports.values()]
 r2_pos = sum(1 for v in r2_vals if v > 0)
-col3.metric("R² > 0", f"{r2_pos}/{len(r2_vals)}")
-col4.metric("Total scenarios", f"{len(reports)}")
+col4.metric("R² > 0", f"{r2_pos}/{len(r2_vals)}")
 
 st.markdown("---")
 

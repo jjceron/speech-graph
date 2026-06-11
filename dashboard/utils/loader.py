@@ -10,6 +10,9 @@ import streamlit as st
 
 BASE_DIR = Path(__file__).resolve().parents[2] / "outputs" / "regression_optuna"
 
+EXPECTED_WINDOWS = ["10", "20", "30", "40"]
+EXPECTED_EXPERIMENTS = ["raw", "zscores", "rawzscore"]
+
 
 def get_task() -> int:
     return st.session_state.get("task", 2)
