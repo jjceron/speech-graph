@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 from utils.loader import list_completed, get_targets, load_rfe_ranking, load_selected_features, load_best_report
 from utils.plots import rfe_ranking_chart
+from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Features", page_icon="🔬", layout="wide")
+render_sidebar()
 st.title("🔬 Features Analysis")
 
 completed = list_completed()

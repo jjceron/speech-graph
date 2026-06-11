@@ -15,8 +15,10 @@ from utils.plots import (
     metric_comparison_chart,
     EXPERIMENT_LABELS,
 )
+from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Cross-Experiment", page_icon="📊", layout="wide")
+render_sidebar()
 st.title(f"📊 Cross-Experiment Comparison — Task {get_task()}")
 
 completed = list_completed()

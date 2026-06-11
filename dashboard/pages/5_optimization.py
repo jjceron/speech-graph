@@ -3,8 +3,10 @@ import numpy as np
 import plotly.graph_objects as go
 from utils.loader import list_completed, get_targets, load_optuna_trials, load_best_report
 from utils.plots import optimization_history, model_selection_bar, optuna_parallel_coords
+from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Optimization", page_icon="⚙️", layout="wide")
+render_sidebar()
 st.title("⚙️ Optuna Optimization Analysis")
 
 completed = list_completed()

@@ -2,10 +2,12 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 from utils.loader import list_completed, get_targets, get_experiments, get_windows, load_best_report
-from utils.plots import scatter_obs_vs_pred, scatter_r2_val_vs_test, hist_metric, residual_plot, target_distribution_plot
 from utils.loader import load_test_iterations, load_val_iterations, load_predictions
+from utils.plots import scatter_obs_vs_pred, scatter_r2_val_vs_test, hist_metric, residual_plot, target_distribution_plot
+from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Distributions", page_icon="📈", layout="wide")
+render_sidebar()
 st.title("📈 Split Distributions")
 
 completed = list_completed()
