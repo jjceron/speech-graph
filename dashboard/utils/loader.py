@@ -85,8 +85,8 @@ def get_targets(task: int | None = None, window: str | None = None, experiment: 
     return sorted(targets)
 
 
-def has_experiment(window: str, experiment: str) -> bool:
-    return _exp_dir(window, experiment).exists()
+def has_experiment(window: str, experiment: str, task: int | None = None) -> bool:
+    return _exp_dir(window, experiment, task=task).exists()
 
 
 def list_completed() -> list[tuple[str, str]]:

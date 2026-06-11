@@ -255,7 +255,12 @@ def optuna_parallel_coords(df: pd.DataFrame, params: list[str], top_k: int = 100
                 sorted_col = col.dropna()
                 if len(sorted_col) == 0:
                     continue
-                cmin, cmax = float(sorted_col.min()), float(sorted_col.max())
+                try:
+                    cmin, cmax = float(sorted_col.min()), float(sorted_col.max())
+                except (ValueError, TypeError):
+                    continue
+                if not (np.isfinite(cmin) and np.isfinite(cmax)):
+                    continue
                 dims.append(
                     dict(
                         label=label,
