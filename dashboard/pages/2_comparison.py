@@ -5,6 +5,7 @@ from utils.loader import (
     list_completed,
     load_best_report,
     load_all_reports,
+    load_predictions,
     get_task,
     get_targets,
     get_experiments,
@@ -84,49 +85,101 @@ with tab_all:
 
 with tab_single:
     avail_targets = get_targets()
-    target = st.selectbox("Target", avail_targets, index=0)
+    avail_windows = sorted(set(w for w, _ in completed))
+
+    col_metric, col_tgts, col_wins = st.columns(3)
+    with col_metric:
+        bt_metric = st.selectbox("Metric", ["R²", "MAE"], key="bt_metric")
+    with col_tgts:
+        sel_targets = st.multiselect("Targets", avail_targets, default=avail_targets, key="bt_targets")
+    with col_wins:
+        sel_windows = st.multiselect("Windows", avail_windows, default=avail_windows, key="bt_wins")
 
     rows = []
+    preds_for_dist = None
     for w, e in completed:
-        r = load_best_report(w, e, target)
-        if r:
+        if w not in sel_windows:
+            continue
+        for t in sel_targets:
+            r = load_best_report(w, e, t)
+            if not r:
+                continue
             ts = r.get("test_summary", {})
-            rows.append(
-                {
-                    "label": f"W{w} — {e}",
-                    "window": w,
-                    "experiment": e,
-                    "target": target,
-                    "r2_mean": ts.get("r2_mean_test", 0),
-                    "r2_lower": ts.get("r2_ci_lower_test", 0),
-                    "r2_upper": ts.get("r2_ci_upper_test", 0),
-                    "mae_mean": ts.get("mae_mean_test", 0),
-                    "mae_lower": ts.get("mae_ci_lower_test", 0),
-                    "mae_upper": ts.get("mae_ci_upper_test", 0),
-                    "rho_mean": ts.get("rho_mean_test", 0) or 0,
-                    "rho_lower": ts.get("rho_ci_lower_test", 0) or 0,
-                    "rho_upper": ts.get("rho_ci_upper_test", 0) or 0,
-                    "pct_below": ts.get("r2_below_zero_test", 0) * 100,
-                }
-            )
+            vs = r.get("validation_summary", {})
+            rows.append({
+                "label": f"W{w} — {e}  {t}",
+                "window": w,
+                "experiment": e,
+                "target": t,
+                "r2_mean": ts.get("r2_mean_test", 0),
+                "r2_lower": ts.get("r2_ci_lower_test", 0),
+                "r2_upper": ts.get("r2_ci_upper_test", 0),
+                "r2_val_mean": vs.get("r2_mean_val"),
+                "r2_val_lower": vs.get("r2_ci_lower_val"),
+                "r2_val_upper": vs.get("r2_ci_upper_val"),
+                "mae_mean": ts.get("mae_mean_test", 0),
+                "mae_lower": ts.get("mae_ci_lower_test", 0),
+                "mae_upper": ts.get("mae_ci_upper_test", 0),
+                "mae_val_mean": vs.get("mae_mean_val"),
+                "mae_val_lower": vs.get("mae_ci_lower_val"),
+                "mae_val_upper": vs.get("mae_ci_upper_val"),
+                "rho_mean": ts.get("rho_mean_test", 0) or 0,
+                "rho_lower": ts.get("rho_ci_lower_test", 0) or 0,
+                "rho_upper": ts.get("rho_ci_upper_test", 0) or 0,
+                "pct_below": ts.get("r2_below_zero_test", 0) * 100,
+            })
+            if preds_for_dist is None:
+                preds_for_dist = load_predictions(w, e, t)
 
-    df = pd.DataFrame(rows)
-
-    if df.empty:
-        st.warning("No data for this target.")
+    if not rows:
+        st.warning("No data for the selected filters.")
         st.stop()
 
+    df = pd.DataFrame(rows)
+    metric_key = "r2" if bt_metric == "R²" else "mae"
+
+    tgt_str = ", ".join(sel_targets) if len(sel_targets) <= 3 else f"{len(sel_targets)} targets"
+
+    # --- Metric Val | Metric Test ---
     col1, col2 = st.columns(2)
     with col1:
-        fig_r2 = bar_r2_comparison(df, "r2", f"R² test — {target}")
-        st.plotly_chart(fig_r2, use_container_width=True)
+        fig_val = bar_r2_comparison(df, metric_key, f"{bt_metric} validation — {tgt_str}", suffix="_val")
+        st.plotly_chart(fig_val, use_container_width=True)
     with col2:
-        fig_mae = bar_r2_comparison(df, "mae", f"MAE test — {target}")
-        st.plotly_chart(fig_mae, use_container_width=True)
+        fig_test = bar_r2_comparison(df, metric_key, f"{bt_metric} test — {tgt_str}")
+        st.plotly_chart(fig_test, use_container_width=True)
 
+    # --- Distribution: val + test overlapped (full-width) ---
+    if preds_for_dist is not None:
+        val_vals = preds_for_dist[preds_for_dist["set"] == "VAL"]["y_true"].dropna().values
+        test_vals = preds_for_dist[preds_for_dist["set"] == "TEST"]["y_true"].dropna().values
+        if len(val_vals) > 0 or len(test_vals) > 0:
+            fig_dist = go.Figure()
+            if len(val_vals) > 0:
+                fig_dist.add_trace(go.Histogram(
+                    x=val_vals, nbinsx=40, name="Validation",
+                    marker_color="#1f77b4", opacity=0.5,
+                ))
+            if len(test_vals) > 0:
+                fig_dist.add_trace(go.Histogram(
+                    x=test_vals, nbinsx=40, name="Test",
+                    marker_color="#d62728", opacity=0.7,
+                ))
+            fig_dist.update_layout(
+                barmode="overlay",
+                title=f"Target variable distribution — {tgt_str}",
+                xaxis_title="y_true",
+                yaxis_title="Splits",
+                template="plotly_white",
+                height=350,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            st.plotly_chart(fig_dist, use_container_width=True)
+
+    # --- Spearman ρ | % R²<0 ---
     col3, col4 = st.columns(2)
     with col3:
-        fig_rho = bar_r2_comparison(df, "rho", f"Spearman ρ test — {target}")
+        fig_rho = bar_r2_comparison(df, "rho", f"Spearman ρ test — {tgt_str}")
         st.plotly_chart(fig_rho, use_container_width=True)
     with col4:
         fig_below = go.Figure()
@@ -140,24 +193,13 @@ with tab_single:
             )
         )
         fig_below.update_layout(
-            title=f"% R² < 0 — {target}",
+            title=f"% R² < 0 — {tgt_str}",
             xaxis_title="Window — Experiment",
             yaxis_title="% Splits",
             template="plotly_white",
             height=400,
         )
         st.plotly_chart(fig_below, use_container_width=True)
-
-    if target == "COG_V1":
-        st.markdown("""
-        **Insight:** COG_V1 is the only target with positive R² — only in **raw** and **rawzscore** experiments.
-        Z-scores alone lose the signal entirely. W20 raw shows the best performance (R² ≈ 0.041, MAE ≈ 0.970).
-        """)
-    elif target == "MOT":
-        st.markdown("""
-        **Insight:** MOT shows weak, inconsistent signal. W10 zscores (R² ≈ 0.023) and W20 zscores (R² ≈ 0.031)
-        are the best performers. Raw features turn negative at W20.
-        """)
 
 with tab_scenario:
     if not completed:
