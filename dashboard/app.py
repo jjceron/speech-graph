@@ -1,5 +1,6 @@
 import streamlit as st
 from utils.loader import list_completed, ALL_TARGETS, load_all_reports, load_best_report
+from utils.plots import forest_plot, TARGET_COLORS
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -33,56 +34,72 @@ st.sidebar.markdown(
 st.title("📊 SpeechGraph Regression Dashboard")
 st.markdown("#### Task 2 — Optuna Regression Results (W10–W40)")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Experiments complete", f"{len(completed)}/12")
 reports = load_all_reports()
 
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Experiments complete", f"{len(completed)}/12")
+
 best_r2 = -999
-best_target = ""
-best_exp = ""
+best_label = ""
 for (w, e, t), r in reports.items():
     ts = r.get("test_summary", {})
     r2 = ts.get("r2_mean_test", -999)
     if r2 is not None and r2 > best_r2:
         best_r2 = r2
-        best_target = t
-        best_exp = f"W{w} {e}"
+        best_label = f"W{w} {e} {t}"
+col2.metric("Best R²", f"{best_r2:.4f}", delta=best_label)
 
-col2.metric("Best R²", f"{best_r2:.4f}", delta=f"{best_target} ({best_exp})" if best_target else "")
-
-target_counts = {t: sum(1 for (_, _, tt) in reports if tt == t) for t in ALL_TARGETS}
-col3.metric("MOT experiments", f"{target_counts.get('MOT', 0)}/12")
-col4.metric("COG_V1 experiments", f"{target_counts.get('COG_V1', 0)}/12")
+r2_vals = [r["test_summary"].get("r2_mean_test", -999) for r in reports.values()]
+r2_pos = sum(1 for v in r2_vals if v > 0)
+col3.metric("R² > 0", f"{r2_pos}/{len(r2_vals)}")
+col4.metric("Total scenarios", f"{len(reports)}")
 
 st.markdown("---")
 
-st.subheader("📋 Results Summary")
+st.subheader("🏆 Top 5 by R² test")
 
 rows = []
 for (w, e, t), r in reports.items():
     ts = r.get("test_summary", {})
-    vs = r.get("validation_summary", {})
     bp = r.get("best_params", {})
     feat = r.get("selected_features", [])
-    reg = bp.get("regressor", "?")
-    row = {
+    rows.append({
+        "R²": ts.get("r2_mean_test", 0),
         "Window": f"W{w}",
         "Experiment": e,
         "Target": t,
-        "R²_test": f"{ts.get('r2_mean_test', 0):.4f}",
-        "R²_CI": f"[{ts.get('r2_ci_lower_test', 0):.4f}, {ts.get('r2_ci_upper_test', 0):.4f}]",
-        "MAE_test": f"{ts.get('mae_mean_test', 0):.3f}",
-        "MAE_CI": f"[{ts.get('mae_ci_lower_test', 0):.3f}, {ts.get('mae_ci_upper_test', 0):.3f}]",
+        "R² [IC 95%]": f"{ts.get('r2_mean_test', 0):.4f} [{ts.get('r2_ci_lower_test', 0):.4f}, {ts.get('r2_ci_upper_test', 0):.4f}]",
+        "MAE [IC 95%]": f"{ts.get('mae_mean_test', 0):.3f} [{ts.get('mae_ci_lower_test', 0):.3f}, {ts.get('mae_ci_upper_test', 0):.3f}]",
         "% R²<0": f"{ts.get('r2_below_zero_test', 0) * 100:.1f}%",
-        "ρ_test": f"{ts.get('rho_mean_test', '—')}",
-        "Model": reg,
-        "Features": len(feat),
-    }
-    rows.append(row)
+        "Model": bp.get("regressor", "?"),
+        "Features": ", ".join(feat) if feat else "-",
+    })
 
 if rows:
-    df_summary = pd.DataFrame(rows)
-    st.dataframe(df_summary, use_container_width=True, hide_index=True)
+    df = pd.DataFrame(rows).sort_values("R²", ascending=False).head(5).drop(columns=["R²"])
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+st.markdown("---")
+st.subheader("📈 All Scenarios — Forest Plot")
+
+all_data = []
+for (w, e, t), r in reports.items():
+    ts = r.get("test_summary", {})
+    r2_mean = ts.get("r2_mean_test", 0)
+    if r2_mean is None:
+        continue
+    all_data.append({
+        "label": f"W{w} {e:<10} {t}",
+        "r2_mean": r2_mean,
+        "r2_lower": ts.get("r2_ci_lower_test", 0),
+        "r2_upper": ts.get("r2_ci_upper_test", 0),
+        "color": TARGET_COLORS.get(t, "#333"),
+    })
+
+if all_data:
+    all_data.sort(key=lambda x: x["r2_mean"])
+    fig = forest_plot(all_data)
+    st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
 st.caption("Data from `outputs/regression_optuna/task2/` — Last updated: see git log")
