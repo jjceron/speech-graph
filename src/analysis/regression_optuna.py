@@ -18,7 +18,7 @@ import time
 import warnings
 from functools import partial
 
-os.environ.setdefault("PYTHONWARNINGS", "ignore::UserWarning:sklearn.utils.parallel")
+os.environ["PYTHONWARNINGS"] = "ignore::UserWarning:sklearn.utils.parallel"
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 warnings.filterwarnings("ignore", category=Warning, module="xgboost")
 from pathlib import Path
@@ -292,7 +292,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             min_samples_leaf=trial.suggest_int("rf_min_samples_leaf", 1, 5),
             max_features=trial.suggest_categorical("rf_max_features", ["sqrt", "log2", None]),
             random_state=random_state,
-            n_jobs=-1,
+            n_jobs=1,
         )
 
     elif name == "ExtraTreesRegressor":
@@ -304,7 +304,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             max_features=trial.suggest_categorical("et_max_features", ["sqrt", "log2", None]),
             criterion="squared_error",
             random_state=random_state,
-            n_jobs=-1,
+            n_jobs=1,
         )
 
     elif name == "BaggingRegressor":
@@ -313,7 +313,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             max_samples=trial.suggest_float("bag_max_samples", 0.5, 1.0),
             max_features=trial.suggest_float("bag_max_features", 0.5, 1.0),
             random_state=random_state,
-            n_jobs=-1,
+            n_jobs=1,
         )
 
     elif name == "StackingRegressor":
@@ -323,14 +323,14 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
         if final_name == "Ridge":
             final_estimator = Ridge(random_state=random_state)
         elif final_name == "RandomForestRegressor":
-            final_estimator = RandomForestRegressor(n_estimators=100, random_state=random_state, n_jobs=-1)
+            final_estimator = RandomForestRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
         else:
-            final_estimator = ExtraTreesRegressor(n_estimators=100, random_state=random_state, n_jobs=-1)
+            final_estimator = ExtraTreesRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
         reg = StackingRegressor(
             estimators=[("ridge", Ridge(random_state=random_state)), ("svr", SVR(kernel="linear"))],
             final_estimator=final_estimator,
             cv=5,
-            n_jobs=-1,
+            n_jobs=1,
         )
 
     elif name == "GaussianProcessRegressor":
@@ -368,7 +368,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             booster=trial.suggest_categorical("xgb_booster", ["gbtree", "gblinear"]),
             objective="reg:squarederror",
             random_state=random_state,
-            n_jobs=-1,
+            n_jobs=1,
         )
 
     else:
@@ -403,7 +403,7 @@ def get_rfe_estimator(
             min_samples_leaf=trial.suggest_int("rfe_proxy_et_min_samples_leaf", 1, 5),
             criterion="squared_error",
             random_state=random_state,
-            n_jobs=-1,
+            n_jobs=1,
         )
     else:
         estimator = LinearSVR(
