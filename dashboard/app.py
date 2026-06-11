@@ -16,7 +16,9 @@ render_sidebar()
 completed = list_completed()
 
 st.title("📊 SpeechGraph Regression Dashboard")
-st.markdown(f"#### Task {get_task()} — Optuna Regression Results (W10–W40)")
+wins = get_windows()
+win_range = f"W{wins[0]}–W{wins[-1]}" if wins else "—"
+st.markdown(f"#### Task {get_task()} — Optuna Regression Results ({win_range})")
 
 reports = load_all_reports()
 
