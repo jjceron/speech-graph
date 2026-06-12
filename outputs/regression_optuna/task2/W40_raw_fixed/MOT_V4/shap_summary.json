@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "pe_T2W40": 0.6519903384901692,
+    "lsc_T2W40": 0.7907065465527899
+  },
+  "mean_shap": {
+    "pe_T2W40": -0.02227428417940825,
+    "lsc_T2W40": 0.01956634472331351
+  },
+  "regressor": "RandomForestRegressor",
+  "n_subjects": 222,
+  "n_features": 2
+}

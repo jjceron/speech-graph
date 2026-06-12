@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "l1_T6W30": 0.2550426256517843,
+    "atd_T6W30": 0.629929878856776
+  },
+  "mean_shap": {
+    "l1_T6W30": -0.03430817160397927,
+    "atd_T6W30": -0.07166555682359892
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 252,
+  "n_features": 2
+}

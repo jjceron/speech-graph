@@ -1,0 +1,15 @@
+{
+  "mean_abs_shap": {
+    "pe_T2W10": 1.2855091244304546,
+    "l3_T2W10": 0.9494072826922267,
+    "diameter_T2W10": 1.0978652179596093
+  },
+  "mean_shap": {
+    "pe_T2W10": 0.004476369536204979,
+    "l3_T2W10": 0.015312641976567103,
+    "diameter_T2W10": -0.019789011512794382
+  },
+  "regressor": "ExtraTreesRegressor",
+  "n_subjects": 240,
+  "n_features": 3
+}

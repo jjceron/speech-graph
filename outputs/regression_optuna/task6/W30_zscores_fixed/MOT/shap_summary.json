@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "z_lsc_T6W30": 3.736597788390939,
+    "z_diameter_T6W30": 3.2354115164317996
+  },
+  "mean_shap": {
+    "z_lsc_T6W30": 0.03150206827932943,
+    "z_diameter_T6W30": -0.1323770411818373
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 252,
+  "n_features": 2
+}

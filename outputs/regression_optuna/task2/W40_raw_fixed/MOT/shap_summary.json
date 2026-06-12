@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "re_T2W40": 1.5543730853195679,
+    "lsc_T2W40": 2.15734822134556
+  },
+  "mean_shap": {
+    "re_T2W40": 0.023011823887228552,
+    "lsc_T2W40": -0.022694962284848335
+  },
+  "regressor": "RandomForestRegressor",
+  "n_subjects": 222,
+  "n_features": 2
+}

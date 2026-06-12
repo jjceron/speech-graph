@@ -1,0 +1,25 @@
+{
+  "mean_abs_shap": {
+    "z_pe_T6W30": 0.0,
+    "z_l1_T6W30": 0.0,
+    "z_l2_T6W30": 0.0,
+    "z_l3_T6W30": 0.0,
+    "z_lsc_T6W30": 0.0,
+    "z_density_T6W30": 0.0,
+    "z_diameter_T6W30": 0.0,
+    "z_asp_T6W30": 0.0
+  },
+  "mean_shap": {
+    "z_pe_T6W30": 0.0,
+    "z_l1_T6W30": 0.0,
+    "z_l2_T6W30": 0.0,
+    "z_l3_T6W30": 0.0,
+    "z_lsc_T6W30": 0.0,
+    "z_density_T6W30": 0.0,
+    "z_diameter_T6W30": 0.0,
+    "z_asp_T6W30": 0.0
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 252,
+  "n_features": 8
+}
