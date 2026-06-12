@@ -19,11 +19,11 @@
 | **W20_zscores_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 | **W20_rawzscore_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 | **W30_raw_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
-| **W30_zscores_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
-| **W30_rawzscore_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
-| **W40_raw_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
-| **W40_zscores_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
-| **W40_rawzscore_fixed** | ⬜ | ⬜ | ⬜ | ⬜ | pending |
+| **W30_zscores_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
+| **W30_rawzscore_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
+| **W40_raw_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
+| **W40_zscores_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
+| **W40_rawzscore_fixed** | ✅ | ✅ | ✅ | ✅ | complete |
 
 ---
 
@@ -155,21 +155,93 @@
 
 ---
 
-### W30_zscores_fixed (pending)
+### W30_rawzscore_fixed (complete)
 
-All W30 zscores experiments are pending.
+| Target | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | MAE_test [IC 95%] | Best Model | Selected Features |
+|---|---|---|---|---|---|---|---|
+| **MOT** | −0.001 [−0.011, 0.008] | 0.130 [0.112, 0.148] | 46.75% | 6.361 [6.308, 6.414] | KNeighborsRegressor (k=17, manhattan) | nodes, re, pe, l1, l2, l3, lcc, lsc, atd, density, diameter, asp, z_re, z_pe, z_l1, z_l2, z_l3, z_lsc, z_density, z_diameter, z_asp |
+| **COG** | −0.011 [−0.012, −0.009] | — | 92.25% | 1.730 [1.712, 1.748] | QuantileRegressor (α=5.183) | z_pe, z_l1, z_l2, z_l3, z_lsc, z_density, z_diameter, z_asp |
+| **MOT_V4** | 0.015 [0.008, 0.023] | 0.120 [0.099, 0.141] | 37.5% | 2.677 [2.657, 2.697] | QuantileRegressor (α=0.010) | l3, z_pe |
+| **COG_V1** | 0.037 [0.033, 0.041] | 0.259 [0.239, 0.278] | 16.5% | 1.004 [0.995, 1.013] | QuantileRegressor (α=0.012) | edges, pe, z_l2 |
+
+| Target | Trial | Best Model | RFE n | MAE_val [IC 95%] | RMSE_val | R²_val [IC 95%] | ρ_val [IC 95%] | MAE_test [IC 95%] | RMSE_test | R²_test [IC 95%] | ρ_test [IC 95%] |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MOT | 297 | KNeighborsRegressor (k=17, manhattan) | 21 | 6.282 [6.249, 6.315] | 7.496 | 0.008 [0.001, 0.014] | 0.141 [0.128, 0.153] | 6.361 [6.308, 6.414] | 7.574 | −0.001 [−0.011, 0.008] | 0.130 [0.112, 0.148] |
+| COG | 9 | QuantileRegressor (α=5.183) | 8 | 1.707 [1.696, 1.719] | 2.244 | −0.014 [−0.015, −0.013] | — | 1.730 [1.712, 1.748] | 2.224 | −0.011 [−0.012, −0.009] | — |
+| MOT_V4 | 202 | QuantileRegressor (α=0.010) | 2 | 2.767 [2.752, 2.781] | 3.439 | 0.006 [0.001, 0.012] | 0.117 [0.104, 0.129] | 2.677 [2.657, 2.697] | 3.308 | 0.015 [0.008, 0.023] | 0.120 [0.099, 0.141] |
+| COG_V1 | 277 | QuantileRegressor (α=0.012) | 3 | 1.005 [0.999, 1.010] | 1.317 | 0.040 [0.037, 0.043] | 0.251 [0.237, 0.266] | 1.004 [0.995, 1.013] | 1.318 | 0.037 [0.033, 0.041] | 0.259 [0.239, 0.278] |
 
 ---
 
-### W30_rawzscore_fixed (pending)
+### W30_zscores_fixed (complete)
 
-All W30 rawzscore experiments are pending.
+| Target | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | MAE_test [IC 95%] | Best Model | Selected Features |
+|---|---|---|---|---|---|---|---|
+| **MOT** | **0.041** [0.032, 0.051] | **0.192** [0.174, 0.211] | **30.25%** | 6.294 [6.244, 6.344] | RandomForestRegressor (n=248, max_depth=2) | z_re, z_pe, z_l2, z_density |
+| **COG** | −0.011 [−0.012, −0.009] | — | 92.25% | 1.730 [1.712, 1.748] | QuantileRegressor (α=5.183) | z_lsc, z_density, z_diameter, z_asp |
+| **MOT_V4** | −0.016 [−0.017, −0.015] | — | 99.75% | 2.689 [2.671, 2.707] | QuantileRegressor (α=5.183) | z_lsc, z_density, z_diameter, z_asp |
+| **COG_V1** | −0.005 [−0.006, −0.004] | — | 79% | 1.024 [1.016, 1.032] | QuantileRegressor (α=5.183) | z_lsc, z_density, z_diameter, z_asp |
+
+| Target | Trial | Best Model | RFE n | MAE_val [IC 95%] | RMSE_val | R²_val [IC 95%] | ρ_val [IC 95%] | MAE_test [IC 95%] | RMSE_test | R²_test [IC 95%] | ρ_test [IC 95%] |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MOT | 298 | RandomForestRegressor (n=248, max_depth=2) | 4 | 6.219 [6.188, 6.251] | 7.348 | 0.047 [0.041, 0.053] | 0.200 [0.187, 0.212] | 6.294 [6.244, 6.344] | 7.409 | 0.041 [0.032, 0.051] | 0.192 [0.174, 0.211] |
+| COG | 9 | QuantileRegressor (α=5.183) | 4 | 1.707 [1.696, 1.719] | 2.244 | −0.014 [−0.015, −0.013] | — | 1.730 [1.712, 1.748] | 2.224 | −0.011 [−0.012, −0.009] | — |
+| MOT_V4 | 9 | QuantileRegressor (α=5.183) | 4 | 2.779 [2.767, 2.791] | 3.492 | −0.024 [−0.025, −0.023] | — | 2.689 [2.671, 2.707] | 3.363 | −0.016 [−0.017, −0.015] | — |
+| COG_V1 | 9 | QuantileRegressor (α=5.183) | 4 | 1.025 [1.020, 1.031] | 1.346 | −0.002 [−0.003, −0.002] | — | 1.024 [1.016, 1.032] | 1.347 | −0.005 [−0.006, −0.004] | — |
 
 ---
 
-### W40_* (pending)
+### W40_raw_fixed (complete)
 
-All W40 experiments (raw, zscores, rawzscore) are pending.
+| Target | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | MAE_test [IC 95%] | Best Model | Selected Features |
+|---|---|---|---|---|---|---|---|
+| **MOT** | −0.013 [−0.028, 0.003] | 0.208 [0.190, 0.226] | 54% | 6.280 [6.218, 6.341] | RandomForestRegressor (n=298, max_depth=11) | re_T2W40, lsc_T2W40 |
+| **COG** | 0.010 [0.004, 0.015] | 0.146 [0.127, 0.165] | 40.5% | 1.651 [1.633, 1.669] | ExtraTreesRegressor (n_estimators=461, max_depth=7) | edges_T2W40, re_T2W40, l1_T2W40, l3_T2W40, lsc_T2W40 |
+| **MOT_V4** | −0.003 [−0.018, 0.012] | 0.185 [0.164, 0.206] | 47% | 2.720 [2.692, 2.747] | RandomForestRegressor (n=158, max_depth=13) | pe_T2W40, lsc_T2W40 |
+| **COG_V1** | 0.029 [0.024, 0.034] | 0.262 [0.243, 0.281] | 23.75% | 0.990 [0.982, 0.998] | QuantileRegressor (α=0.006) | edges_T2W40, atd_T2W40 |
+
+| Target | Trial | Best Model | RFE n | MAE_val [IC 95%] | RMSE_val | R²_val [IC 95%] | ρ_val [IC 95%] | MAE_test [IC 95%] | RMSE_test | R²_test [IC 95%] | ρ_test [IC 95%] |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MOT | 247 | RandomForestRegressor (n=298, max_depth=11) | 2 | 6.281 [6.237, 6.326] | 7.564 | 0.011 [0.001, 0.021] | 0.221 [0.209, 0.234] | 6.280 [6.218, 6.341] | 7.580 | −0.013 [−0.028, 0.003] | 0.208 [0.190, 0.226] |
+| COG | 206 | ExtraTreesRegressor (n_estimators=461, max_depth=7) | 5 | 1.744 [1.732, 1.757] | 2.223 | 0.013 [0.010, 0.017] | 0.159 [0.146, 0.173] | 1.651 [1.633, 1.669] | 2.142 | 0.010 [0.004, 0.015] | 0.146 [0.127, 0.165] |
+| MOT_V4 | 249 | RandomForestRegressor (n=158, max_depth=13) | 2 | 2.797 [2.778, 2.816] | 3.454 | −0.007 [−0.017, 0.004] | 0.177 [0.164, 0.190] | 2.720 [2.692, 2.747] | 3.349 | −0.003 [−0.018, 0.012] | 0.185 [0.164, 0.206] |
+| COG_V1 | 259 | QuantileRegressor (α=0.006) | 2 | 0.992 [0.987, 0.997] | 1.308 | 0.041 [0.037, 0.044] | 0.271 [0.257, 0.285] | 0.990 [0.982, 0.998] | 1.295 | 0.029 [0.024, 0.034] | 0.262 [0.243, 0.281] |
+
+---
+
+### W40_rawzscore_fixed (complete)
+
+| Target | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | MAE_test [IC 95%] | Best Model | Selected Features |
+|---|---|---|---|---|---|---|---|
+| **MOT** | 0.014 [0.002, 0.026] | 0.166 [0.147, 0.185] | 42.75% | 6.221 [6.169, 6.273] | LinearRegression | l1_T2W40, l2_T2W40, l3_T2W40, z_l1_T2W40, z_l3_T2W40 |
+| **COG** | 0.013 [0.006, 0.019] | 0.153 [0.134, 0.172] | 39.25% | 1.651 [1.633, 1.669] | ExtraTreesRegressor (n_estimators=369, max_depth=13) | edges_T2W40, re_T2W40, lsc_T2W40, z_re_T2W40, z_pe_T2W40 |
+| **MOT_V4** | −0.016 [−0.018, −0.015] | — | 99.5% | 2.694 [2.676, 2.711] | QuantileRegressor (α=5.183) | z_pe_T2W40, z_l1_T2W40, z_l2_T2W40, z_l3_T2W40, z_lsc_T2W40, z_density_T2W40, z_diameter_T2W40, z_asp_T2W40 |
+| **COG_V1** | 0.028 [0.023, 0.033] | 0.255 [0.235, 0.274] | 24.25% | 0.991 [0.982, 0.999] | QuantileRegressor (α=0.0004) | nodes_T2W40, edges_T2W40, l2_T2W40 |
+
+| Target | Trial | Best Model | RFE n | MAE_val [IC 95%] | RMSE_val | R²_val [IC 95%] | ρ_val [IC 95%] | MAE_test [IC 95%] | RMSE_test | R²_test [IC 95%] | ρ_test [IC 95%] |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MOT | 25 | LinearRegression | 5 | 6.269 [6.234, 6.305] | 7.486 | 0.032 [0.024, 0.040] | 0.194 [0.182, 0.207] | 6.221 [6.169, 6.273] | 7.490 | 0.014 [0.002, 0.026] | 0.166 [0.147, 0.185] |
+| COG | 132 | ExtraTreesRegressor (n_estimators=369, max_depth=13) | 5 | 1.737 [1.725, 1.750] | 2.216 | 0.020 [0.016, 0.024] | 0.172 [0.159, 0.186] | 1.651 [1.633, 1.669] | 2.138 | 0.013 [0.006, 0.019] | 0.153 [0.134, 0.172] |
+| MOT_V4 | 9 | QuantileRegressor (α=5.183) | 8 | 2.797 [2.785, 2.808] | 3.505 | −0.033 [−0.034, −0.032] | — | 2.694 [2.676, 2.711] | 3.384 | −0.016 [−0.018, −0.015] | — |
+| COG_V1 | 185 | QuantileRegressor (α=0.0004) | 3 | 0.993 [0.988, 0.998] | 1.309 | 0.040 [0.036, 0.043] | 0.263 [0.249, 0.277] | 0.991 [0.982, 0.999] | 1.296 | 0.028 [0.023, 0.033] | 0.255 [0.235, 0.274] |
+
+---
+
+### W40_zscores_fixed (complete)
+
+| Target | R²_test [IC 95%] | ρ_test [IC 95%] | % R²<0 | MAE_test [IC 95%] | Best Model | Selected Features |
+|---|---|---|---|---|---|---|---|
+| **MOT** | **0.037** [0.030, 0.044] | 0.176 [0.157, 0.195] | 29.75% | 6.264 [6.221, 6.307] | ExtraTreesRegressor (n_estimators=236, max_depth=3) | z_re_T2W40, z_pe_T2W40, z_l2_T2W40, z_density_T2W40 |
+| **COG** | −0.018 [−0.020, −0.016] | — | 96.25% | 1.638 [1.620, 1.655] | QuantileRegressor (α=5.183) | z_lsc_T2W40, z_density_T2W40, z_diameter_T2W40, z_asp_T2W40 |
+| **MOT_V4** | 0.004 [−0.006, 0.015] | 0.151 [0.130, 0.172] | 44.75% | 2.725 [2.702, 2.747] | KNeighborsRegressor (k=7, manhattan) | z_re_T2W40, z_l2_T2W40 |
+| **COG_V1** | −0.005 [−0.006, −0.005] | — | 82.75% | 1.001 [0.994, 1.008] | QuantileRegressor (α=5.183) | z_lsc_T2W40, z_density_T2W40, z_diameter_T2W40, z_asp_T2W40 |
+
+| Target | Trial | Best Model | RFE n | MAE_val [IC 95%] | RMSE_val | R²_val [IC 95%] | ρ_val [IC 95%] | MAE_test [IC 95%] | RMSE_test | R²_test [IC 95%] | ρ_test [IC 95%] |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MOT | 284 | ExtraTreesRegressor (n_estimators=236, max_depth=3) | 4 | 6.315 [6.285, 6.345] | 7.416 | 0.051 [0.046, 0.056] | 0.190 [0.178, 0.203] | 6.264 [6.221, 6.307] | 7.415 | 0.037 [0.030, 0.044] | 0.176 [0.157, 0.195] |
+| COG | 9 | QuantileRegressor (α=5.183) | 4 | 1.751 [1.738, 1.763] | 2.262 | −0.022 [−0.023, −0.020] | — | 1.638 [1.620, 1.655] | 2.171 | −0.018 [−0.020, −0.016] | — |
+| MOT_V4 | 281 | KNeighborsRegressor (k=7, manhattan) | 2 | 2.803 [2.789, 2.818] | 3.444 | 0.001 [−0.006, 0.008] | 0.145 [0.132, 0.158] | 2.725 [2.702, 2.747] | 3.343 | 0.004 [−0.006, 0.015] | 0.151 [0.130, 0.172] |
+| COG_V1 | 9 | QuantileRegressor (α=5.183) | 4 | 1.008 [1.003, 1.013] | 1.338 | −0.002 [−0.002, −0.002] | — | 1.001 [0.994, 1.008] | 1.319 | −0.005 [−0.006, −0.005] | — |
 
 ---
 
@@ -186,8 +258,13 @@ All W40 experiments (raw, zscores, rawzscore) are pending.
 | **W20** | zscores | 0.031 [0.023, 0.039] | 0.170 [0.153, 0.188] | 35% | 6.400 [6.349, 6.451] | LinearRegression | z_pe, z_density, z_asp |
 | **W20** | rawzscore | -0.009 [-0.022, 0.004] | 0.165 [0.145, 0.184] | 48.75% | 6.394 [6.336, 6.452] | KNeighborsRegressor (k=10, weights=distance) | edges, pe, l1, l2, lsc, z_re, z_pe, z_l1, z_l2, z_density, z_diameter, z_asp |
 | **W30** | raw | 0.011 [0.005, 0.017] | 0.125 [0.104, 0.146] | 37.5% | 6.397 [6.354, 6.440] | ElasticNet (α=0.234, l1_ratio=0.755) | l2, asp |
+| **W30** | rawzscore | −0.001 [−0.011, 0.008] | 0.130 [0.112, 0.148] | 46.75% | 6.361 [6.308, 6.414] | KNeighborsRegressor (k=17, manhattan) | 21 features |
+| **W30** | zscores | **0.041** [0.032, 0.051] | **0.192** [0.174, 0.211] | **30.25%** | 6.294 [6.244, 6.344] | RandomForestRegressor (n=248, max_depth=2) | z_re, z_pe, z_l2, z_density |
+| **W40** | raw | −0.013 [−0.028, 0.003] | 0.208 [0.190, 0.226] | 54% | 6.280 [6.218, 6.341] | RandomForestRegressor | re_T2W40, lsc_T2W40 |
+| **W40** | rawzscore | 0.014 [0.002, 0.026] | 0.166 [0.147, 0.185] | 42.75% | 6.221 [6.169, 6.273] | LinearRegression | 5 features |
+| **W40** | zscores | **0.037** [0.030, 0.044] | 0.176 [0.157, 0.195] | **29.75%** | 6.264 [6.221, 6.307] | ExtraTreesRegressor (n_estimators=236, max_depth=3) | z_re_T2W40, z_pe_T2W40, z_l2_T2W40, z_density_T2W40 |
 
-- At W10, zscores produce the highest R² (0.023) and lowest failure rate (33%), while rawzscore eliminates signal (R²≈0). At W20, raw signal turns negative (R²=−0.021, 55% failure), while zscores produce the strongest MOT signal across all experiments (R²=0.031, 35% failure, LinearRegression). W20 rawzscore underperforms both individual experiment types (R²=−0.009). At W30, raw partially recovers (R²=0.011, 37.5% failure) with only 2 features (l2, asp), suggesting a simpler, more robust representation at longer windows.
+- At W10, zscores produce the highest R² (0.023) and lowest failure rate (33%), while rawzscore eliminates signal (R²≈0). At W20, raw signal turns negative (R²=−0.021, 55% failure), while zscores produce the strongest MOT signal across all experiments (R²=0.031, 35% failure, LinearRegression). W20 rawzscore underperforms both individual experiment types (R²=−0.009). At W30, raw partially recovers (R²=0.011, 37.5% failure) with only 2 features (l2, asp). **W30 zscores achieve the best MOT result overall (R²=0.041, 30.25% failure, RandomForestRegressor with 4 z-score features)**, improving notably over W20 zscores (0.031). At W40, the pattern holds: zscores achieve R²=0.037 (29.75% failure, ExtraTrees) using the same 4 z-score features (z_re, z_pe, z_l2, z_density) — nearly matching W30. W40 rawzscore with LinearRegression reaches R²=0.014 (42.75% failure), while raw reverts to negative. This confirms that **z-score features at W30–W40 consistently produce the strongest MOT signal**, with failure rates ~30%.
 
 ### COG
 
@@ -200,8 +277,13 @@ All W40 experiments (raw, zscores, rawzscore) are pending.
 | **W20** | zscores | -0.013 [-0.015, -0.011] | — | 93.5% | 1.701 [1.684, 1.718] | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
 | **W20** | rawzscore | -0.013 [-0.015, -0.011] | — | 93.5% | 1.701 [1.684, 1.718] | QuantileRegressor (α=5.1826) | z_pe, z_l1, z_l2, z_l3, z_lsc, z_density, z_diameter, z_asp |
 | **W30** | raw | **0.020** [0.014, 0.025] | **0.189** [0.171, 0.207] | **31%** | 1.724 [1.705, 1.742] | ExtraTreesRegressor (n_estimators=445, max_depth=18) | nodes, edges, re, l1, l3, lsc |
+| **W30** | rawzscore | −0.011 [−0.012, −0.009] | — | 92.25% | 1.730 [1.712, 1.748] | QuantileRegressor (α=5.183) | z_pe, z_l1, z_l2, z_l3, z_lsc, z_density, z_diameter, z_asp |
+| **W30** | zscores | −0.011 [−0.012, −0.009] | — | 92.25% | 1.730 [1.712, 1.748] | QuantileRegressor (α=5.183) | z_lsc, z_density, z_diameter, z_asp |
+| **W40** | raw | 0.010 [0.004, 0.015] | 0.146 [0.127, 0.165] | 40.5% | 1.651 [1.633, 1.669] | ExtraTreesRegressor | edges_T2W40, re_T2W40, l1_T2W40, l3_T2W40, lsc_T2W40 |
+| **W40** | rawzscore | 0.013 [0.006, 0.019] | 0.153 [0.134, 0.172] | 39.25% | 1.651 [1.633, 1.669] | ExtraTreesRegressor | edges_T2W40, re_T2W40, lsc_T2W40, z_re_T2W40, z_pe_T2W40 |
+| **W40** | zscores | −0.018 [−0.020, −0.016] | — | 96.25% | 1.638 [1.620, 1.655] | QuantileRegressor (α=5.183) | z_lsc_T2W40, z_density_T2W40, z_diameter_T2W40, z_asp_T2W40 |
 
-- R² is consistently negative (≈ −0.013) across W10–W20 experiments. ρ is not computable. >90% of splits fail across all configurations. The results are nearly identical between W10 and W20, confirming no predictive signal at those windows. **However, at W30_raw, COG becomes positive for the first time (R²=0.020 [0.014, 0.025], 31% failure)**, driven by ExtraTreesRegressor with 6 network features (nodes, edges, re, l1, l3, lsc). This suggests that at longer time windows, graph-theoretic features begin to capture COG-relevant variance.
+- R² is consistently negative (≈ −0.013) across W10–W20 experiments. ρ is not computable. >90% of splits fail across all configurations. The results are nearly identical between W10 and W20, confirming no predictive signal at those windows. **However, at W30_raw, COG becomes positive for the first time (R²=0.020 [0.014, 0.025], 31% failure)**, driven by ExtraTreesRegressor with 6 network features (nodes, edges, re, l1, l3, lsc). At W40, the positive signal continues: raw (R²=0.010, 40.5% failure) and rawzscore (R²=0.013, 39.25% failure) both remain positive but weaken compared to W30. The features shift to include T2W40-suffix variants, with ExtraTrees as the best model for both. Zscores alone remain negative (R²=−0.018, 96% failure). This confirms that **raw or combined raw+z-score features at longer windows (W30–W40) capture COG-relevant variance**, with a peak at W30 and partial attenuation at W40.
 
 ### MOT_V4
 
@@ -214,8 +296,13 @@ All W40 experiments (raw, zscores, rawzscore) are pending.
 | **W20** | zscores | -0.001 [-0.007, 0.005] | 0.104 [0.085, 0.122] | 50.5% | 2.853 [2.834, 2.872] | QuantileRegressor (α=0.00) | z_pe, z_l2 |
 | **W20** | rawzscore | **0.027** [0.021, 0.033] | 0.133 [0.114, 0.152] | **32%** | 2.861 [2.842, 2.880] | ExtraTreesRegressor (n_estimators=430, max_depth=5) | l2, lsc, z_re, z_pe, z_l2 |
 | **W30** | raw | -0.016 [-0.017, -0.015] | — | 99.75% | 2.689 [2.671, 2.707] | QuantileRegressor (α=5.183) | lsc, atd, density, diameter, asp |
+| **W30** | rawzscore | 0.015 [0.008, 0.023] | 0.120 [0.099, 0.141] | 37.5% | 2.677 [2.657, 2.697] | QuantileRegressor (α=0.010) | l3, z_pe |
+| **W30** | zscores | −0.016 [−0.017, −0.015] | — | 99.75% | 2.689 [2.671, 2.707] | QuantileRegressor (α=5.183) | z_lsc, z_density, z_diameter, z_asp |
+| **W40** | raw | −0.003 [−0.018, 0.012] | 0.185 [0.164, 0.206] | 47% | 2.720 [2.692, 2.747] | RandomForestRegressor | pe_T2W40, lsc_T2W40 |
+| **W40** | rawzscore | −0.016 [−0.018, −0.015] | — | 99.5% | 2.694 [2.676, 2.711] | QuantileRegressor (α=5.183) | 8 z-score features |
+| **W40** | zscores | 0.004 [−0.006, 0.015] | 0.151 [0.130, 0.172] | 44.75% | 2.725 [2.702, 2.747] | KNeighborsRegressor (k=7, manhattan) | z_re_T2W40, z_l2_T2W40 |
 
-- R² hovers near zero across most configurations. Zscores improve notably from W10 (−0.031, 100% failure) to W20 (−0.001, 50.5% failure). **W20_rawzscore achieves the best MOT_V4 result overall (R²=0.027, 32% failure, ExtraTrees)** — the first configuration with a clearly positive R². However, W30_raw regresses to constant prediction (−0.016, 99.75% failure), suggesting the effect is window-dependent.
+- R² hovers near zero across most configurations. Zscores improve notably from W10 (−0.031, 100% failure) to W20 (−0.001, 50.5% failure). **W20_rawzscore achieves the best MOT_V4 result overall (R²=0.027, 32% failure, ExtraTrees)** — the first configuration with a clearly positive R². W30_rawzscore also shows a positive signal (R²=0.015, 37.5% failure, 2 features: l3, z_pe), second only to W20_rawzscore. At W40, the signal weakens: W40_zscores achieves a marginal R²=0.004 (44.75% failure, KNN with 2 z-score features), while raw (R²=−0.003) and rawzscore (R²=−0.016) fail. No W40 configuration surpasses the W20_rawzscore benchmark.
 
 ### COG_V1
 
@@ -227,6 +314,52 @@ All W40 experiments (raw, zscores, rawzscore) are pending.
 | **W20** | raw | 0.041 [0.034, 0.048] | 0.250 [0.231, 0.269] | 20.25% | 0.970 [0.962, 0.979] | QuantileRegressor (α=0.0012) | nodes, edges, l2, lcc |
 | **W20** | zscores | -0.005 [-0.006, -0.004] | — | 82.5% | 0.991 [0.983, 0.998] | QuantileRegressor (α=5.1826) | z_lsc, z_density, z_diameter, z_asp |
 | **W20** | rawzscore | 0.042 [0.037, 0.047] | 0.267 [0.248, 0.286] | 18.5% | 0.971 [0.963, 0.979] | QuantileRegressor (α=0.0227) | edges, z_asp |
-| **W30** | raw | 0.037 [0.033, 0.041] | **0.279** [0.261, 0.297] | **16.75%** | 1.003 [0.994, 1.011] | QuantileRegressor (α=0.0351) | edges, density, diameter, asp |
+| **W30** | raw | 0.037 [0.033, 0.041] | 0.279 [0.261, 0.297] | 16.75% | 1.003 [0.994, 1.011] | QuantileRegressor (α=0.0351) | edges, density, diameter, asp |
+| **W30** | rawzscore | 0.037 [0.033, 0.041] | 0.259 [0.239, 0.278] | 16.5% | 1.004 [0.995, 1.013] | QuantileRegressor (α=0.012) | edges, pe, z_l2 |
+| **W30** | zscores | −0.005 [−0.006, −0.004] | — | 79% | 1.024 [1.016, 1.032] | QuantileRegressor (α=5.183) | z_lsc, z_density, z_diameter, z_asp |
+| **W40** | raw | 0.029 [0.024, 0.034] | 0.262 [0.243, 0.281] | 23.75% | 0.990 [0.982, 0.998] | QuantileRegressor (α=0.006) | edges_T2W40, atd_T2W40 |
+| **W40** | rawzscore | 0.028 [0.023, 0.033] | 0.255 [0.235, 0.274] | 24.25% | 0.991 [0.982, 0.999] | QuantileRegressor (α=0.0004) | nodes_T2W40, edges_T2W40, l2_T2W40 |
+| **W40** | zscores | −0.005 [−0.006, −0.005] | — | 82.75% | 1.001 [0.994, 1.008] | QuantileRegressor (α=5.183) | z_lsc_T2W40, z_density_T2W40, z_diameter_T2W40, z_asp_T2W40 |
 
-- COG_V1 is the only target with consistently positive R² across raw, rawzscore, and now W30 raw. ρ improves from W10 (0.230) to W20 (0.250) to W30 (0.279), and failing splits decrease (24% → 20.25% → 16.75%). W20_rawzscore performs comparably to raw with the simplest feature set (edges, z_asp only). The signal is lost with zscores alone (R²≈−0.004 to −0.005, ~82% failure across both windows).
+- COG_V1 is the only target with consistently positive R² across raw, rawzscore, and now W30 raw and rawzscore. ρ improves from W10 (0.230) to W20 (0.250) to W30 (0.259–0.279), and failing splits decrease to ~16.5%. W30_rawzscore matches W30_raw (R²=0.037) with only 3 features (edges, pe, z_l2). At W40, both raw (R²=0.029, 23.75% failure) and rawzscore (R²=0.028, 24.25% failure) remain positive but decline from W30 peak. The best W40 models use only 2–3 features (edges_T2W40+atd_T2W40 or nodes_T2W40+edges_T2W40+l2_T2W40), reverting to simpler raw/combined representations. Zscores alone remain negative (R²≈−0.005, ~83% failure), consistent with W20–W30.
+
+---
+
+## Task 6: Correlations (Narrative Recall)
+
+- **Task**: Story retelling narrative recall (audio-described text retelling)
+- **Method**: Pearson correlation (simple and partial) between graph-theoretic EEG features and behavioral scores
+- **Windows**: 30–200 seconds (T6W30 to T6W200, step 10)
+- **Experiments**: raw (13 features), zscores (9 z-features)
+- **Note**: These are correlation analyses, not regression. R² values are not comparable to Task 2 Optuna results. Values shown are mean absolute r across all features per target.
+
+| Window | Type | MOT r | MOT partial | COG r | COG partial | MOT_V4 r | MOT_V4 partial | COG_V1 r | COG_V1 partial |
+|---|---|---|---|---|---|---|---|---|---|
+| **T6W30** | raw | 0.073 | 0.085 | 0.107 | 0.048 | 0.111 | 0.130 | 0.095 | 0.070 |
+| **T6W30** | zscores | 0.046 | 0.048 | 0.061 | 0.046 | 0.061 | 0.063 | 0.065 | 0.058 |
+| **T6W40** | raw | 0.073 | 0.086 | 0.107 | 0.048 | 0.106 | 0.125 | 0.098 | 0.074 |
+| **T6W40** | zscores | 0.042 | 0.044 | 0.043 | 0.033 | 0.053 | 0.055 | 0.055 | 0.047 |
+| **T6W50** | raw | 0.071 | 0.083 | **0.114** | 0.053 | 0.104 | 0.124 | 0.102 | 0.078 |
+| **T6W50** | zscores | 0.043 | 0.045 | 0.041 | 0.031 | 0.053 | 0.057 | 0.055 | 0.047 |
+| **T6W150** | raw | **0.081** | **0.091** | 0.090 | 0.040 | **0.114** | **0.130** | 0.085 | 0.065 |
+| **T6W150** | zscores | 0.031 | 0.031 | 0.043 | 0.045 | 0.042 | 0.043 | 0.036 | 0.033 |
+| **T6W160** | raw | 0.064 | 0.072 | 0.095 | 0.047 | 0.100 | 0.114 | 0.096 | 0.075 |
+| **T6W160** | zscores | 0.023 | 0.025 | 0.048 | 0.055 | 0.035 | 0.036 | 0.030 | 0.024 |
+| **T6W170** | raw | 0.067 | 0.076 | 0.091 | 0.042 | 0.098 | 0.112 | 0.095 | 0.075 |
+| **T6W170** | zscores | 0.021 | 0.021 | 0.043 | 0.037 | 0.039 | 0.041 | 0.042 | 0.036 |
+| **T6W180** | raw | 0.070 | 0.079 | 0.088 | 0.035 | 0.103 | 0.117 | 0.097 | 0.073 |
+| **T6W180** | zscores | 0.034 | 0.036 | 0.036 | 0.021 | 0.028 | 0.031 | 0.044 | 0.040 |
+| **T6W190** | raw | 0.081 | 0.091 | 0.090 | 0.035 | 0.103 | 0.118 | **0.106** | **0.081** |
+| **T6W190** | zscores | 0.040 | 0.041 | 0.048 | 0.038 | 0.052 | 0.052 | 0.060 | 0.058 |
+| **T6W200** | raw | 0.073 | 0.081 | 0.108 | **0.060** | 0.094 | 0.108 | **0.107** | **0.084** |
+| **T6W200** | zscores | 0.033 | 0.034 | 0.030 | 0.022 | 0.044 | 0.045 | 0.048 | 0.047 |
+
+### Key Observations (Task 6)
+
+- **Raw features consistently outperform zscores** across all windows and targets, often by 2–3×. This mirrors the Task 2 regression findings.
+- **MOT**: r peaks at T6W150 (0.081 raw, 0.091 partial) and T6W190 (0.081 raw). Partial correlations are consistently higher than simple r, suggesting suppression of shared variance.
+- **COG**: r peaks at T6W50 (0.114 raw) — the strongest simple correlation across all Task 6 targets. Partial correlations drop sharply (0.053), indicating shared variance with other targets.
+- **MOT_V4**: r peaks at T6W150 (0.114 raw, 0.130 partial). Partial correlations are consistently higher than simple r, similar to MOT.
+- **COG_V1**: r peaks at T6W190 (0.106 raw) and T6W200 (0.107 raw). Partial r is also highest at T6W190 (0.081) and T6W200 (0.084).
+- **Window dependence**: Unlike Task 2's clear W30–W40 peak, Task 6 shows relatively flat r across windows (T6W30 to T6W200), with a mild peak at T6W150–T6W200 for MOT and MOT_V4, and at T6W50 for COG.
+- **Overall signal strength**: Task 6 raw correlations (r ≈ 0.07–0.11) are comparable to Task 2 R² values (0.01–0.04) when considering that correlation r is not directly comparable to regression R².
