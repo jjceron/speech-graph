@@ -180,7 +180,7 @@ with tab_single:
                 xaxis_title=f"{bt_target} mean per subject",
                 yaxis_title="Number of subjects",
                 template="plotly_white",
-                height=400, bargap=0.05,
+                height=450, bargap=0.05,
             )
             st.plotly_chart(fig_dist, use_container_width=True)
             st.selectbox(
@@ -201,7 +201,7 @@ with tab_single:
                 title=f"{bt_target} variance",
                 yaxis_title="y_true",
                 template="plotly_white",
-                height=400,
+                height=450,
                 showlegend=False,
             )
             st.plotly_chart(fig_box, use_container_width=True)
