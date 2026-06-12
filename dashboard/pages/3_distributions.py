@@ -53,10 +53,10 @@ if report:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Test Distributions", "Val vs Test", "Obs vs Pred", "Residuals", "Target Distribution"])
 
 with tab1:
-    for label, col_name, color in [
-        ("MAE", "mae", "#2ca02c"),
-        ("R²", "r2", "#1f77b4"),
-        ("ρ (Spearman)", "rho", "#9467bd"),
+    for label, col_name, val_color, test_color in [
+        ("MAE", "mae", "#ff7f0e", "#2ca02c"),
+        ("R²", "r2", "#d62728", "#1f77b4"),
+        ("ρ (Spearman)", "rho", "#8c564b", "#9467bd"),
     ]:
         v = val_df[col_name].dropna().values if val_df is not None else np.array([])
         t = test_df[col_name].dropna().values
@@ -64,19 +64,22 @@ with tab1:
             v = v[np.isfinite(v)]
             t = t[np.isfinite(t)]
 
+        if len(t) == 0:
+            st.info(f"{label} not computable for this target.")
+            continue
+
         fig = go.Figure()
         if len(v) > 0:
             fig.add_trace(go.Histogram(
                 x=v, nbinsx=30,
                 name=f"Val (μ={v.mean():.4f})",
-                marker_color=color, opacity=0.5,
+                marker_color=val_color, opacity=0.6,
             ))
-        if len(t) > 0:
-            fig.add_trace(go.Histogram(
-                x=t, nbinsx=30,
-                name=f"Test (μ={t.mean():.4f})",
-                marker_color=color, opacity=0.5,
-            ))
+        fig.add_trace(go.Histogram(
+            x=t, nbinsx=30,
+            name=f"Test (μ={t.mean():.4f})",
+            marker_color=test_color, opacity=0.6,
+        ))
 
         t_mean = float(t.mean())
         t_lo = float(np.percentile(t, 2.5))
