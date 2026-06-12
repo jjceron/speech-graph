@@ -525,18 +525,15 @@ def plot_regressor_nfeatures_heatmap(df: pd.DataFrame, metric: str = "mae") -> g
     ))
 
     if best_pos:
-        fig.add_trace(go.Scatter(
-            x=[str(int(pivot_best.columns[best_pos[1]]))],
-            y=[pivot_best.index[best_pos[0]]],
-            mode="markers",
-            marker=dict(
-                symbol="square", size=28,
-                color="rgba(0,0,0,0)",
-                line=dict(width=3.5, color="#222"),
-            ),
-            showlegend=False,
-            hoverinfo="skip",
-        ))
+        fig.add_shape(
+            type="rect",
+            x0=best_pos[1] - 0.5, x1=best_pos[1] + 0.5,
+            y0=best_pos[0] - 0.5, y1=best_pos[0] + 0.5,
+            xref="x", yref="y",
+            line=dict(color="#222", width=3.5),
+            fillcolor="rgba(0,0,0,0)",
+            layer="above",
+        )
 
     fig.update_layout(
         title=title,
