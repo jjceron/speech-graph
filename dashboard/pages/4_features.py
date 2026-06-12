@@ -103,7 +103,29 @@ with tab_shap:
         summary = json.load(f)
 
     st.subheader(f"SHAP Feature Importance — W{sw} {se} — {stg}")
-    st.caption(f"Model: **{summary['regressor']}** | Subjects: {summary['n_subjects']} | Features: {summary['n_features']}")
+
+    report_shap = load_best_report(sw, se, stg)
+    caption_parts = [
+        f"Model: **{summary['regressor']}**",
+        f"Subjects: {summary['n_subjects']}",
+        f"Features: {summary['n_features']}",
+    ]
+    if report_shap:
+        vs = report_shap.get("validation_summary", {})
+        ts = report_shap.get("test_summary", {})
+        mae_v = vs.get("mae_mean_val")
+        mae_t = ts.get("mae_mean_test")
+        r2_v = vs.get("r2_mean_val")
+        r2_t = ts.get("r2_mean_test")
+        if mae_v is not None:
+            caption_parts.append(f"MAE val: {mae_v:.4f}")
+        if mae_t is not None:
+            caption_parts.append(f"MAE test: {mae_t:.4f}")
+        if r2_v is not None:
+            caption_parts.append(f"R² val: {r2_v:.4f}")
+        if r2_t is not None:
+            caption_parts.append(f"R² test: {r2_t:.4f}")
+    st.caption(" | ".join(caption_parts))
 
     shap_df = pd.read_csv(shap_values_path)
     shap_val_cols = [c for c in shap_df.columns if c not in ("subject", "y_true", "y_pred")]
