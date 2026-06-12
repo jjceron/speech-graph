@@ -350,6 +350,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             final_estimator = Ridge(random_state=random_state)
         elif final_name == "RandomForestRegressor":
             final_estimator = RandomForestRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
+<<<<<<< HEAD
         elif final_name == "ExtraTreesRegressor":
             final_estimator = ExtraTreesRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
         else:
@@ -358,6 +359,15 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             estimators=[("ridge", Ridge(random_state=random_state)), ("svr", SVR(kernel="linear"))],
             final_estimator=final_estimator,
             cv=None,
+=======
+        else:
+            final_estimator = ExtraTreesRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
+        reg = StackingRegressor(
+            estimators=[("ridge", Ridge(random_state=random_state)), ("svr", SVR(kernel="linear"))],
+            final_estimator=final_estimator,
+            cv=5,
+            n_jobs=1,
+>>>>>>> 40f90a1 (Update)
         )
 
     elif name == "GaussianProcessRegressor":

@@ -94,11 +94,21 @@ def has_experiment(window: str, experiment: str, task: int | None = None) -> boo
 
 def list_completed() -> list[tuple[str, str]]:
     task = get_task()
+<<<<<<< HEAD
+=======
+    targets = get_targets(task=task)
+    if not targets:
+        return []
+>>>>>>> 40f90a1 (Update)
     completed = []
     for w in get_windows(task=task):
         for e in get_experiments(task=task):
             exp_dir = _exp_dir(w, e, task=task)
+<<<<<<< HEAD
             if exp_dir.exists():
+=======
+            if exp_dir.exists() and all((exp_dir / t).exists() for t in targets):
+>>>>>>> 40f90a1 (Update)
                 completed.append((w, e))
     return completed
 

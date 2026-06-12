@@ -7,7 +7,11 @@ from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Distributions", page_icon="📈", layout="wide")
 render_sidebar()
+<<<<<<< HEAD
 st.title("📈 Distributions")
+=======
+st.title("📈 Split Distributions")
+>>>>>>> 40f90a1 (Update)
 
 completed = list_completed()
 if not completed:
@@ -16,9 +20,17 @@ if not completed:
 
 col_w, col_e, col_t = st.columns(3)
 with col_w:
+<<<<<<< HEAD
     window = st.selectbox("Window", get_windows(), index=0)
 with col_e:
     experiment = st.selectbox("Experiment", [e for e in get_experiments() if get_targets(window=window, experiment=e)], index=0)
+=======
+    windows = sorted(set(w for w, _ in completed))
+    window = st.selectbox("Window", windows, index=0)
+with col_e:
+    exps = [e for w, e in completed if w == window]
+    experiment = st.selectbox("Experiment", exps, index=0)
+>>>>>>> 40f90a1 (Update)
 with col_t:
     target = st.selectbox("Target", get_targets(), index=0)
 
@@ -41,7 +53,11 @@ if report:
         f"**R² test:** {ts['r2_mean_test']:.4f} [{ts['r2_ci_lower_test']:.4f}, {ts['r2_ci_upper_test']:.4f}]"
     )
 
+<<<<<<< HEAD
 st.subheader("Stability across MC Cross-Validation Splits")
+=======
+st.subheader("Test/Val Distributions")
+>>>>>>> 40f90a1 (Update)
 
 for label, col_name, val_color, test_color in [
         ("MAE", "mae", "#ff7f0e", "#2ca02c"),

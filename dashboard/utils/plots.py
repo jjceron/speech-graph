@@ -227,7 +227,11 @@ def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
     df["_sort"] = (~df["selected"]).astype(int)
     df = df.sort_values(["_sort", "ranking", "feature"])
 
+<<<<<<< HEAD
     colors = ["#2ca02c" if s else "#d9534f" for s in df["selected"]]
+=======
+    colors = ["#2ca02c" if s else "#aaaaaa" for s in df["selected"]]
+>>>>>>> 40f90a1 (Update)
     n_sel = df["selected"].sum()
     max_name_len = df["feature"].str.len().max()
 
@@ -254,6 +258,7 @@ def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
 
 
 def optimization_history(df: pd.DataFrame) -> go.Figure:
+<<<<<<< HEAD
     df = df.dropna(subset=["value"]).copy()
     if "state" in df.columns:
         df = df[df["state"] == "COMPLETE"]
@@ -280,11 +285,35 @@ def optimization_history(df: pd.DataFrame) -> go.Figure:
         x=df["number"], y=best, mode="lines",
         line=dict(color="red", width=2), name="Best so far",
     ))
+=======
+    df = df.dropna(subset=["value"]).sort_values("number")
+    best = df["value"].cummin()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=df["number"],
+            y=df["value"],
+            mode="markers",
+            marker=dict(size=4, opacity=0.4, color="steelblue"),
+            name="Trial",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df["number"],
+            y=best,
+            mode="lines",
+            line=dict(color="red", width=2),
+            name="Best so far",
+        )
+    )
+>>>>>>> 40f90a1 (Update)
     fig.update_layout(
         title="Optuna Optimization History",
         xaxis_title="Trial",
         yaxis_title="Objective (MAE validation)",
         template="plotly_white",
+<<<<<<< HEAD
         height=450,
         hovermode="x unified",
     )
@@ -352,11 +381,15 @@ def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
         yaxis_title="Trials ≤ threshold (%)",
         template="plotly_white", height=450,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+=======
+        height=400,
+>>>>>>> 40f90a1 (Update)
     )
     return fig
 
 
 def model_selection_bar(df: pd.DataFrame) -> go.Figure:
+<<<<<<< HEAD
     dfp = df.dropna(subset=["value", "params_regressor"]).copy()
     if "state" in dfp.columns:
         dfp = dfp[dfp["state"] == "COMPLETE"]
@@ -415,10 +448,30 @@ def model_selection_bar(df: pd.DataFrame) -> go.Figure:
         template="plotly_white",
         height=400,
         margin=dict(l=160),
+=======
+    counts = df["params_regressor"].value_counts()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=counts.index,
+            y=counts.values,
+            marker_color=px.colors.qualitative.Plotly[: len(counts)],
+            text=counts.values,
+            textposition="outside",
+        )
+    )
+    fig.update_layout(
+        title="Regressor Selection Frequency (300 trials)",
+        xaxis_title="Regressor",
+        yaxis_title="Trials",
+        template="plotly_white",
+        height=400,
+>>>>>>> 40f90a1 (Update)
     )
     return fig
 
 
+<<<<<<< HEAD
 def plot_objective_by_regressor(df: pd.DataFrame) -> go.Figure:
     dfp = df.dropna(subset=["value", "params_regressor"]).copy()
     if "state" in dfp.columns:
@@ -616,6 +669,66 @@ def plot_regressor_performance_summary(df: pd.DataFrame) -> go.Figure:
         yaxis_title="Best MAE val (lower is better)",
         template="plotly_white",
         height=450,
+=======
+def optuna_parallel_coords(df: pd.DataFrame, params: list[str], top_k: int = 100) -> go.Figure:
+    dfp = df.dropna(subset=["value"]).copy()
+    if len(dfp) == 0:
+        return go.Figure()
+
+    if top_k < len(dfp):
+        dfp = dfp.nsmallest(top_k, "value")
+
+    dims = []
+    for p in params:
+        if p in dfp.columns:
+            col = dfp[p]
+            label = p.replace("params_", "")
+            if col.dtype == "object":
+                codes, labels = pd.factorize(col)
+                dims.append(
+                    dict(
+                        label=label,
+                        values=codes,
+                        tickvals=list(range(len(labels))),
+                        ticktext=[str(l) for l in labels],
+                    )
+                )
+            else:
+                sorted_col = col.dropna()
+                if len(sorted_col) == 0:
+                    continue
+                try:
+                    cmin, cmax = float(sorted_col.min()), float(sorted_col.max())
+                except (ValueError, TypeError):
+                    continue
+                if not (np.isfinite(cmin) and np.isfinite(cmax)):
+                    continue
+                dims.append(
+                    dict(
+                        label=label,
+                        values=col,
+                        range=[cmin, cmax],
+                    )
+                )
+
+    if not dims:
+        return go.Figure()
+
+    fig = go.Figure(
+        go.Parcoords(
+            dimensions=dims,
+            line=dict(
+                color=dfp["value"],
+                colorscale="Viridis_r",
+                showscale=True,
+                colorbar=dict(title="MAE val"),
+            ),
+        )
+    )
+    fig.update_layout(
+        title=f"Parallel Coordinates — Top {top_k} of {len(df.dropna(subset=['value']))} Trials",
+        height=600,
+>>>>>>> 40f90a1 (Update)
     )
     return fig
 

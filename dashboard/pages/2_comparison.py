@@ -87,14 +87,28 @@ with tab_all:
     st.plotly_chart(fig_r2_val, use_container_width=True)
 
 with tab_single:
+<<<<<<< HEAD
+=======
+    avail_windows = sorted(set(w for w, _ in completed))
+    avail_experiments = sorted(set(e for _, e in completed))
+    avail_targets = get_targets()
+
+>>>>>>> 40f90a1 (Update)
     col_metric, col_win, col_exp, col_tgt = st.columns(4)
     with col_metric:
         bt_metric = st.selectbox("Metric", ["MAE", "R²"], index=0, key="bt_metric")
     with col_win:
+<<<<<<< HEAD
         bt_window = st.selectbox("Window", get_windows(), key="bt_window")
     with col_exp:
         bt_exp = st.selectbox(
             "Experiment", [e for e in get_experiments() if get_targets(window=bt_window, experiment=e)],
+=======
+        bt_window = st.selectbox("Window", avail_windows, key="bt_window")
+    with col_exp:
+        bt_exp = st.selectbox(
+            "Experiment", avail_experiments,
+>>>>>>> 40f90a1 (Update)
             format_func=lambda x: EXPERIMENT_LABELS.get(x, x),
             key="bt_exp",
         )
@@ -126,6 +140,7 @@ with tab_single:
             mlab = "R²"
             t_v = f"{ts.get('r2_mean_test',0):.4f} [{ts.get('r2_ci_lower_test',0):.4f}, {ts.get('r2_ci_upper_test',0):.4f}]"
             v_v = f"{vs.get('r2_mean_val',0):.4f} [{vs.get('r2_ci_lower_val',0):.4f}, {vs.get('r2_ci_upper_val',0):.4f}]"
+<<<<<<< HEAD
         target_vals = preds["y_true"]
         target_std = float(target_vals.std())
         target_mae = float(preds["y_pred"].sub(preds["y_true"]).abs().mean())
@@ -133,6 +148,9 @@ with tab_single:
         st.info(f"**Model:** {bp.get('regressor','?')} | **Features:** {len(feat)} | "
                 f"**{mlab} test:** {t_v} | **{mlab} val:** {v_v} | "
                 f"**σ_target:** {target_std:.3f} | **MAE/σ:** {mae_ratio:.3f}")
+=======
+        st.info(f"**Model:** {bp.get('regressor','?')} | **Features:** {len(feat)} | **{mlab} test:** {t_v} | **{mlab} val:** {v_v}")
+>>>>>>> 40f90a1 (Update)
 
     # --- Target vs Predicted — Test | Validation (side by side) ---
     col_test, col_val = st.columns(2)
@@ -174,17 +192,23 @@ with tab_single:
         default_subj = subj_list[0]
         highlight_subj = st.session_state.get("comp_highlight_subj", default_subj)
         subj_val = float(subj_means[highlight_subj])
+<<<<<<< HEAD
         overall_mean = float(subj_means.mean())
         overall_std = float(sub_yt.std())
 
         # --- Horizontal boxplot (above) ---
         mae_val = float((preds["y_pred"] - preds["y_true"]).abs().mean())
+=======
+
+        # --- Horizontal boxplot (above) ---
+>>>>>>> 40f90a1 (Update)
         fig_box = go.Figure()
         fig_box.add_trace(go.Box(
             x=sub_yt.values, orientation="h",
             name=bt_target, boxmean="sd",
             marker_color="#9467bd",
         ))
+<<<<<<< HEAD
         fig_box.add_vline(
             x=overall_mean, line_dash="dash", line_color="red", line_width=2,
             annotation_text=f"μ={overall_mean:.2f}",
@@ -205,6 +229,10 @@ with tab_single:
         )
         fig_box.update_layout(
             title=f"{bt_target} — σ={overall_std:.3f}, MAE/σ={mae_val/overall_std:.3f}" if overall_std > 0 else bt_target,
+=======
+        fig_box.update_layout(
+            title=f"{bt_target} variance",
+>>>>>>> 40f90a1 (Update)
             template="plotly_white",
             height=300,
             margin=dict(t=30, b=10),
@@ -218,6 +246,7 @@ with tab_single:
             marker_color="#1f77b4", opacity=0.7, name="Subjects",
         ))
 
+<<<<<<< HEAD
         fig_dist.add_vline(
             x=overall_mean, line_dash="dash", line_color="red", line_width=2,
             annotation_text=f"μ = {overall_mean:.2f}",
@@ -230,6 +259,14 @@ with tab_single:
             annotation_position="top left",
             annotation_font_size=11,
         )
+=======
+        overall_mean = float(subj_means.mean())
+        fig_dist.add_vline(
+            x=overall_mean, line_dash="dash", line_color="red", line_width=2,
+            annotation_text=f"Mean = {overall_mean:.2f}",
+            annotation_position="top right",
+        )
+>>>>>>> 40f90a1 (Update)
         fig_dist.add_vline(
             x=subj_val, line_dash="dash", line_color="green", line_width=2,
             annotation_text=highlight_subj.split("-")[-1][:8],
@@ -237,7 +274,11 @@ with tab_single:
         )
 
         fig_dist.update_layout(
+<<<<<<< HEAD
             title=f"Target Distribution — μ={overall_mean:.2f} σ={overall_std:.3f}",
+=======
+            title="Target Variable Distribution by Subject",
+>>>>>>> 40f90a1 (Update)
             xaxis_title=f"{bt_target} score",
             yaxis_title="Number of subjects",
             template="plotly_white",
@@ -262,7 +303,11 @@ with tab_scenario:
         avail_targets = get_targets()
         scenario_target = st.selectbox("Target", avail_targets, index=0, key="scenario_t")
     with col_s2:
+<<<<<<< HEAD
         avail_exps = get_experiments()
+=======
+        avail_exps = sorted(set(e for _, e in completed))
+>>>>>>> 40f90a1 (Update)
         selected_exps = st.multiselect(
             "Experiments",
             options=avail_exps,
@@ -270,7 +315,11 @@ with tab_scenario:
             format_func=lambda x: EXPERIMENT_LABELS.get(x, x),
         )
     with col_s3:
+<<<<<<< HEAD
         avail_wins = get_windows()
+=======
+        avail_wins = sorted(set(w for w, _ in completed), key=int)
+>>>>>>> 40f90a1 (Update)
         selected_wins = st.multiselect(
             "Windows",
             options=avail_wins,
