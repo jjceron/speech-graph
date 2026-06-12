@@ -91,5 +91,7 @@ with tab3:
         fig_imp = plot_parameter_importance(trials, height=height)
         st.plotly_chart(fig_imp, use_container_width=True, key="imp_t3")
 
-    fig_heat = plot_regressor_nfeatures_heatmap(trials)
+    heat_metric = st.radio("Heatmap metric", ["MAE (val)", "R² (val)"], horizontal=True, key="heat_metric")
+    metric_key = "mae" if heat_metric == "MAE (val)" else "r2"
+    fig_heat = plot_regressor_nfeatures_heatmap(trials, metric=metric_key)
     st.plotly_chart(fig_heat, use_container_width=True, key="heat_t3")
