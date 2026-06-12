@@ -45,4 +45,3 @@ def render_sidebar() -> None:
     st.sidebar.page_link("pages/3_distributions.py", label="Distributions", icon="📈")
     st.sidebar.page_link("pages/4_features.py", label="Features", icon="🔬")
     st.sidebar.page_link("pages/5_optimization.py", label="Optimization", icon="⚙️")
-    st.sidebar.page_link("pages/6_subjects.py", label="Subjects", icon="👤")
