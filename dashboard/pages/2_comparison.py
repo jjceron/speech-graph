@@ -139,6 +139,7 @@ with tab_single:
         if len(sd_test) > 0:
             fig_test = plot_target_vs_predicted(
                 sd_test, set_name="Test", scenario_label=scenario_label,
+                metric=bt_metric,
             )
             st.plotly_chart(fig_test, use_container_width=True)
         else:
@@ -148,7 +149,7 @@ with tab_single:
         if len(sd_val) > 0:
             fig_val = plot_target_vs_predicted(
                 sd_val, set_name="Validation", scenario_label=scenario_label,
-                marker_color="#ff7f0e",
+                marker_color="#ff7f0e", metric=bt_metric,
             )
             st.plotly_chart(fig_val, use_container_width=True)
         else:
