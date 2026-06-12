@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from utils.loader import list_completed, get_windows, get_experiments, get_targets, load_optuna_trials, load_best_report
-from utils.plots import plot_optimization_ecdf, model_selection_bar, plot_objective_by_regressor, plot_parameter_importance, plot_rfe_vs_objective
+from utils.plots import plot_optimization_ecdf, model_selection_bar, plot_objective_by_regressor, plot_parameter_importance, plot_regressor_nfeatures_heatmap
 from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Optimization", page_icon="⚙️", layout="wide")
@@ -45,9 +45,6 @@ with tab1:
     fig_box = plot_objective_by_regressor(trials)
     st.plotly_chart(fig_box, use_container_width=True, key="box_t1")
 
-    fig_rfe = plot_rfe_vs_objective(trials)
-    st.plotly_chart(fig_rfe, use_container_width=True, key="rfe_t1")
-
 with tab2:
     col_a, col_b = st.columns([3, 2])
     with col_a:
@@ -71,20 +68,28 @@ with tab2:
             st.dataframe(stats, use_container_width=True)
 
 with tab3:
-    col_a, col_b = st.columns([3, 2])
-    with col_a:
-        fig_imp = plot_parameter_importance(trials)
-        st.plotly_chart(fig_imp, use_container_width=True)
-    with col_b:
-        if report:
-            params = report.get("best_params", {})
-            feat = report.get("selected_features", [])
-            st.subheader("Best Trial Parameters")
-            rows = []
-            for k, v in params.items():
-                rows.append({"Parameter": k, "Value": str(v)})
-            rows.append({"Parameter": "n_features", "Value": str(len(feat))})
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    param_cols = [c for c in trials.columns if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
+    n_imp = sum(1 for c in param_cols if trials[c].dropna().nunique() >= 3 and trials[c].notna().sum() >= 10)
 
-            st.subheader("Selected Features")
-            st.dataframe(pd.DataFrame({"Feature": feat}), use_container_width=True, hide_index=True)
+    plot_h = max(250, n_imp * 35)
+    n_table_rows = (len(report.get("best_params", {})) + 1 + len(report.get("selected_features", []))) if report else 0
+    table_h = n_table_rows * 36 + 80
+    height = min(max(plot_h, table_h, 250), 520)
+
+    col_a, col_b = st.columns([2, 3])
+    with col_a:
+        if report:
+            with st.container(height=height):
+                st.subheader("Best Trial Parameters")
+                rows = [{"Parameter": k, "Value": str(v)} for k, v in report.get("best_params", {}).items()]
+                rows.append({"Parameter": "n_features", "Value": str(len(report.get("selected_features", [])))})
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+                st.subheader("Selected Features")
+                st.dataframe(pd.DataFrame({"Feature": report.get("selected_features", [])}), use_container_width=True, hide_index=True)
+    with col_b:
+        fig_imp = plot_parameter_importance(trials, height=height)
+        st.plotly_chart(fig_imp, use_container_width=True, key="imp_t3")
+
+    fig_heat = plot_regressor_nfeatures_heatmap(trials)
+    st.plotly_chart(fig_heat, use_container_width=True, key="heat_t3")

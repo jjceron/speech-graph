@@ -408,7 +408,7 @@ def plot_objective_by_regressor(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def plot_parameter_importance(df: pd.DataFrame) -> go.Figure:
+def plot_parameter_importance(df: pd.DataFrame, height: int | None = None) -> go.Figure:
     dfp = df.dropna(subset=["value"])
     param_cols = [c for c in dfp.columns
                   if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
@@ -439,31 +439,64 @@ def plot_parameter_importance(df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         title="Parameter Importance (Spearman ρ with objective)",
         xaxis_title="Correlation with MAE val",
-        template="plotly_white", height=max(250, len(labels) * 35),
-        margin=dict(l=180),
+        template="plotly_white",
+        height=height if height is not None else max(250, len(labels) * 35),
+        margin=dict(l=160),
     )
     fig.add_vline(x=0, line_dash="dot", line_color="gray")
     return fig
 
 
-def plot_rfe_vs_objective(df: pd.DataFrame) -> go.Figure:
-    dfp = df.dropna(subset=["value", "params_rfe_n_features"])
-    fig = go.Figure()
-    for reg in sorted(dfp["params_regressor"].unique()):
-        mask = dfp["params_regressor"] == reg
-        fig.add_trace(go.Scatter(
-            x=dfp.loc[mask, "params_rfe_n_features"],
-            y=dfp.loc[mask, "value"],
-            mode="markers",
-            marker=dict(size=5, opacity=0.5),
-            name=reg,
-            hovertemplate=f"<b>{reg}</b><br>RFE N: %{{x}}<br>MAE val: %{{y:.4f}}<extra></extra>",
-        ))
+def plot_regressor_nfeatures_heatmap(df: pd.DataFrame) -> go.Figure:
+    dfp = df.dropna(subset=["value", "params_regressor", "params_rfe_n_features"]).copy()
+    dfp["params_rfe_n_features"] = dfp["params_rfe_n_features"].astype(int)
+
+    pivot_best = dfp.pivot_table(
+        index="params_regressor", columns="params_rfe_n_features",
+        values="value", aggfunc="min",
+    )
+    pivot_cnt = dfp.pivot_table(
+        index="params_regressor", columns="params_rfe_n_features",
+        values="value", aggfunc="count",
+    )
+
+    row_order = dfp.groupby("params_regressor")["value"].min().sort_values().index.tolist()
+    pivot_best = pivot_best.reindex(row_order)
+    pivot_cnt = pivot_cnt.reindex(row_order)
+
+    hover = []
+    for i in range(len(pivot_best.index)):
+        row_h = []
+        for j in range(len(pivot_best.columns)):
+            v = pivot_best.iloc[i, j]
+            c = pivot_cnt.iloc[i, j]
+            if pd.isna(v):
+                row_h.append(f"<b>{pivot_best.index[i]}</b><br>N={int(pivot_best.columns[j])}<br>No trials")
+            else:
+                row_h.append(f"<b>{pivot_best.index[i]}</b><br>N={int(pivot_best.columns[j])}<br>Best MAE: {v:.4f}<br>Trials: {int(c)}")
+        hover.append(row_h)
+
+    fig = go.Figure(go.Heatmap(
+        z=pivot_best.values,
+        x=[str(int(c)) for c in pivot_best.columns],
+        y=pivot_best.index,
+        colorscale="RdYlGn_r",
+        zmin=pivot_best.min().min(),
+        zmax=pivot_best.max().max(),
+        text=[[f"{v:.4f}" if not pd.isna(v) else "" for v in row] for row in pivot_best.values],
+        texttemplate="%{text}", textfont=dict(size=11),
+        hovertext=hover, hovertemplate="%{hovertext}<extra></extra>",
+        colorbar=dict(title="Best MAE", thickness=15),
+        xgap=2, ygap=2,
+    ))
+
     fig.update_layout(
-        title="RFE N Features vs Objective",
+        title="Best Objective by Regressor × N Features",
         xaxis_title="RFE N Features",
-        yaxis_title="Objective (MAE val)",
-        template="plotly_white", height=400,
+        yaxis_title="",
+        template="plotly_white",
+        height=max(250, len(pivot_best.index) * 45 + 60),
+        margin=dict(l=160),
     )
     return fig
 
