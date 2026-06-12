@@ -464,6 +464,8 @@ def plot_regressor_nfeatures_heatmap(df: pd.DataFrame, metric: str = "mae") -> g
         title = "Best R² by Regressor × N Features"
 
     dfp = df.dropna(subset=[value_col, "params_regressor", "params_rfe_n_features"]).copy()
+    if "state" in dfp.columns:
+        dfp = dfp[dfp["state"] == "COMPLETE"]
     if len(dfp) == 0:
         return go.Figure()
     dfp["params_rfe_n_features"] = dfp["params_rfe_n_features"].astype(int)
