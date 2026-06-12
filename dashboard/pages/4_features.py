@@ -135,20 +135,12 @@ with tab_shap:
         y=feat_names[::-1],
         orientation="h",
         marker_color=colors[::-1],
-        error_x=dict(
-            type="data",
-            symmetric=False,
-            array=[err_hi[i] for i in reversed(range(len(err_hi)))],
-            arrayminus=[err_lo[i] for i in reversed(range(len(err_lo)))],
-            thickness=1.5,
-            width=0.3,
-        ),
     ))
     fig.update_layout(
-        title="SHAP Feature Importance (IQR whiskers)",
+        title="SHAP Feature Importance",
         xaxis_title="Mean SHAP contribution (→ higher prediction)",
         template="plotly_white",
-        height=max(300, len(feat_names) * 35),
+        height=max(450, len(feat_names) * 40),
         shapes=[{
             "type": "line", "x0": 0, "y0": -0.5,
             "x1": 0, "y1": len(feat_names) - 0.5,
@@ -186,7 +178,7 @@ with tab_shap:
             xaxis_title="SHAP value (→ higher prediction)",
             yaxis=dict(tickvals=list(range(nf)), ticktext=feat_names[::-1]),
             template="plotly_white",
-            height=max(300, nf * 50),
+            height=max(450, nf * 60),
             showlegend=False,
             shapes=[{
                 "type": "line", "x0": 0, "y0": -0.5,
