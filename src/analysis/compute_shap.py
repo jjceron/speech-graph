@@ -240,7 +240,7 @@ def main():
     parser.add_argument("--task", type=int, nargs="+", default=[2], help="Task number(s)")
     parser.add_argument("--window", type=int, help="Window size")
     parser.add_argument("--experiment", type=str, help="Experiment type (raw, rawzscore, zscores)")
-    parser.add_argument("--target", type=str, help="Target variable")
+    parser.add_argument("--target", type=str, help="Target variable (or 'all' for all targets)")
     parser.add_argument("--force", action="store_true", help="Recompute even if files exist")
     args = parser.parse_args()
 
@@ -261,11 +261,13 @@ def main():
         if not args.window or not args.experiment or not args.target:
             parser.error("--window, --experiment, --target required when not using --all")
         task = (args.task or [2])[0]
-        ok = compute_shap_for(task, args.window, args.experiment, args.target, force=args.force)
-        if ok:
-            print(f"SHAP computed for task{task} W{args.window} {args.experiment} {args.target}")
-        else:
-            print(f"Failed or already exists for task{task} W{args.window} {args.experiment} {args.target}")
+        targets = ALL_TASKS.get(task, ALL_TASKS[2]) if args.target == "all" else [args.target]
+        total = 0
+        for target in targets:
+            ok = compute_shap_for(task, args.window, args.experiment, target, force=args.force)
+            if ok:
+                total += 1
+        print(f"Done. SHAP computed for {total}/{len(targets)} targets (task{task} W{args.window} {args.experiment}).")
 
 
 ALL_TASKS = {
