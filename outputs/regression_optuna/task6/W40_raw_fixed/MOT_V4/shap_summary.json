@@ -1,0 +1,23 @@
+{
+  "mean_abs_shap": {
+    "l3_T6W40": 0.0,
+    "lcc_T6W40": 0.0,
+    "lsc_T6W40": 0.0,
+    "atd_T6W40": 0.0,
+    "density_T6W40": 0.0,
+    "diameter_T6W40": 0.0,
+    "asp_T6W40": 0.0
+  },
+  "mean_shap": {
+    "l3_T6W40": 0.0,
+    "lcc_T6W40": 0.0,
+    "lsc_T6W40": 0.0,
+    "atd_T6W40": 0.0,
+    "density_T6W40": 0.0,
+    "diameter_T6W40": 0.0,
+    "asp_T6W40": 0.0
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 252,
+  "n_features": 7
+}
