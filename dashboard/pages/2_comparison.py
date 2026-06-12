@@ -237,6 +237,10 @@ with tab_scenario:
 
     sdf = pd.DataFrame(scenario_rows)
     is_mae = se_metric == "MAE"
+    if is_mae:
+        sdf = sdf.sort_values("mae_val_mean")
+    else:
+        sdf = sdf.sort_values("r2_val_mean", ascending=False)
 
     st.subheader(f"Scenario Comparison Table — {se_metric}")
     if is_mae:
