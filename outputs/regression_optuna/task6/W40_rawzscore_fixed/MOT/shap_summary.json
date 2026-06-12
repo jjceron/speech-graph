@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "lcc_T6W40": 0.9542710949735889,
+    "z_density_T6W40": 0.0
+  },
+  "mean_shap": {
+    "lcc_T6W40": -0.07018248473482779,
+    "z_density_T6W40": 0.0
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 252,
+  "n_features": 2
+}
