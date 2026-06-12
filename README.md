@@ -53,4 +53,4 @@ $$
 
 All results —cross-experiment comparisons, distributions, feature analysis, optimization, and SHAP analysis— are available on the live dashboard:
 
-➡️ **[speechgraph-dashboard.streamlit.app](https://speechgraph-dashboard.streamlit.app/)**
+➡️ **[SpeechGraph Dashboard](https://speechgraph-dashboard.streamlit.app/)**
