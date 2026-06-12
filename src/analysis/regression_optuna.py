@@ -1016,7 +1016,7 @@ def run_one_target(
 
     db_path = output_dir / f"optuna_trials_{experiment_name}.db"
     study = optuna.create_study(
-        sampler=optuna.samplers.TPESampler(seed=seed),
+        sampler=optuna.samplers.RandomSampler(seed=seed),
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=pruner_startup_trials,
             n_warmup_steps=pruner_warmup_steps,
