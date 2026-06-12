@@ -15,7 +15,6 @@ from utils.plots import (
     bar_r2_comparison,
     metric_comparison_chart,
     compute_subject_metrics,
-    plot_subject_metric,
     plot_target_vs_predicted,
     EXPERIMENT_LABELS,
 )
@@ -136,13 +135,8 @@ with tab_single:
         else:
             st.info("No VALIDATION data.")
 
-    # --- MAE / R² by subject (selectable set) ---
-    bt_set = st.selectbox("Set for metric chart", ["TEST", "VALIDATION"], key="bt_set")
+    bt_set = st.selectbox("Set", ["TEST", "VALIDATION"], key="bt_set")
     subject_df = compute_subject_metrics(preds, set_name=bt_set)
-    if len(subject_df) > 0:
-        fig_title = f"{bt_metric} by subject — {bt_set} — {scenario_label}"
-        fig_metric = plot_subject_metric(subject_df, metric=bt_metric, title=fig_title)
-        st.plotly_chart(fig_metric, use_container_width=True)
 
     # --- Subject-level data table ---
     with st.expander("Subject-level data table"):
