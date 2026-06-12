@@ -70,7 +70,7 @@ col_view, col_metric = st.columns(2)
 with col_view:
     view_mode = st.radio("View", ["Top 5", "All Results"], horizontal=True)
 with col_metric:
-    sort_metric = st.selectbox("Sort by", ["MAE", "R²"], index=0)
+    sort_metric = st.selectbox("Sort by", ["R²", "MAE"], index=0)
 
 if rows:
     df = pd.DataFrame(rows)
