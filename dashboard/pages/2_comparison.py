@@ -135,29 +135,9 @@ with tab_single:
         else:
             st.info("No VALIDATION data.")
 
-    bt_set = st.selectbox("Set", ["TEST", "VALIDATION"], key="bt_set")
-    subject_df = compute_subject_metrics(preds, set_name=bt_set)
-
-    # --- Subject-level data table ---
-    with st.expander("Subject-level data table"):
-        pcols = ["subject", "mae", "mae_std", "mae_lower", "mae_upper",
-                 "n_predictions", "y_true_mean", "y_pred_mean", "bias_mean", "r2"]
-        display = subject_df[pcols].copy()
-        display.columns = [
-            "Subject", "MAE", "MAE Std", "MAE Lower CI", "MAE Upper CI",
-            "N Splits", "y_true Mean", "y_pred Mean", "Bias Mean", "R²",
-        ]
-        for c in ["MAE", "MAE Std", "MAE Lower CI", "MAE Upper CI"]:
-            display[c] = display[c].round(4)
-        for c in ["y_true Mean", "y_pred Mean"]:
-            display[c] = display[c].round(3)
-        display["Bias Mean"] = display["Bias Mean"].round(4)
-        display["R²"] = display["R²"].round(4)
-        st.dataframe(display, use_container_width=True, hide_index=True)
-
     # --- Distribution: y_true across subjects + boxplot of individual values ---
-    sub_yt = preds[preds["set"] == bt_set]["y_true"]
-    subj_means = sub_yt.groupby(preds[preds["set"] == bt_set]["subject"]).mean()
+    sub_yt = preds["y_true"]
+    subj_means = sub_yt.groupby(preds["subject"]).mean()
     if len(sub_yt) > 0:
         col_hist, col_box = st.columns([3, 1])
         with col_hist:
@@ -167,7 +147,7 @@ with tab_single:
                 marker_color="#1f77b4", opacity=0.7, name="Subjects",
             ))
             fig_dist.update_layout(
-                title=f"Target distribution — {bt_set} — {scenario_label}",
+                title=f"Target distribution — {scenario_label}",
                 xaxis_title=f"{bt_target} mean per subject",
                 yaxis_title="Number of subjects",
                 template="plotly_white",
