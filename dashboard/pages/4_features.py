@@ -5,7 +5,7 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from utils.loader import list_completed, get_targets, load_rfe_ranking, load_selected_features, load_best_report
+from utils.loader import list_completed, get_windows, get_experiments, get_targets, load_rfe_ranking, load_selected_features, load_best_report
 from utils.plots import rfe_ranking_chart
 from utils.sidebar import render_sidebar
 
@@ -23,11 +23,9 @@ tab_rfe, tab_shap = st.tabs(["RFE", "SHAP Analysis"])
 with tab_rfe:
     col_w, col_e, col_t = st.columns(3)
     with col_w:
-        windows = sorted(set(w for w, _ in completed))
-        window = st.selectbox("Window", windows, index=0, key="feat_w")
+        window = st.selectbox("Window", get_windows(), index=0, key="feat_w")
     with col_e:
-        exps = [e for w, e in completed if w == window]
-        experiment = st.selectbox("Experiment", exps, index=0, key="feat_e")
+        experiment = st.selectbox("Experiment", [e for e in get_experiments() if get_targets(window=window, experiment=e)], index=0, key="feat_e")
     with col_t:
         target = st.selectbox("Target", get_targets(), index=0, key="feat_t")
 
@@ -80,11 +78,9 @@ with tab_rfe:
 with tab_shap:
     col_sw, col_se, col_st = st.columns(3)
     with col_sw:
-        shap_windows = sorted(set(w for w, _ in completed))
-        sw = st.selectbox("Window", shap_windows, index=0, key="shap_w")
+        sw = st.selectbox("Window", get_windows(), index=0, key="shap_w")
     with col_se:
-        shap_exps = [e for w, e in completed if w == sw]
-        se = st.selectbox("Experiment", shap_exps, index=0, key="shap_e")
+        se = st.selectbox("Experiment", [e for e in get_experiments() if get_targets(window=sw, experiment=e)], index=0, key="shap_e")
     with col_st:
         stg = st.selectbox("Target", get_targets(), index=0, key="shap_t")
 

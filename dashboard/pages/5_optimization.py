@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-from utils.loader import list_completed, get_targets, load_optuna_trials, load_best_report
+from utils.loader import list_completed, get_windows, get_experiments, get_targets, load_optuna_trials, load_best_report
 from utils.plots import optimization_history, model_selection_bar, optuna_parallel_coords
 from utils.sidebar import render_sidebar
 
@@ -16,11 +16,9 @@ if not completed:
 
 col_w, col_e, col_t = st.columns(3)
 with col_w:
-    windows = sorted(set(w for w, _ in completed))
-    window = st.selectbox("Window", windows, index=0, key="opt_w")
+    window = st.selectbox("Window", get_windows(), index=0, key="opt_w")
 with col_e:
-    exps = [e for w, e in completed if w == window]
-    experiment = st.selectbox("Experiment", exps, index=0, key="opt_e")
+    experiment = st.selectbox("Experiment", [e for e in get_experiments() if get_targets(window=window, experiment=e)], index=0, key="opt_e")
 with col_t:
     target = st.selectbox("Target", get_targets(), index=0, key="opt_t")
 
