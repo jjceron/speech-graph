@@ -133,10 +133,11 @@ def compute_shap_for(
     report_path = exp_dir / "best_trial_final_report.json"
     out_csv = exp_dir / "shap_values.csv"
     out_json = exp_dir / "shap_summary.json"
+    out_feat = exp_dir / "shap_feature_values.csv"
 
     if not report_path.exists():
         return False
-    if not force and out_csv.exists() and out_json.exists():
+    if not force and out_csv.exists() and out_json.exists() and out_feat.exists():
         return True
 
     with open(report_path) as f:
@@ -195,6 +196,10 @@ def compute_shap_for(
     shap_df["y_pred"] = pipeline.predict(X)
     shap_df.index.name = "subject"
     shap_df.to_csv(out_csv)
+
+    feat_df = X_transformed_df.copy()
+    feat_df.index.name = "subject"
+    feat_df.to_csv(out_feat)
 
     summary = {
         "mean_abs_shap": {f: float(np.abs(shap_values[:, i]).mean()) for i, f in enumerate(available)},

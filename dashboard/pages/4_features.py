@@ -112,8 +112,8 @@ with tab_shap:
     for col in shap_val_cols:
         vals = shap_df[col].values
         mean_v = float(vals.mean())
-        lo = float(np.percentile(vals, 2.5))
-        hi = float(np.percentile(vals, 97.5))
+        lo = float(np.percentile(vals, 25))
+        hi = float(np.percentile(vals, 75))
         feat_data.append((col, mean_v, lo, hi))
 
     feat_data.sort(key=lambda x: abs(x[1]), reverse=True)
@@ -145,7 +145,7 @@ with tab_shap:
         ),
     ))
     fig.update_layout(
-        title="SHAP Feature Importance (95% CI)",
+        title="SHAP Feature Importance (IQR whiskers)",
         xaxis_title="Mean SHAP contribution (→ higher prediction)",
         template="plotly_white",
         height=max(300, len(feat_names) * 35),
@@ -156,6 +156,45 @@ with tab_shap:
         }],
     )
     st.plotly_chart(fig, use_container_width=True)
+
+    # --- Beeswarm ---
+    feat_values_path = shap_dir / "shap_feature_values.csv"
+    if feat_values_path.exists():
+        feat_vals_df = pd.read_csv(feat_values_path)
+        bf = go.Figure()
+        nf = len(feat_names)
+        rng = np.random.RandomState(42)
+        for i, feat in enumerate(feat_names):
+            sv = shap_df[feat].values
+            fv = feat_vals_df[feat].values
+            yj = rng.uniform(-0.2, 0.2, len(sv))
+            bf.add_trace(go.Scatter(
+                x=sv,
+                y=[nf - 1 - i + y for y in yj],
+                mode="markers",
+                marker=dict(
+                    size=4, color=fv,
+                    colorscale="RdYlBu_r",
+                    showscale=i == 0,
+                    colorbar=dict(title="Feature<br>value", len=0.8) if i == 0 else None,
+                ),
+                name=feat,
+                hovertemplate=f"<b>{feat}</b><br>SHAP: %{{x:.4f}}<br>Value: %{{marker.color:.4f}}<extra></extra>",
+            ))
+        bf.update_layout(
+            title="SHAP value distribution by subject",
+            xaxis_title="SHAP value (→ higher prediction)",
+            yaxis=dict(tickvals=list(range(nf)), ticktext=feat_names[::-1]),
+            template="plotly_white",
+            height=max(300, nf * 50),
+            showlegend=False,
+            shapes=[{
+                "type": "line", "x0": 0, "y0": -0.5,
+                "x1": 0, "y1": nf - 0.5,
+                "line": {"color": "gray", "width": 1, "dash": "dot"},
+            }],
+        )
+        st.plotly_chart(bf, use_container_width=True)
 
     display_df = shap_df[["subject"] + shap_val_cols + ["y_true", "y_pred"]].copy()
     for col in shap_val_cols:
