@@ -115,6 +115,23 @@ with tab_single:
 
     scenario_label = f"W{bt_window} {bt_exp}  {bt_target}"
 
+    report_single = load_best_report(bt_window, bt_exp, bt_target)
+    if report_single:
+        bp = report_single.get("best_params", {})
+        feat = report_single.get("selected_features", [])
+        vs = report_single.get("validation_summary", {})
+        ts = report_single.get("test_summary", {})
+        is_mae = bt_metric == "MAE"
+        if is_mae:
+            mlab = "MAE"
+            t_v = f"{ts.get('mae_mean_test',0):.4f} [{ts.get('mae_ci_lower_test',0):.4f}, {ts.get('mae_ci_upper_test',0):.4f}]"
+            v_v = f"{vs.get('mae_mean_val',0):.4f} [{vs.get('mae_ci_lower_val',0):.4f}, {vs.get('mae_ci_upper_val',0):.4f}]"
+        else:
+            mlab = "R²"
+            t_v = f"{ts.get('r2_mean_test',0):.4f} [{ts.get('r2_ci_lower_test',0):.4f}, {ts.get('r2_ci_upper_test',0):.4f}]"
+            v_v = f"{vs.get('r2_mean_val',0):.4f} [{vs.get('r2_ci_lower_val',0):.4f}, {vs.get('r2_ci_upper_val',0):.4f}]"
+        st.info(f"**Model:** {bp.get('regressor','?')} | **Features:** {len(feat)} | **{mlab} test:** {t_v} | **{mlab} val:** {v_v}")
+
     # --- Target vs Predicted — Test | Validation (side by side) ---
     col_test, col_val = st.columns(2)
     with col_test:
