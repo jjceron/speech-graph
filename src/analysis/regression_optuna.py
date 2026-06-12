@@ -103,6 +103,7 @@ FAST_REGRESSORS = [
     "ExtraTreesRegressor",
     "KNeighborsRegressor",
     "DecisionTreeRegressor",
+    "XGBRegressor",
 ]
 
 
