@@ -783,6 +783,7 @@ def plot_target_vs_predicted(
     subject_df: pd.DataFrame,
     set_name: str = "TEST",
     scenario_label: str = "",
+    marker_color: str = "#1f77b4",
 ) -> go.Figure:
     df = subject_df.copy()
 
@@ -796,7 +797,7 @@ def plot_target_vs_predicted(
     fig.add_trace(go.Scatter(
         x=df["y_pred_mean"], y=df["y_true_mean"],
         mode="markers",
-        marker=dict(size=8, color="#1f77b4"),
+        marker=dict(size=8, color=marker_color),
         name="Subjects",
         error_x=dict(
             type="data", symmetric=False,

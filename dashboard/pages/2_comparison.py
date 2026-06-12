@@ -131,6 +131,7 @@ with tab_single:
         if len(sd_val) > 0:
             fig_val = plot_target_vs_predicted(
                 sd_val, set_name="Validation", scenario_label=scenario_label,
+                marker_color="#ff7f0e",
             )
             st.plotly_chart(fig_val, use_container_width=True)
         else:
@@ -140,71 +141,68 @@ with tab_single:
     sub_yt = preds["y_true"]
     subj_means = sub_yt.groupby(preds["subject"]).mean()
     if len(sub_yt) > 0:
-        col_hist, col_box = st.columns([3, 1])
-        with col_hist:
-            subj_list = sorted(subj_means.index)
-            _init_counts = Counter(s.split("-")[-1] for s in subj_list)
-            _display_map = {}
-            for s in subj_list:
-                ini = s.split("-")[-1]
-                if _init_counts[ini] > 1:
-                    _display_map[s] = f"{ini} ({s.split('-')[2]})"
-                else:
-                    _display_map[s] = ini
+        subj_list = sorted(subj_means.index)
+        _init_counts = Counter(s.split("-")[-1] for s in subj_list)
+        _display_map = {}
+        for s in subj_list:
+            ini = s.split("-")[-1]
+            if _init_counts[ini] > 1:
+                _display_map[s] = f"{ini} ({s.split('-')[2]})"
+            else:
+                _display_map[s] = ini
 
-            default_subj = subj_list[0]
-            highlight_subj = st.session_state.get("comp_highlight_subj", default_subj)
-            subj_val = float(subj_means[highlight_subj])
+        default_subj = subj_list[0]
+        highlight_subj = st.session_state.get("comp_highlight_subj", default_subj)
+        subj_val = float(subj_means[highlight_subj])
 
-            fig_dist = go.Figure()
-            fig_dist.add_trace(go.Histogram(
-                x=subj_means.values, nbinsx=40,
-                marker_color="#1f77b4", opacity=0.7, name="Subjects",
-            ))
+        # --- Horizontal boxplot (above) ---
+        fig_box = go.Figure()
+        fig_box.add_trace(go.Box(
+            x=sub_yt.values, orientation="h",
+            name=bt_target, boxmean="sd",
+            marker_color="#9467bd",
+        ))
+        fig_box.update_layout(
+            title=f"{bt_target} variance",
+            template="plotly_white",
+            height=300,
+        )
+        st.plotly_chart(fig_box, use_container_width=True)
 
-            overall_mean = float(subj_means.mean())
-            fig_dist.add_vline(
-                x=overall_mean, line_dash="dash", line_color="red", line_width=2,
-                annotation_text=f"Mean = {overall_mean:.2f}",
-                annotation_position="top right",
-            )
+        # --- Histogram (below) ---
+        fig_dist = go.Figure()
+        fig_dist.add_trace(go.Histogram(
+            x=subj_means.values, nbinsx=20,
+            marker_color="#1f77b4", opacity=0.7, name="Subjects",
+        ))
 
-            fig_dist.add_vline(
-                x=subj_val, line_dash="dash", line_color="green", line_width=2,
-                annotation_text=highlight_subj.split("-")[-1][:8],
-                annotation_position="top left",
-            )
+        overall_mean = float(subj_means.mean())
+        fig_dist.add_vline(
+            x=overall_mean, line_dash="dash", line_color="red", line_width=2,
+            annotation_text=f"Mean = {overall_mean:.2f}",
+            annotation_position="top right",
+        )
+        fig_dist.add_vline(
+            x=subj_val, line_dash="dash", line_color="green", line_width=2,
+            annotation_text=highlight_subj.split("-")[-1][:8],
+            annotation_position="top left",
+        )
 
-            fig_dist.update_layout(
-                title="Target Variable Distribution by Subject",
-                xaxis_title=f"{bt_target} mean per subject",
-                yaxis_title="Number of subjects",
-                template="plotly_white",
-                height=450, bargap=0.05,
-            )
-            st.plotly_chart(fig_dist, use_container_width=True)
-            st.selectbox(
-                "Highlight subject",
-                options=subj_list,
-                format_func=lambda s: _display_map.get(s, s.split("-")[-1]),
-                key="comp_highlight_subj",
-            )
-        with col_box:
-            fig_box = go.Figure()
-            fig_box.add_trace(go.Box(
-                y=sub_yt.values,
-                name=bt_target,
-                boxmean="sd",
-                marker_color="#1f77b4",
-            ))
-            fig_box.update_layout(
-                title=f"{bt_target} variance",
-                yaxis_title="y_true",
-                template="plotly_white",
-                height=450,
-                showlegend=False,
-            )
-            st.plotly_chart(fig_box, use_container_width=True)
+        fig_dist.update_layout(
+            title="Target Variable Distribution by Subject",
+            xaxis_title=f"{bt_target} score",
+            yaxis_title="Number of subjects",
+            template="plotly_white",
+            height=350, bargap=0.05,
+        )
+        st.plotly_chart(fig_dist, use_container_width=True)
+
+        st.selectbox(
+            "Highlight subject",
+            options=subj_list,
+            format_func=lambda s: _display_map.get(s, s.split("-")[-1]),
+            key="comp_highlight_subj",
+        )
 
 with tab_scenario:
     if not completed:
