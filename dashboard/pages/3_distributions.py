@@ -3,7 +3,12 @@ import numpy as np
 import plotly.graph_objects as go
 from utils.loader import list_completed, get_targets, get_experiments, get_windows, load_best_report
 from utils.loader import load_test_iterations, load_val_iterations, load_predictions
-from utils.plots import scatter_obs_vs_pred, scatter_r2_val_vs_test, hist_metric, residual_plot, target_distribution_plot
+from utils.plots import (
+    scatter_obs_vs_pred, scatter_target_vs_pred_raw,
+    scatter_r2_val_vs_test, hist_metric, residual_plot,
+    target_distribution_plot, compute_subject_metrics,
+    plot_target_vs_predicted,
+)
 from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Distributions", page_icon="📈", layout="wide")
@@ -113,13 +118,31 @@ with tab2:
 
 with tab3:
     if pred_df is not None and len(pred_df) > 0:
-        set_choice = st.selectbox("Set", ["TEST", "VAL"], index=0)
+        set_options = sorted(pred_df["set"].dropna().unique())
+        default_idx = set_options.index("TEST") if "TEST" in set_options else 0
+        set_choice = st.selectbox("Set", set_options, index=default_idx)
+
         subset = pred_df[pred_df["set"] == set_choice]
-        if len(subset) > 0:
-            fig = scatter_obs_vs_pred(subset, set_name=set_choice)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
+        n_pred_unique = subset["y_pred"].nunique()
+        if n_pred_unique == 1:
+            const_val = float(subset["y_pred"].iloc[0])
+            st.warning(
+                f"Predictions are constant ({const_val:.4f}) for this configuration. "
+                "Correlation is not computable and the model may be collapsing to the "
+                "mean/median target."
+            )
+
+        subject_df = compute_subject_metrics(pred_df, set_name=set_choice)
+        if len(subject_df) == 0:
             st.info(f"No {set_choice} predictions available.")
+        else:
+            scenario_label = f"W{window} {experiment}  {target}"
+
+            fig_scatter = plot_target_vs_predicted(
+                subject_df, set_name=set_choice,
+                scenario_label=scenario_label,
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
     else:
         st.info("No predictions data available.")
 
