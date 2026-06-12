@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from collections import Counter
 from utils.loader import (
     list_completed,
     load_best_report,
@@ -141,13 +142,47 @@ with tab_single:
     if len(sub_yt) > 0:
         col_hist, col_box = st.columns([3, 1])
         with col_hist:
+            st.subheader("Target Variable Distribution by Subject")
+
+            subj_list = sorted(subj_means.index)
+            _init_counts = Counter(s.split("-")[-1] for s in subj_list)
+            _display_map = {}
+            for s in subj_list:
+                ini = s.split("-")[-1]
+                if _init_counts[ini] > 1:
+                    _display_map[s] = f"{ini} ({s.split('-')[2]})"
+                else:
+                    _display_map[s] = ini
+
+            highlight_subj = st.selectbox(
+                "Highlight subject",
+                options=subj_list,
+                format_func=lambda s: _display_map.get(s, s.split("-")[-1]),
+                key="comp_highlight_subj",
+            )
+            subj_id = highlight_subj
+            subj_val = float(subj_means[subj_id])
+
             fig_dist = go.Figure()
             fig_dist.add_trace(go.Histogram(
                 x=subj_means.values, nbinsx=40,
                 marker_color="#1f77b4", opacity=0.7, name="Subjects",
             ))
+
+            overall_mean = float(subj_means.mean())
+            fig_dist.add_vline(
+                x=overall_mean, line_dash="dash", line_color="red", line_width=2,
+                annotation_text=f"Mean = {overall_mean:.2f}",
+                annotation_position="top right",
+            )
+
+            fig_dist.add_vline(
+                x=subj_val, line_dash="dash", line_color="green", line_width=2,
+                annotation_text=subj_id.split("-")[-1][:8],
+                annotation_position="top left",
+            )
+
             fig_dist.update_layout(
-                title=f"Target distribution — {scenario_label}",
                 xaxis_title=f"{bt_target} mean per subject",
                 yaxis_title="Number of subjects",
                 template="plotly_white",
@@ -155,6 +190,7 @@ with tab_single:
             )
             st.plotly_chart(fig_dist, use_container_width=True)
         with col_box:
+            st.subheader(f"{bt_target} variance")
             fig_box = go.Figure()
             fig_box.add_trace(go.Box(
                 y=sub_yt.values,
@@ -163,10 +199,9 @@ with tab_single:
                 marker_color="#1f77b4",
             ))
             fig_box.update_layout(
-                title=f"{bt_target} variance",
                 yaxis_title="y_true",
                 template="plotly_white",
-                height=350,
+                height=430,
                 showlegend=False,
             )
             st.plotly_chart(fig_box, use_container_width=True)
