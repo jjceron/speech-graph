@@ -33,25 +33,18 @@ with tab_rfe:
 
     st.subheader(f"W{window} — {experiment} — {target}")
 
-    col1, col2 = st.columns(2)
+    ranking = load_rfe_ranking(window, experiment, target)
+    if ranking is not None:
+        fig = rfe_ranking_chart(ranking)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No RFE ranking data.")
 
-    with col1:
-        ranking = load_rfe_ranking(window, experiment, target)
-        if ranking is not None:
-            fig = rfe_ranking_chart(ranking)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No RFE ranking data.")
-
-    with col2:
-        report = load_best_report(window, experiment, target)
-        if report:
-            feat = report.get("selected_features", [])
-            bp = report.get("best_params", {})
-            st.subheader("Selected Features")
-            st.write(f"**{len(feat)}** features selected by RFE")
-            st.write(f"Model: **{bp.get('regressor', '?')}**")
-            st.dataframe(pd.DataFrame({"Feature": feat}), use_container_width=True, hide_index=True)
+    report = load_best_report(window, experiment, target)
+    if report:
+        feat = report.get("selected_features", [])
+        bp = report.get("best_params", {})
+        st.info(f"**Model:** {bp.get('regressor', '?')}, **{len(feat)}** features selected by RFE")
 
     st.markdown("---")
     st.subheader(f"Feature Comparison Across Experiments — Target: {target}")

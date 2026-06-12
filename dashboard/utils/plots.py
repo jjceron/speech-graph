@@ -221,26 +221,34 @@ def scatter_r2_val_vs_test(r2_val: np.ndarray, r2_test: np.ndarray) -> go.Figure
 
 
 def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
-    df = df.sort_values("ranking")
-    colors = ["#2ca02c" if s else "#d62728" for s in df["selected"]]
+    df = df.copy()
+    df["feature"] = df["feature"].str.replace(r"_[A-Z]\d+[A-Z]\w+$", "", regex=True)
+
+    df["_sort"] = (~df["selected"]).astype(int)
+    df = df.sort_values(["_sort", "ranking", "feature"])
+
+    colors = ["#2ca02c" if s else "#aaaaaa" for s in df["selected"]]
+    n_sel = df["selected"].sum()
+    max_name_len = df["feature"].str.len().max()
+
     fig = go.Figure()
-    fig.add_trace(
-        go.Bar(
-            x=df["ranking"],
-            y=df["feature"],
-            orientation="h",
-            marker_color=colors,
-            text=df["ranking"],
-            textposition="outside",
-        )
-    )
+    fig.add_trace(go.Bar(
+        x=df["ranking"], y=df["feature"],
+        orientation="h", marker_color=colors,
+        text=df["ranking"], textposition="outside",
+    ))
     fig.update_layout(
         title="RFE Feature Ranking (1 = best)",
         xaxis_title="Ranking",
         yaxis_title="Feature",
         template="plotly_white",
         height=max(300, 25 * len(df)),
-        margin=dict(l=200),
+        margin=dict(l=max(100, 9 * max_name_len + 10)),
+        shapes=[{
+            "type": "line", "x0": 0.5, "y0": n_sel - 0.5,
+            "x1": df["ranking"].max() + 1, "y1": n_sel - 0.5,
+            "line": {"color": "gray", "width": 1, "dash": "dot"},
+        }] if n_sel < len(df) else [],
     )
     return fig
 
