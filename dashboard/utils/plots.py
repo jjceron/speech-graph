@@ -339,10 +339,11 @@ def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
     )
 
     fig.update_xaxes(range=x_range, autorange=False)
+    fig.update_yaxes(tickformat=".0%")
     fig.update_layout(
         title="Trials Achieving Threshold (ECDF per Regressor)",
         xaxis_title="Objective (MAE val) — worse → better",
-        yaxis_title="Fraction of trials ≤ threshold",
+        yaxis_title="Trials ≤ threshold (%)",
         template="plotly_white", height=450,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
