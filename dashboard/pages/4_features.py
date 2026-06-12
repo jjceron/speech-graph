@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import numpy as np
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -104,33 +105,58 @@ with tab_shap:
     st.subheader(f"SHAP Feature Importance — W{sw} {se} — {stg}")
     st.caption(f"Model: **{summary['regressor']}** | Subjects: {summary['n_subjects']} | Features: {summary['n_features']}")
 
-    mas = summary["mean_abs_shap"]
-    if not mas or all(v == 0.0 for v in mas.values()):
+    shap_df = pd.read_csv(shap_values_path)
+    shap_val_cols = [c for c in shap_df.columns if c not in ("subject", "y_true", "y_pred")]
+
+    feat_data = []
+    for col in shap_val_cols:
+        vals = shap_df[col].values
+        mean_v = float(vals.mean())
+        lo = float(np.percentile(vals, 2.5))
+        hi = float(np.percentile(vals, 97.5))
+        feat_data.append((col, mean_v, lo, hi))
+
+    feat_data.sort(key=lambda x: abs(x[1]), reverse=True)
+
+    all_zero = all(abs(x[1]) < 1e-12 for x in feat_data)
+    if all_zero:
         st.warning("All SHAP values are zero — the model collapsed to constant prediction (degenerate).")
         st.stop()
 
-    mas_sorted = sorted(mas.items(), key=lambda x: x[1], reverse=True)
-    feat_names = [x[0] for x in mas_sorted]
-    feat_vals = [x[1] for x in mas_sorted]
+    feat_names = [x[0] for x in feat_data]
+    means = [x[1] for x in feat_data]
+    err_lo = [x[1] - x[2] for x in feat_data]
+    err_hi = [x[3] - x[1] for x in feat_data]
+    colors = ["#d62728" if m < 0 else "#2ca02c" for m in means]
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=feat_vals[::-1],
+        x=means[::-1],
         y=feat_names[::-1],
         orientation="h",
-        marker_color="#2ca02c",
+        marker_color=colors[::-1],
+        error_x=dict(
+            type="data",
+            symmetric=False,
+            array=[err_hi[i] for i in reversed(range(len(err_hi)))],
+            arrayminus=[err_lo[i] for i in reversed(range(len(err_lo)))],
+            thickness=1.5,
+            width=0.3,
+        ),
     ))
     fig.update_layout(
-        title="Mean |SHAP| per feature",
-        xaxis_title="mean |SHAP|",
-        yaxis_title="Feature",
+        title="SHAP Feature Importance (95% CI)",
+        xaxis_title="Mean SHAP contribution (→ higher prediction)",
         template="plotly_white",
-        height=max(300, len(feat_names) * 30),
+        height=max(300, len(feat_names) * 35),
+        shapes=[{
+            "type": "line", "x0": 0, "y0": -0.5,
+            "x1": 0, "y1": len(feat_names) - 0.5,
+            "line": {"color": "gray", "width": 1, "dash": "dot"},
+        }],
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    shap_df = pd.read_csv(shap_values_path)
-    shap_val_cols = [c for c in shap_df.columns if c not in ("subject", "y_true", "y_pred")]
     display_df = shap_df[["subject"] + shap_val_cols + ["y_true", "y_pred"]].copy()
     for col in shap_val_cols:
         display_df[col] = display_df[col].map(lambda x: f"{x:.4f}")
