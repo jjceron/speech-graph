@@ -86,7 +86,7 @@ for label, col_name, val_color, test_color in [
             title=f"{label} — Val vs Test",
             barmode="overlay",
             template="plotly_white",
-            height=300,
+            height=450,
         )
         if col_name == "r2":
             fig.add_vline(x=0, line_dash="dot", line_color="gray", opacity=0.4)
