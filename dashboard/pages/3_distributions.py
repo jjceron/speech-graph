@@ -41,7 +41,7 @@ if report:
         f"**R² test:** {ts['r2_mean_test']:.4f} [{ts['r2_ci_lower_test']:.4f}, {ts['r2_ci_upper_test']:.4f}]"
     )
 
-st.subheader("Test vs Validation over MC Iterations")
+st.subheader("Stability across MC Cross-Validation Splits")
 
 for label, col_name, val_color, test_color in [
         ("MAE", "mae", "#ff7f0e", "#2ca02c"),
