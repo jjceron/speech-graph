@@ -166,6 +166,7 @@ with tab_single:
             title=f"{bt_target} variance",
             template="plotly_white",
             height=300,
+            margin=dict(t=30, b=10),
         )
         st.plotly_chart(fig_box, use_container_width=True)
 
@@ -193,7 +194,7 @@ with tab_single:
             xaxis_title=f"{bt_target} score",
             yaxis_title="Number of subjects",
             template="plotly_white",
-            height=380, bargap=0.05,
+            height=380, bargap=0.05, margin=dict(t=10, b=30),
         )
         st.plotly_chart(fig_dist, use_container_width=True)
 
