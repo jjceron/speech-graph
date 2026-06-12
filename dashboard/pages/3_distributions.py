@@ -16,11 +16,9 @@ if not completed:
 
 col_w, col_e, col_t = st.columns(3)
 with col_w:
-    windows = sorted(set(w for w, _ in completed))
-    window = st.selectbox("Window", windows, index=0)
+    window = st.selectbox("Window", get_windows(), index=0)
 with col_e:
-    exps = [e for w, e in completed if w == window]
-    experiment = st.selectbox("Experiment", exps, index=0)
+    experiment = st.selectbox("Experiment", [e for e in get_experiments() if get_targets(window=window, experiment=e)], index=0)
 with col_t:
     target = st.selectbox("Target", get_targets(), index=0)
 

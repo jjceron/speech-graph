@@ -87,18 +87,14 @@ with tab_all:
     st.plotly_chart(fig_r2_val, use_container_width=True)
 
 with tab_single:
-    avail_windows = sorted(set(w for w, _ in completed))
-    avail_experiments = sorted(set(e for _, e in completed))
-    avail_targets = get_targets()
-
     col_metric, col_win, col_exp, col_tgt = st.columns(4)
     with col_metric:
         bt_metric = st.selectbox("Metric", ["MAE", "R²"], index=0, key="bt_metric")
     with col_win:
-        bt_window = st.selectbox("Window", avail_windows, key="bt_window")
+        bt_window = st.selectbox("Window", get_windows(), key="bt_window")
     with col_exp:
         bt_exp = st.selectbox(
-            "Experiment", avail_experiments,
+            "Experiment", [e for e in get_experiments() if get_targets(window=bt_window, experiment=e)],
             format_func=lambda x: EXPERIMENT_LABELS.get(x, x),
             key="bt_exp",
         )
@@ -233,7 +229,7 @@ with tab_scenario:
         avail_targets = get_targets()
         scenario_target = st.selectbox("Target", avail_targets, index=0, key="scenario_t")
     with col_s2:
-        avail_exps = sorted(set(e for _, e in completed))
+        avail_exps = get_experiments()
         selected_exps = st.multiselect(
             "Experiments",
             options=avail_exps,
@@ -241,7 +237,7 @@ with tab_scenario:
             format_func=lambda x: EXPERIMENT_LABELS.get(x, x),
         )
     with col_s3:
-        avail_wins = sorted(set(w for w, _ in completed), key=int)
+        avail_wins = get_windows()
         selected_wins = st.multiselect(
             "Windows",
             options=avail_wins,
