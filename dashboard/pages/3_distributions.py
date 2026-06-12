@@ -77,10 +77,21 @@ for label, col_name, val_color, test_color in [
         t_lo = float(np.percentile(t, 2.5))
         t_hi = float(np.percentile(t, 97.5))
 
-        fig.add_vline(x=t_mean, line_dash="dash", line_color="red", line_width=2,
-                       annotation_text=f"μ={t_mean:.4f}")
-        fig.add_vline(x=t_lo, line_dash="dot", line_color="red", line_width=1, opacity=0.4)
-        fig.add_vline(x=t_hi, line_dash="dot", line_color="red", line_width=1, opacity=0.4)
+        fig.add_vline(x=t_mean, line_dash="dash", line_color=test_color, line_width=2,
+                       annotation_text=f"μ<sub>t</sub>={t_mean:.4f}",
+                       annotation_position="top right")
+        fig.add_vline(x=t_lo, line_dash="dot", line_color=test_color, line_width=1, opacity=0.4)
+        fig.add_vline(x=t_hi, line_dash="dot", line_color=test_color, line_width=1, opacity=0.4)
+
+        if len(v) > 0:
+            v_mean = float(v.mean())
+            v_lo = float(np.percentile(v, 2.5))
+            v_hi = float(np.percentile(v, 97.5))
+            fig.add_vline(x=v_mean, line_dash="dash", line_color=val_color, line_width=2,
+                           annotation_text=f"μ<sub>v</sub>={v_mean:.4f}",
+                           annotation_position="top left")
+            fig.add_vline(x=v_lo, line_dash="dot", line_color=val_color, line_width=1, opacity=0.4)
+            fig.add_vline(x=v_hi, line_dash="dot", line_color=val_color, line_width=1, opacity=0.4)
 
         fig.update_layout(
             title=f"{label} — Val vs Test",
