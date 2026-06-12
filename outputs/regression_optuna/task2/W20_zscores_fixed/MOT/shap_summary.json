@@ -1,0 +1,15 @@
+{
+  "mean_abs_shap": {
+    "z_pe_T2W20": 0.8695641039416626,
+    "z_density_T2W20": 1.8779220268463075,
+    "z_asp_T2W20": 1.9096418857049076
+  },
+  "mean_shap": {
+    "z_pe_T2W20": -0.04544426522008678,
+    "z_density_T2W20": -0.06403218347332586,
+    "z_asp_T2W20": 0.08645133925463878
+  },
+  "regressor": "LinearRegression",
+  "n_subjects": 237,
+  "n_features": 3
+}

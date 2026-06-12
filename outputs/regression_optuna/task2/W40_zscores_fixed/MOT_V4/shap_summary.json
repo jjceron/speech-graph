@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "z_re_T2W40": 0.5959103840682789,
+    "z_l2_T2W40": 0.39434566145092464
+  },
+  "mean_shap": {
+    "z_re_T2W40": -0.04087956377430127,
+    "z_l2_T2W40": 0.005990990990990681
+  },
+  "regressor": "KNeighborsRegressor",
+  "n_subjects": 222,
+  "n_features": 2
+}

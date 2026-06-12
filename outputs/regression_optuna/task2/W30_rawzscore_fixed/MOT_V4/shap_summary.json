@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "l3_T2W30": 0.12822872681383446,
+    "z_pe_T2W30": 0.4024272773878397
+  },
+  "mean_shap": {
+    "l3_T2W30": -0.004108988469816749,
+    "z_pe_T2W30": 0.02339580643563399
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 230,
+  "n_features": 2
+}

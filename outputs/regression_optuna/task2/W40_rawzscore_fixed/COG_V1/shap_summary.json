@@ -1,0 +1,15 @@
+{
+  "mean_abs_shap": {
+    "nodes_T2W40": 0.0,
+    "edges_T2W40": 0.11585830733068664,
+    "l2_T2W40": 0.0
+  },
+  "mean_shap": {
+    "nodes_T2W40": 0.0,
+    "edges_T2W40": 0.01710993469583212,
+    "l2_T2W40": 0.0
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 222,
+  "n_features": 3
+}
