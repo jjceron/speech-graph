@@ -7,7 +7,7 @@ from utils.sidebar import render_sidebar
 
 st.set_page_config(page_title="Distributions", page_icon="📈", layout="wide")
 render_sidebar()
-st.title("📈 Split Distributions")
+st.title("📈 Distributions")
 
 completed = list_completed()
 if not completed:
@@ -41,7 +41,7 @@ if report:
         f"**R² test:** {ts['r2_mean_test']:.4f} [{ts['r2_ci_lower_test']:.4f}, {ts['r2_ci_upper_test']:.4f}]"
     )
 
-st.subheader("Test/Val Distributions")
+st.subheader("Test vs Validation over MC Iterations")
 
 for label, col_name, val_color, test_color in [
         ("MAE", "mae", "#ff7f0e", "#2ca02c"),
