@@ -193,7 +193,7 @@ with tab_single:
             xaxis_title=f"{bt_target} score",
             yaxis_title="Number of subjects",
             template="plotly_white",
-            height=350, bargap=0.05,
+            height=380, bargap=0.05,
         )
         st.plotly_chart(fig_dist, use_container_width=True)
 
