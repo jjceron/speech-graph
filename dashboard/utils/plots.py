@@ -792,6 +792,7 @@ def plot_target_vs_predicted(
     set_name: str = "TEST",
     scenario_label: str = "",
     marker_color: str = "#1f77b4",
+    metric: str = "MAE",
 ) -> go.Figure:
     df = subject_df.copy()
 
@@ -800,12 +801,24 @@ def plot_target_vs_predicted(
     margin = (hi - lo) * 0.05 if hi > lo else 1
     lims = [lo - margin, hi + margin]
 
+    is_mae = metric == "MAE"
+    color_col = "mae" if is_mae else "r2"
+    metric_label = "MAE" if is_mae else "R²"
+    colorscale = "RdYlGn_r" if is_mae else "RdYlBu"
+    hover_line = f"{metric_label}: %{{customdata[4]:.4f}}" if is_mae else f"{metric_label}: %{{customdata[5]:.4f}}"
+
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
         x=df["y_pred_mean"], y=df["y_true_mean"],
         mode="markers",
-        marker=dict(size=8, color=marker_color),
+        marker=dict(
+            size=8,
+            color=df[color_col],
+            colorscale=colorscale,
+            showscale=True,
+            colorbar=dict(title=metric_label),
+        ),
         name="Subjects",
         error_x=dict(
             type="data", symmetric=False,
@@ -814,12 +827,12 @@ def plot_target_vs_predicted(
             visible=True, thickness=1.5, width=5,
         ),
         customdata=df[["subject", "y_pred_lower", "y_pred_upper",
-                        "n_predictions", "mae"]],
+                        "n_predictions", "mae", "r2"]],
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Predicted: %{x:.3f} [%{customdata[1]:.3f}, %{customdata[2]:.3f}]<br>"
             "Observed: %{y:.3f}<br>"
-            "MAE: %{customdata[4]:.4f}<br>"
+            + hover_line + "<br>"
             "N test predictions: %{customdata[3]}<extra></extra>"
         ),
     ))
