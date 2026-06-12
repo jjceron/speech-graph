@@ -1,0 +1,14 @@
+feature,selected,ranking
+l3_T6W50,True,1
+pe_T6W50,True,1
+re_T6W50,True,1
+atd_T6W50,False,2
+lsc_T6W50,False,2
+l2_T6W50,False,3
+nodes_T6W50,False,3
+asp_T6W50,False,4
+density_T6W50,False,4
+diameter_T6W50,False,5
+lcc_T6W50,False,5
+edges_T6W50,False,6
+l1_T6W50,False,6
