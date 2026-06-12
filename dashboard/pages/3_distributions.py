@@ -5,7 +5,7 @@ from utils.loader import list_completed, get_targets, get_experiments, get_windo
 from utils.loader import load_test_iterations, load_val_iterations, load_predictions
 from utils.plots import (
     scatter_obs_vs_pred, scatter_target_vs_pred_raw,
-    scatter_r2_val_vs_test, hist_metric, residual_plot,
+    scatter_r2_val_vs_test, residual_plot,
     target_distribution_plot, compute_subject_metrics,
     plot_target_vs_predicted,
 )
@@ -42,34 +42,61 @@ report = load_best_report(window, experiment, target)
 if report:
     bp = report.get("best_params", {})
     feat = report.get("selected_features", [])
+    ts = report["test_summary"]
     st.info(
         f"**Best model:** {bp.get('regressor', '?')} | "
         f"**Features:** {bp.get('rfe_n_features', '?')} selected | "
-        f"**R² test:** {report['test_summary']['r2_mean_test']:.4f} [{report['test_summary']['r2_ci_lower_test']:.4f}, {report['test_summary']['r2_ci_upper_test']:.4f}]"
+        f"**MAE test:** {ts['mae_mean_test']:.4f} [{ts['mae_ci_lower_test']:.4f}, {ts['mae_ci_upper_test']:.4f}] | "
+        f"**R² test:** {ts['r2_mean_test']:.4f} [{ts['r2_ci_lower_test']:.4f}, {ts['r2_ci_upper_test']:.4f}]"
     )
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Test Distributions", "Val vs Test", "Obs vs Pred", "Residuals", "Target Distribution"])
 
 with tab1:
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        r2 = test_df["r2"].dropna().values
-        fig = hist_metric(r2, "R²", "#1f77b4")
+    for label, col_name, color in [
+        ("MAE", "mae", "#2ca02c"),
+        ("R²", "r2", "#1f77b4"),
+        ("ρ (Spearman)", "rho", "#9467bd"),
+    ]:
+        v = val_df[col_name].dropna().values if val_df is not None else np.array([])
+        t = test_df[col_name].dropna().values
+        if col_name == "rho":
+            v = v[np.isfinite(v)]
+            t = t[np.isfinite(t)]
+
+        fig = go.Figure()
+        if len(v) > 0:
+            fig.add_trace(go.Histogram(
+                x=v, nbinsx=30,
+                name=f"Val (μ={v.mean():.4f})",
+                marker_color=color, opacity=0.5,
+            ))
+        if len(t) > 0:
+            fig.add_trace(go.Histogram(
+                x=t, nbinsx=30,
+                name=f"Test (μ={t.mean():.4f})",
+                marker_color=color, opacity=0.5,
+            ))
+
+        t_mean = float(t.mean())
+        t_lo = float(np.percentile(t, 2.5))
+        t_hi = float(np.percentile(t, 97.5))
+
+        fig.add_vline(x=t_mean, line_dash="dash", line_color="red", line_width=2,
+                       annotation_text=f"μ={t_mean:.4f}")
+        fig.add_vline(x=t_lo, line_dash="dot", line_color="red", line_width=1, opacity=0.4)
+        fig.add_vline(x=t_hi, line_dash="dot", line_color="red", line_width=1, opacity=0.4)
+
+        fig.update_layout(
+            title=f"{label} — Val vs Test",
+            barmode="overlay",
+            template="plotly_white",
+            height=300,
+        )
+        if col_name == "r2":
+            fig.add_vline(x=0, line_dash="dot", line_color="gray", opacity=0.4)
+
         st.plotly_chart(fig, use_container_width=True)
-    with col2:
-        mae = test_df["mae"].dropna().values
-        fig = hist_metric(mae, "MAE", "#2ca02c")
-        st.plotly_chart(fig, use_container_width=True)
-    with col3:
-        rho = test_df["rho"].dropna()
-        rho = rho[np.isfinite(rho)].values
-        if len(rho) > 0:
-            fig = hist_metric(rho, "ρ", "#9467bd")
-        else:
-            fig = None
-            st.info("ρ not computable for this target.")
-        if fig:
-            st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
     if val_df is not None:
