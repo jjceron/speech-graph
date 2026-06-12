@@ -42,3 +42,4 @@ Thumbs.db
 tmp/
 outputs/regression_optuna/logs/
 .opencode/
+
