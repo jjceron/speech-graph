@@ -255,6 +255,12 @@ er_single = generate_random_er_graphs({"a--a": 3}, window_size=3, n_random=2, se
 check("srl_er: single node self-loop", len(er_single) == 2)
 check("srl_er: single node has nodes=1", all(r["nodes"] == 1 for r in er_single))
 
+# ER with unweighted input (as the pipeline now passes): all weights = 1
+er_unweighted = generate_random_er_graphs({"a--b": 1, "a--c": 1}, window_size=3, n_random=5, seed=42)
+check("srl_er: unweighted edges count matches input",
+      all(1 <= r["edges"] <= 2 for r in er_unweighted),
+      "2 unique pairs → edges should be between 1 and 2")
+
 # ======================================================================
 print()
 print("=" * 60)

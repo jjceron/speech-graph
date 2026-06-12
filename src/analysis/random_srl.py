@@ -13,7 +13,7 @@ import math
 import random
 
 from src.graphs.srl_graphs import build_srl_graph
-from src.graphs.srl_metrics import compute_srl_metrics
+from src.graphs.srl_metrics import compute_srl_metrics, compute_srl_metrics_weighted
 from src.analysis.random_graph import compute_z_scores
 
 
@@ -73,13 +73,13 @@ def generate_random_srl_graphs(
         List of metric dicts, one per random graph.
     """
     if not relations:
-        return _empty_graphs(window_size, n_random)
+        return _empty_graphs(window_size, n_random, metrics_func=compute_srl_metrics_weighted)
 
     results: list[dict[str, float]] = []
     for i in range(n_random):
         shuffled = shuffle_srl_relations(relations, seed=seed + i)
         G = build_srl_graph(shuffled)
-        m = compute_srl_metrics(G, window_size=window_size)
+        m = compute_srl_metrics_weighted(G, window_size=window_size)
         results.append(m)
     return results
 
@@ -163,7 +163,7 @@ def generate_random_er_graphs(
     nodes, n_edges = _extract_er_parameters(relations)
 
     if not nodes or n_edges == 0:
-        return _empty_graphs(window_size, n_random)
+        return _empty_graphs(window_size, n_random, metrics_func=compute_srl_metrics)
 
     results: list[dict[str, float]] = []
     for i in range(n_random):
@@ -178,7 +178,12 @@ def generate_random_er_graphs(
 def _empty_graphs(
     window_size: int,
     n_random: int,
+    metrics_func=compute_srl_metrics,
 ) -> list[dict[str, float]]:
-    """Return ``n_random`` empty metric dicts."""
-    empty = compute_srl_metrics(build_srl_graph({}), window_size=window_size)
+    """Return ``n_random`` empty metric dicts.
+
+    Args:
+        metrics_func: Metric function to use (default: ``compute_srl_metrics``).
+    """
+    empty = metrics_func(build_srl_graph({}), window_size=window_size)
     return [dict(empty) for _ in range(n_random)]

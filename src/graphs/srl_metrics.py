@@ -17,6 +17,29 @@ def _empty() -> dict[str, float]:
     }
 
 
+def compute_srl_metrics_weighted(G: nx.DiGraph, window_size: int = 3) -> dict[str, float]:
+    """Weighted variant of :func:`compute_srl_metrics`.
+
+    Same as the original except:
+      - ``edges`` = sum of all edge weights (instead of unique edge count).
+      - ``density`` = total edge weight / (n * (n-1)) for directed complete
+        reference (instead of unique undirected non-self pairs / nC2).
+
+    Column names are identical to the original; use a different output file
+    (e.g. ``*_weight.txt``) to distinguish.
+    """
+    result = compute_srl_metrics(G, window_size=window_size)
+    node_count = G.number_of_nodes()
+    edge_sum = int(sum(d.get("weight", 1) for _, _, d in G.edges(data=True)))
+
+    result["edges"] = edge_sum
+    if node_count > 1:
+        result["density"] = float(edge_sum / (node_count * (node_count - 1)))
+    else:
+        result["density"] = 0.0
+    return result
+
+
 def compute_srl_metrics(G: nx.DiGraph, window_size: int = 3) -> dict[str, float]:
     """Compute the 15 SpeechGraph metrics from an SRL-based DiGraph.
 
@@ -90,7 +113,7 @@ def compute_srl_metrics(G: nx.DiGraph, window_size: int = 3) -> dict[str, float]
             (len(c) for c in nx.strongly_connected_components(G)), default=0
         )
     )
-    atd = float(2.0 * edge_sum / node_count) if node_count else 0.0
+    atd = float(edge_sum / node_count) if node_count else 0.0
 
     # Density: unique undirected non-self pairs / all possible pairs
     undirected_edges: set[frozenset] = set()
@@ -119,7 +142,7 @@ def compute_srl_metrics(G: nx.DiGraph, window_size: int = 3) -> dict[str, float]
     return {
         "wc": wc,
         "nodes": int(node_count),
-        "edges": int(edge_sum),
+        "edges": int(edge_unique),
         "re": int(repeated),
         "pe": int(pe),
         "l1": int(l1),
