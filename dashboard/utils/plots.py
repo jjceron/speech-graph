@@ -447,51 +447,99 @@ def plot_parameter_importance(df: pd.DataFrame, height: int | None = None) -> go
     return fig
 
 
-def plot_regressor_nfeatures_heatmap(df: pd.DataFrame) -> go.Figure:
-    dfp = df.dropna(subset=["value", "params_regressor", "params_rfe_n_features"]).copy()
+def plot_regressor_nfeatures_heatmap(df: pd.DataFrame, metric: str = "mae") -> go.Figure:
+    if metric == "mae":
+        value_col = "value"
+        aggfunc = "min"
+        ascending = True
+        colorscale = "RdYlGn_r"
+        label = "Best MAE"
+        title = "Best MAE by Regressor × N Features"
+    else:
+        value_col = "user_attrs_r2_mean_val"
+        aggfunc = "max"
+        ascending = False
+        colorscale = "RdYlGn"
+        label = "Best R²"
+        title = "Best R² by Regressor × N Features"
+
+    dfp = df.dropna(subset=[value_col, "params_regressor", "params_rfe_n_features"]).copy()
+    if len(dfp) == 0:
+        return go.Figure()
     dfp["params_rfe_n_features"] = dfp["params_rfe_n_features"].astype(int)
 
     pivot_best = dfp.pivot_table(
         index="params_regressor", columns="params_rfe_n_features",
-        values="value", aggfunc="min",
+        values=value_col, aggfunc=aggfunc,
     )
     pivot_cnt = dfp.pivot_table(
         index="params_regressor", columns="params_rfe_n_features",
-        values="value", aggfunc="count",
+        values=value_col, aggfunc="count",
     )
 
-    row_order = dfp.groupby("params_regressor")["value"].min().sort_values().index.tolist()
+    row_order = dfp.groupby("params_regressor")[value_col].agg(aggfunc).sort_values(ascending=ascending).index.tolist()
     pivot_best = pivot_best.reindex(row_order)
     pivot_cnt = pivot_cnt.reindex(row_order)
 
+    zmin = pivot_best.min().min()
+    zmax = pivot_best.max().max()
+    best_val = pivot_best.min().min() if ascending else pivot_best.max().max()
+    best_pos = None
+
     hover = []
+    texts = []
     for i in range(len(pivot_best.index)):
         row_h = []
+        row_t = []
         for j in range(len(pivot_best.columns)):
             v = pivot_best.iloc[i, j]
             c = pivot_cnt.iloc[i, j]
             if pd.isna(v):
                 row_h.append(f"<b>{pivot_best.index[i]}</b><br>N={int(pivot_best.columns[j])}<br>No trials")
+                row_t.append("")
             else:
-                row_h.append(f"<b>{pivot_best.index[i]}</b><br>N={int(pivot_best.columns[j])}<br>Best MAE: {v:.4f}<br>Trials: {int(c)}")
+                is_best = (ascending and v == best_val) or (not ascending and v == best_val)
+                row_t.append(f"{v:.4f}")
+                row_h.append(
+                    f"<b>{pivot_best.index[i]}</b><br>"
+                    f"N={int(pivot_best.columns[j])}<br>"
+                    f"{label}: {v:.4f}<br>"
+                    f"Trials: {int(c)}"
+                    f"{'<br><b>◀ BEST</b>' if is_best else ''}"
+                )
+                if is_best:
+                    best_pos = (i, j)
         hover.append(row_h)
+        texts.append(row_t)
 
     fig = go.Figure(go.Heatmap(
         z=pivot_best.values,
         x=[str(int(c)) for c in pivot_best.columns],
         y=pivot_best.index,
-        colorscale="RdYlGn_r",
-        zmin=pivot_best.min().min(),
-        zmax=pivot_best.max().max(),
-        text=[[f"{v:.4f}" if not pd.isna(v) else "" for v in row] for row in pivot_best.values],
-        texttemplate="%{text}", textfont=dict(size=11),
+        colorscale=colorscale,
+        zmin=zmin, zmax=zmax,
+        text=texts, texttemplate="%{text}", textfont=dict(size=11),
         hovertext=hover, hovertemplate="%{hovertext}<extra></extra>",
-        colorbar=dict(title="Best MAE", thickness=15),
+        colorbar=dict(title=label, thickness=15),
         xgap=2, ygap=2,
     ))
 
+    if best_pos:
+        fig.add_trace(go.Scatter(
+            x=[str(int(pivot_best.columns[best_pos[1]]))],
+            y=[pivot_best.index[best_pos[0]]],
+            mode="markers",
+            marker=dict(
+                symbol="square", size=28,
+                color="rgba(0,0,0,0)",
+                line=dict(width=3.5, color="#222"),
+            ),
+            showlegend=False,
+            hoverinfo="skip",
+        ))
+
     fig.update_layout(
-        title="Best Objective by Regressor × N Features",
+        title=title,
         xaxis_title="RFE N Features",
         yaxis_title="",
         template="plotly_white",
