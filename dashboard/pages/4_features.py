@@ -46,25 +46,27 @@ with col2:
         st.dataframe(pd.DataFrame({"Feature": feat}), use_container_width=True, hide_index=True)
 
 st.markdown("---")
-st.subheader("Feature Comparison Across Experiments")
+st.subheader(f"Feature Comparison Across Experiments — Target: {target}")
 
 all_rows = []
 for w, e in completed:
-    for t in get_targets():
-        report = load_best_report(w, e, t)
-        if report:
-            feat = report.get("selected_features", [])
-            bp = report.get("best_params", {})
-            all_rows.append(
-                {
-                    "Window": f"W{w}",
-                    "Experiment": e,
-                    "Target": t,
-                    "Model": bp.get("regressor", "?"),
-                    "N Features": len(feat),
-                    "Features": ", ".join(feat),
-                }
-            )
+    report = load_best_report(w, e, target)
+    if report:
+        feat = report.get("selected_features", [])
+        bp = report.get("best_params", {})
+        vs = report.get("validation_summary", {})
+        ts = report.get("test_summary", {})
+        all_rows.append({
+            "Window": f"W{w}",
+            "Experiment": e,
+            "Target": target,
+            "Model": bp.get("regressor", "?"),
+            "MAE val": vs.get("mae_mean_val"),
+            "MAE test": ts.get("mae_mean_test"),
+            "N Features": len(feat),
+            "Features": ", ".join(feat),
+        })
 
 df_all = pd.DataFrame(all_rows)
+df_all = df_all.sort_values("MAE val")
 st.dataframe(df_all, use_container_width=True, hide_index=True)
