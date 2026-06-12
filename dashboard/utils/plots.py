@@ -227,7 +227,7 @@ def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
     df["_sort"] = (~df["selected"]).astype(int)
     df = df.sort_values(["_sort", "ranking", "feature"])
 
-    colors = ["#2ca02c" if s else "#aaaaaa" for s in df["selected"]]
+    colors = ["#2ca02c" if s else "#d9534f" for s in df["selected"]]
     n_sel = df["selected"].sum()
     max_name_len = df["feature"].str.len().max()
 
