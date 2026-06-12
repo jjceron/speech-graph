@@ -1,0 +1,14 @@
+feature,selected,ranking
+lsc_T2W40,True,1
+re_T2W40,True,1
+l3_T2W40,False,2
+l2_T2W40,False,3
+pe_T2W40,False,3
+asp_T2W40,False,4
+density_T2W40,False,4
+diameter_T2W40,False,5
+l1_T2W40,False,5
+lcc_T2W40,False,6
+nodes_T2W40,False,6
+atd_T2W40,False,7
+edges_T2W40,False,7
