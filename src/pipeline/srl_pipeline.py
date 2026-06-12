@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.graphs.sent_window import sentence_windows
 from src.graphs.srl_graphs import aggregate_relations, build_srl_graph
-from src.graphs.srl_metrics import METRICS, compute_srl_metrics
+from src.graphs.srl_metrics import METRICS, compute_srl_metrics, compute_srl_metrics_weighted
 from src.preprocessing.loaders import load_transcript_txt
 from src.preprocessing.srl_processor import (
     PRONOUNS_DIC,
@@ -267,6 +267,7 @@ def run_pipeline(
     for window_size in windows:
         print(f"\n--- Window W{window_size} ---")
         all_rows: dict[str, list[dict]] = {gt: [] for gt, _ in GRAPH_TYPES}
+        all_rows_weighted: dict[str, list[dict]] = {gt: [] for gt, _ in GRAPH_TYPES}
         total_windows = 0
 
         for uid, sentences in by_subject.items():
@@ -285,6 +286,11 @@ def run_pipeline(
                     metrics["window"] = window_id
                     all_rows[graph_type].append(metrics)
 
+                    metrics_w = compute_srl_metrics_weighted(G, window_size=window_size)
+                    metrics_w["file"] = uid
+                    metrics_w["window"] = window_id
+                    all_rows_weighted[graph_type].append(metrics_w)
+
                 total_windows += 1
 
         print(f"  Subjects: {total_subjects}, Total windows: {total_windows}")
@@ -295,6 +301,13 @@ def run_pipeline(
                 save_results(rows, task, window_size, graph_type, out_dir, suffix=suffix)
             else:
                 print(f"  {graph_type.upper()}: no data")
+
+        for graph_type in all_rows_weighted:
+            rows = all_rows_weighted[graph_type]
+            if rows:
+                save_results(rows, task, window_size, graph_type, out_dir, suffix=suffix + "_weight")
+            else:
+                print(f"  {graph_type.upper()} weight: no data")
 
     print("\nDone.")
 

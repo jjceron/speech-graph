@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.graphs.sent_window import sentence_windows
 from src.graphs.srl_graphs import aggregate_relations, build_srl_graph
-from src.graphs.srl_metrics import compute_srl_metrics
+from src.graphs.srl_metrics import compute_srl_metrics, compute_srl_metrics_weighted
 from src.analysis.random_srl import generate_random_srl_graphs, generate_random_er_graphs
 from src.analysis.random_graph import compute_z_scores
 from src.preprocessing.srl_processor import (
@@ -292,8 +292,14 @@ def run_pipeline(
                     if not rels:
                         continue
 
+                    if null_model == "erdos_renyi":
+                        rels = {k: 1 for k in rels}
+
                     G = build_srl_graph(rels)
-                    original = compute_srl_metrics(G, window_size=window_size)
+                    if null_model == "erdos_renyi":
+                        original = compute_srl_metrics(G, window_size=window_size)
+                    else:
+                        original = compute_srl_metrics_weighted(G, window_size=window_size)
 
                     if null_model == "erdos_renyi":
                         random_list = generate_random_er_graphs(
