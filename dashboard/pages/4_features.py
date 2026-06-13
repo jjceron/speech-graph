@@ -127,33 +127,62 @@ with tab_shap:
     feat_data = []
     for col in shap_val_cols:
         vals = shap_df[col].values
+        abs_vals = np.abs(vals)
         mean_v = float(vals.mean())
-        lo = float(np.percentile(vals, 25))
-        hi = float(np.percentile(vals, 75))
-        feat_data.append((col, mean_v, lo, hi))
+        mean_abs = float(abs_vals.mean())
+        lo_s = float(np.percentile(vals, 25))
+        hi_s = float(np.percentile(vals, 75))
+        lo_a = float(np.percentile(abs_vals, 25))
+        hi_a = float(np.percentile(abs_vals, 75))
+        feat_data.append((col, mean_v, mean_abs, lo_s, hi_s, lo_a, hi_a))
 
-    feat_data.sort(key=lambda x: abs(x[1]), reverse=True)
+    feat_data.sort(key=lambda x: x[2], reverse=True)
 
-    all_zero = all(abs(x[1]) < 1e-12 for x in feat_data)
+    all_zero = all(x[2] < 1e-12 for x in feat_data)
     if all_zero:
         st.warning("All SHAP values are zero — the model collapsed to constant prediction (degenerate).")
         st.stop()
 
     feat_names = [x[0] for x in feat_data]
-    means = [x[1] for x in feat_data]
-    err_lo = [x[1] - x[2] for x in feat_data]
-    err_hi = [x[3] - x[1] for x in feat_data]
-    colors = ["#d62728" if m < 0 else "#2ca02c" for m in means]
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=means[::-1],
+    # --- Chart 1: Ranking by Magnitude ---
+    means_abs = [x[2] for x in feat_data]
+    err_lo_a = [x[2] - x[5] for x in feat_data]
+    err_hi_a = [x[6] - x[2] for x in feat_data]
+
+    fig1 = go.Figure()
+    fig1.add_trace(go.Bar(
+        x=means_abs[::-1],
+        y=feat_names[::-1],
+        orientation="h",
+        marker_color="#2ca02c",
+        error_x=dict(
+            type="data", symmetric=False,
+            array=err_hi_a[::-1], arrayminus=err_lo_a[::-1],
+            visible=True, thickness=1, width=3,
+        ),
+    ))
+    fig1.update_layout(
+        title="SHAP Feature Importance — Ranking by Magnitude",
+        xaxis_title="Mean |SHAP|",
+        template="plotly_white",
+        height=max(450, len(feat_names) * 40),
+    )
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # --- Chart 2: Direction ---
+    means_s = [x[1] for x in feat_data]
+    colors = ["#d62728" if m < 0 else "#2ca02c" for m in means_s]
+
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(
+        x=means_s[::-1],
         y=feat_names[::-1],
         orientation="h",
         marker_color=colors[::-1],
     ))
-    fig.update_layout(
-        title="SHAP Feature Importance",
+    fig2.update_layout(
+        title="Mean Signed SHAP Contribution — Direction",
         xaxis_title="Mean SHAP contribution (→ higher prediction)",
         template="plotly_white",
         height=max(450, len(feat_names) * 40),
@@ -163,12 +192,14 @@ with tab_shap:
             "line": {"color": "gray", "width": 1, "dash": "dot"},
         }],
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True)
+    st.caption("⬇ Sorted by mean |SHAP| descending — highest importance first")
 
     # --- Beeswarm ---
     feat_values_path = shap_dir / "shap_feature_values.csv"
     if feat_values_path.exists():
         feat_vals_df = pd.read_csv(feat_values_path)
+        global_max = max(abs(feat_vals_df[col]).max() for col in shap_val_cols)
         bf = go.Figure()
         nf = len(feat_names)
         rng = np.random.RandomState(42)
@@ -183,6 +214,8 @@ with tab_shap:
                 marker=dict(
                     size=4, color=fv,
                     colorscale="RdYlBu_r",
+                    cmin=-global_max,
+                    cmax=global_max,
                     showscale=i == 0,
                     colorbar=dict(title="Feature<br>value", len=0.8) if i == 0 else None,
                 ),
