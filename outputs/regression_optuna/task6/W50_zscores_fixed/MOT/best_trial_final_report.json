@@ -1,5 +1,5 @@
 {
-  "best_trial_number": 20,
+  "best_trial_number": 142,
   "best_value_internal_minimized": 6.3866150851888275,
   "best_params": {
     "regressor": "LinearRegression",

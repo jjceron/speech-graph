@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "re_T6W50": 0.21995166662714788,
+    "pe_T6W50": 0.13398459157608653
+  },
+  "mean_shap": {
+    "re_T6W50": 0.007171834573226591,
+    "pe_T6W50": -0.00717183457322621
+  },
+  "regressor": "ExtraTreesRegressor",
+  "n_subjects": 252,
+  "n_features": 2
+}
