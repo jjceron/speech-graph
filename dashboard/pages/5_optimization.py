@@ -46,26 +46,64 @@ with tab1:
     st.plotly_chart(fig_box, use_container_width=True, key="box_t1")
 
 with tab2:
-    col_a, col_b = st.columns([3, 2])
-    with col_a:
-        fig_models = model_selection_bar(trials)
-        st.plotly_chart(fig_models, use_container_width=True, key="bar_t2")
-    with col_b:
-        df = trials.dropna(subset=["value", "params_regressor"]).copy()
-        if len(df) > 0:
-            stats = df.groupby("params_regressor")["value"].agg(["count", "mean", "std", "min"])
-            stats = stats.rename(columns={
-                "count": "Trials",
-                "mean": "Mean MAE val",
-                "std": "Std MAE val",
-                "min": "Best MAE val",
+    fig_models = model_selection_bar(trials)
+    st.plotly_chart(fig_models, use_container_width=True, key="bar_t2")
+
+    df = trials.dropna(subset=["value", "params_regressor"]).copy()
+    if len(df) > 0:
+        global_best_val = df["value"].min()
+        best_reg = df.loc[df["value"].idxmin(), "params_regressor"]
+
+        def best_trial_ci(grp):
+            idx = grp["value"].idxmin()
+            return pd.Series({
+                "ci_lower": grp.loc[idx, "user_attrs_mae_ci_lower_val"],
+                "ci_upper": grp.loc[idx, "user_attrs_mae_ci_upper_val"],
             })
-            stats["Mean MAE val"] = stats["Mean MAE val"].map("{:.4f}".format)
-            stats["Std MAE val"] = stats["Std MAE val"].map("{:.4f}".format)
-            stats["Best MAE val"] = stats["Best MAE val"].map("{:.4f}".format)
-            stats = stats.sort_values("Best MAE val")
-            st.subheader("Per-Regressor Stats")
-            st.dataframe(stats, use_container_width=True)
+
+        stats = df.groupby("params_regressor").agg(
+            Trials=("value", "count"),
+            best_val=("value", "min"),
+            mean_val=("value", "mean"),
+            std_val=("value", "std"),
+        ).reset_index()
+
+        ci_df = df.groupby("params_regressor").apply(best_trial_ci).reset_index()
+        stats = stats.merge(ci_df, on="params_regressor")
+
+        stats["Regressor"] = stats["params_regressor"]
+        stats["Best MAE Val"] = stats["best_val"].map("{:.4f}".format)
+        stats["Mean MAE Val"] = stats["mean_val"].map("{:.4f}".format)
+        stats["Std MAE Val"] = stats["std_val"].map("{:.4f}".format)
+        stats["CI 95% Val"] = stats.apply(
+            lambda r: f"[{r['ci_lower']:.4f}, {r['ci_upper']:.4f}]", axis=1
+        )
+
+        display_cols = ["Regressor", "Trials", "Best MAE Val", "Mean MAE Val", "Std MAE Val", "CI 95% Val"]
+        stats_display = stats[display_cols].sort_values("Best MAE Val")
+
+        def highlight_best(row):
+            if row["Regressor"] == best_reg:
+                return ["font-weight: bold; color: #222"] * len(row)
+            return [""] * len(row)
+
+        st.subheader("Per-Regressor Stats (Validation)")
+        st.dataframe(
+            stats_display.style.apply(highlight_best, axis=1),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        if report:
+            ts = report.get("test_summary", {})
+            if ts:
+                st.subheader("Test Results (Best Trial)")
+                test_rows = [{
+                    "Metric": metric,
+                    "Mean": f"{ts.get(f'{key}_mean_test', '?'):.4f}",
+                    "CI 95%": f"[{ts.get(f'{key}_ci_lower_test', '?'):.4f}, {ts.get(f'{key}_ci_upper_test', '?'):.4f}]",
+                } for metric, key in [("MAE", "mae"), ("RMSE", "rmse"), ("R²", "r2"), ("rho", "rho")]]
+                st.dataframe(pd.DataFrame(test_rows), use_container_width=True, hide_index=True)
 
 with tab3:
     param_cols = [c for c in trials.columns if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
