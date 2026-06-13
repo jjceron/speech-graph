@@ -79,7 +79,7 @@ METRIC_NAMES = ["mae", "d2mae", "rmse", "mape", "r2", "median_ae", "max_error", 
 LOWER_IS_BETTER = {"mae", "rmse", "mape", "median_ae", "max_error"}
 HIGHER_IS_BETTER = {"d2mae", "r2", "rho"}
 
-DEFAULT_REGRESSORS = [
+ALL_REGRESSORS = [
     "LinearRegression",
     "Ridge",
     "ElasticNet",
@@ -95,7 +95,7 @@ DEFAULT_REGRESSORS = [
     "XGBRegressor",
 ]
 
-FAST_REGRESSORS = [
+DEFAULT_REGRESSORS = [
     "LinearRegression",
     "ElasticNet",
     "QuantileRegressor",
@@ -895,7 +895,7 @@ def parse_regressors(value: str) -> list[str]:
     else:
         regressors = [item.strip() for item in value.split(",") if item.strip()]
 
-    unknown = sorted(set(regressors) - set(DEFAULT_REGRESSORS))
+        unknown = sorted(set(regressors) - set(ALL_REGRESSORS))
     if unknown:
         raise ValueError(f"Unknown regressors: {unknown}")
 
@@ -1130,11 +1130,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout-sec", type=int, default=480)
     parser.add_argument("--max-rfe-features", type=int, default=100)
     parser.add_argument("--fast", action="store_true",
-                        help="Modo rápido: excluye Bagging, Stacking, GPR y reduce splits en optimización")
+                        help="Modo rápido: reduce splits en optimización")
     parser.add_argument("--optimize-splits", type=int, default=None,
                         help="Splits usados durante optimización (default: n_iter; con --fast: n_iter//4, min 50)")
-    parser.add_argument("--pruner-startup-trials", type=int, default=50)
-    parser.add_argument("--pruner-warmup-steps", type=int, default=10)
+    parser.add_argument("--pruner-startup-trials", type=int, default=100)
+    parser.add_argument("--pruner-warmup-steps", type=int, default=15)
     parser.add_argument("--metrics-dir", default="data/processed/metrics")
     parser.add_argument("--metadata", default="data/raw/metadata.xlsx")
     parser.add_argument("--output", default="outputs/regression_optuna")
@@ -1150,11 +1150,6 @@ def main() -> None:
     covar_cols = [item.strip() for item in args.covar.split(",") if item.strip()] if args.covar else None
 
     if args.fast:
-        regressors = [r for r in regressors if r in FAST_REGRESSORS]
-        if not regressors:
-            regressors = FAST_REGRESSORS[:]
-        if args.pruner_warmup_steps == 10:
-            args.pruner_warmup_steps = 5
         if args.optimize_splits is None:
             args.optimize_splits = max(50, args.n_iter // 4)
 
