@@ -113,6 +113,8 @@ def select_explainer(model, name: str, X_background: np.ndarray | pd.DataFrame):
     tree_families = {"RandomForestRegressor", "ExtraTreesRegressor", "DecisionTreeRegressor", "XGBRegressor"}
     linear_families = {"LinearRegression", "Ridge", "ElasticNet"}
     if name in tree_families:
+        if name == "XGBRegressor":
+            return shap.TreeExplainer(model.get_booster())
         return shap.TreeExplainer(model)
     elif name in linear_families:
         return shap.LinearExplainer(model, X_background)
