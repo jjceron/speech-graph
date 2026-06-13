@@ -1,9 +1,9 @@
 feature,selected,ranking
 asp_T2W30,True,1
-density_T2W30,True,1
 diameter_T2W30,True,1
 edges_T2W30,True,1
 atd_T2W30,False,2
+density_T2W30,False,2
 lcc_T2W30,False,3
 lsc_T2W30,False,3
 l2_T2W30,False,4

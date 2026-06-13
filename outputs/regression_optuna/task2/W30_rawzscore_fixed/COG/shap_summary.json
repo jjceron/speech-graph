@@ -1,25 +1,19 @@
 {
   "mean_abs_shap": {
-    "z_pe_T2W30": 0.0,
-    "z_l1_T2W30": 0.0,
-    "z_l2_T2W30": 0.0,
-    "z_l3_T2W30": 0.0,
-    "z_lsc_T2W30": 0.0,
-    "z_density_T2W30": 0.0,
-    "z_diameter_T2W30": 0.0,
-    "z_asp_T2W30": 0.0
+    "edges_T2W30": 0.15253603672917226,
+    "re_T2W30": 0.08484912487456107,
+    "l1_T2W30": 0.07010650548516018,
+    "lcc_T2W30": 0.06903839549290204,
+    "z_l3_T2W30": 0.08360727556234387
   },
   "mean_shap": {
-    "z_pe_T2W30": 0.0,
-    "z_l1_T2W30": 0.0,
-    "z_l2_T2W30": 0.0,
-    "z_l3_T2W30": 0.0,
-    "z_lsc_T2W30": 0.0,
-    "z_density_T2W30": 0.0,
-    "z_diameter_T2W30": 0.0,
-    "z_asp_T2W30": 0.0
+    "edges_T2W30": 0.0015363377417656728,
+    "re_T2W30": 0.0006200656642058749,
+    "l1_T2W30": 0.0023749619915529015,
+    "lcc_T2W30": -0.005009382299375081,
+    "z_l3_T2W30": 0.0004780169018506844
   },
-  "regressor": "QuantileRegressor",
+  "regressor": "ExtraTreesRegressor",
   "n_subjects": 230,
-  "n_features": 8
+  "n_features": 5
 }
