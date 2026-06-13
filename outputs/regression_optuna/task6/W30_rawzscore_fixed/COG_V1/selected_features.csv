@@ -1,9 +1,5 @@
 feature
-z_pe_T6W30
-z_l1_T6W30
-z_l2_T6W30
-z_l3_T6W30
-z_lsc_T6W30
+edges_T6W30
 z_density_T6W30
 z_diameter_T6W30
 z_asp_T6W30
