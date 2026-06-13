@@ -894,10 +894,9 @@ def parse_regressors(value: str) -> list[str]:
         regressors = DEFAULT_REGRESSORS[:]
     else:
         regressors = [item.strip() for item in value.split(",") if item.strip()]
-
         unknown = sorted(set(regressors) - set(ALL_REGRESSORS))
-    if unknown:
-        raise ValueError(f"Unknown regressors: {unknown}")
+        if unknown:
+            raise ValueError(f"Unknown regressors: {unknown}")
 
     if XGBRegressor is None:
         regressors = [name for name in regressors if name != "XGBRegressor"]
