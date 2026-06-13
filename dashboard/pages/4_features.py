@@ -205,6 +205,7 @@ with tab_shap:
         st.plotly_chart(bf, use_container_width=True)
 
     display_df = shap_df[["subject"] + shap_val_cols + ["y_true", "y_pred"]].copy()
+    display_df["subject"] = display_df["subject"].apply(lambda s: s.split("-")[-1])
     for col in shap_val_cols:
         display_df[col] = display_df[col].map(lambda x: f"{x:.4f}")
     display_df["y_true"] = display_df["y_true"].map(lambda x: f"{x:.1f}")
