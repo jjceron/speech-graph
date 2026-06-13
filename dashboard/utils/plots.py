@@ -254,7 +254,10 @@ def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
 
 
 def optimization_history(df: pd.DataFrame) -> go.Figure:
-    df = df.dropna(subset=["value"]).sort_values("number")
+    df = df.dropna(subset=["value"]).copy()
+    if "state" in df.columns:
+        df = df[df["state"] == "COMPLETE"]
+    df = df.sort_values("number")
     best = df["value"].cummin()
 
     y_lower = best.iloc[-1] * 0.90
@@ -291,8 +294,11 @@ def optimization_history(df: pd.DataFrame) -> go.Figure:
 
 def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
     dfp = df.dropna(subset=["value", "params_regressor"]).copy()
+    if "state" in dfp.columns:
+        dfp = dfp[dfp["state"] == "COMPLETE"]
     if len(dfp) == 0:
         return go.Figure()
+
     best_val = dfp["value"].min()
 
     fig = go.Figure()
