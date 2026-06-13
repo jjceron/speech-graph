@@ -50,6 +50,8 @@ with tab2:
     st.plotly_chart(fig_models, use_container_width=True, key="bar_t2")
 
     df = trials.dropna(subset=["value", "params_regressor"]).copy()
+    if "state" in df.columns:
+        df = df[df["state"] == "COMPLETE"]
     if len(df) > 0:
         global_best_val = df["value"].min()
         best_reg = df.loc[df["value"].idxmin(), "params_regressor"]
