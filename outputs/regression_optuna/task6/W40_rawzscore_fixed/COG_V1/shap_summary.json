@@ -1,13 +1,15 @@
 {
   "mean_abs_shap": {
-    "nodes_T6W40": 3.4602455367784892,
-    "lcc_T6W40": 3.4772174948378867
+    "z_density_T6W40": 0.0,
+    "z_diameter_T6W40": 0.0,
+    "z_asp_T6W40": 0.0
   },
   "mean_shap": {
-    "nodes_T6W40": -0.27263407604817425,
-    "lcc_T6W40": 0.2557342091116016
+    "z_density_T6W40": 0.0,
+    "z_diameter_T6W40": 0.0,
+    "z_asp_T6W40": 0.0
   },
   "regressor": "QuantileRegressor",
   "n_subjects": 252,
-  "n_features": 2
+  "n_features": 3
 }

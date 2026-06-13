@@ -1,13 +1,13 @@
 {
   "mean_abs_shap": {
-    "density_T6W40": 0.47066274596336416,
-    "z_l1_T6W40": 0.15838128079822333
+    "lcc_T6W40": 0.4045041051573079,
+    "z_l1_T6W40": 0.28189793087270987
   },
   "mean_shap": {
-    "density_T6W40": -0.04889061418154246,
-    "z_l1_T6W40": -0.02221110684298778
+    "lcc_T6W40": -0.013976281216339344,
+    "z_l1_T6W40": -0.020927976296874522
   },
-  "regressor": "QuantileRegressor",
+  "regressor": "ElasticNet",
   "n_subjects": 252,
   "n_features": 2
 }

@@ -1,23 +1,15 @@
 {
   "mean_abs_shap": {
-    "l3_T6W40": 0.0,
-    "lcc_T6W40": 0.0,
-    "lsc_T6W40": 0.0,
-    "atd_T6W40": 0.0,
-    "density_T6W40": 0.0,
-    "diameter_T6W40": 0.0,
-    "asp_T6W40": 0.0
+    "l1_T6W40": 0.1828128351125353,
+    "density_T6W40": 0.5346152681629224,
+    "asp_T6W40": 0.013110245227904594
   },
   "mean_shap": {
-    "l3_T6W40": 0.0,
-    "lcc_T6W40": 0.0,
-    "lsc_T6W40": 0.0,
-    "atd_T6W40": 0.0,
-    "density_T6W40": 0.0,
-    "diameter_T6W40": 0.0,
-    "asp_T6W40": 0.0
+    "l1_T6W40": -0.01380539850516989,
+    "density_T6W40": -0.05553375327765991,
+    "asp_T6W40": 0.001148026155884158
   },
   "regressor": "QuantileRegressor",
   "n_subjects": 252,
-  "n_features": 7
+  "n_features": 3
 }
