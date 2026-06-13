@@ -1,17 +1,15 @@
 {
   "mean_abs_shap": {
-    "nodes_T2W20": 0.14954934487494717,
-    "edges_T2W20": 0.21297171355637798,
-    "l2_T2W20": 0.0,
-    "lcc_T2W20": 0.17239781574344104
+    "edges_T2W20": 0.1230112101257683,
+    "diameter_T2W20": 0.0,
+    "asp_T2W20": 0.0
   },
   "mean_shap": {
-    "nodes_T2W20": 0.020701152529744003,
-    "edges_T2W20": -0.0005959471152750189,
-    "l2_T2W20": 0.0,
-    "lcc_T2W20": -0.03280766934939413
+    "edges_T2W20": -0.0003442155514305876,
+    "diameter_T2W20": 0.0,
+    "asp_T2W20": 0.0
   },
   "regressor": "QuantileRegressor",
   "n_subjects": 237,
-  "n_features": 4
+  "n_features": 3
 }

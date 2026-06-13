@@ -1,10 +1,10 @@
 feature,selected,ranking
-z_asp_T2W20,True,1
 z_density_T2W20,True,1
+z_diameter_T2W20,True,1
+z_l1_T2W20,True,1
+z_l2_T2W20,True,1
 z_pe_T2W20,True,1
-z_l2_T2W20,False,2
-z_lsc_T2W20,False,3
-z_l1_T2W20,False,4
-z_diameter_T2W20,False,5
-z_re_T2W20,False,6
-z_l3_T2W20,False,7
+z_re_T2W20,True,1
+z_lsc_T2W20,False,2
+z_asp_T2W20,False,3
+z_l3_T2W20,False,4
