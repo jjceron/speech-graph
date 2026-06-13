@@ -218,7 +218,7 @@ with tab_shap:
                     cmin=0, cmax=1,
                     showscale=i == 0,
                     colorbar=dict(
-                        title="Feature value", len=0.8,
+                        title="Feature value",
                         tickvals=[0, 1], ticktext=["Low", "High"],
                     ) if i == 0 else None,
                 ),
