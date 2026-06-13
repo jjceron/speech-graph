@@ -395,6 +395,11 @@ def model_selection_bar(df: pd.DataFrame) -> go.Figure:
         hovertemplate=text_template,
         customdata=grp[["best_mae", "mean_mae", "mean_nf"]].to_numpy(),
     ))
+    ticktexts = [
+        f"<b>{r}</b>" if r == best_reg else r
+        for r in grp["params_regressor"]
+    ]
+    fig.update_yaxes(ticktext=ticktexts, tickvals=grp["params_regressor"])
     fig.update_layout(
         title="Completed Trials per Regressor",
         xaxis_title="Completed Trials",
