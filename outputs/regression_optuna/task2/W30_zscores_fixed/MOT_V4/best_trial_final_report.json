@@ -1,23 +1,22 @@
 {
-  "best_trial_number": 9,
+  "best_trial_number": 43,
   "best_value_internal_minimized": 2.775843541800988,
   "best_params": {
     "regressor": "QuantileRegressor",
-    "use_scaler": false,
-    "quantile_alpha": 5.18260989109199,
-    "rfe_n_features": 4
+    "use_scaler": true,
+    "quantile_alpha": 1.6186162039332974,
+    "rfe_n_features": 3
   },
   "best_metadata": {
     "regressor": "QuantileRegressor",
-    "use_scaler": false,
+    "use_scaler": true,
     "rfe_estimator": {
       "mode": "original",
       "type": "QuantileRegressor"
     },
     "n_candidate_features": 9,
-    "rfe_n_features": 4,
+    "rfe_n_features": 3,
     "rfe_selected_features": [
-      "z_lsc_T2W30",
       "z_density_T2W30",
       "z_diameter_T2W30",
       "z_asp_T2W30"
@@ -144,7 +143,6 @@
     "r2_below_zero_test": 0.9975
   },
   "selected_features": [
-    "z_lsc_T2W30",
     "z_density_T2W30",
     "z_diameter_T2W30",
     "z_asp_T2W30"

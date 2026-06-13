@@ -1,25 +1,17 @@
 {
   "mean_abs_shap": {
-    "z_pe_T6W30": 0.0,
-    "z_l1_T6W30": 0.0,
-    "z_l2_T6W30": 0.0,
-    "z_l3_T6W30": 0.0,
-    "z_lsc_T6W30": 0.0,
-    "z_density_T6W30": 0.0,
+    "density_T6W30": 0.491240443014901,
+    "z_l1_T6W30": 0.13597430174341324,
     "z_diameter_T6W30": 0.0,
     "z_asp_T6W30": 0.0
   },
   "mean_shap": {
-    "z_pe_T6W30": 0.0,
-    "z_l1_T6W30": 0.0,
-    "z_l2_T6W30": 0.0,
-    "z_l3_T6W30": 0.0,
-    "z_lsc_T6W30": 0.0,
-    "z_density_T6W30": 0.0,
+    "density_T6W30": -0.05939124277715137,
+    "z_l1_T6W30": -0.0192354865370879,
     "z_diameter_T6W30": 0.0,
     "z_asp_T6W30": 0.0
   },
   "regressor": "QuantileRegressor",
   "n_subjects": 252,
-  "n_features": 8
+  "n_features": 4
 }

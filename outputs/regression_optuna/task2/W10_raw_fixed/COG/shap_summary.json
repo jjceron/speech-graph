@@ -1,19 +1,13 @@
 {
   "mean_abs_shap": {
-    "lsc_T2W10": 0.0,
-    "atd_T2W10": 0.0,
-    "density_T2W10": 0.0,
     "diameter_T2W10": 0.0,
     "asp_T2W10": 0.0
   },
   "mean_shap": {
-    "lsc_T2W10": 0.0,
-    "atd_T2W10": 0.0,
-    "density_T2W10": 0.0,
     "diameter_T2W10": 0.0,
     "asp_T2W10": 0.0
   },
   "regressor": "QuantileRegressor",
   "n_subjects": 240,
-  "n_features": 5
+  "n_features": 2
 }

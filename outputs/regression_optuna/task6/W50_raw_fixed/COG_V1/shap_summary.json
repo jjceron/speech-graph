@@ -1,0 +1,17 @@
+{
+  "mean_abs_shap": {
+    "edges_T6W50": 0.09629267802336636,
+    "lsc_T6W50": 0.0,
+    "density_T6W50": 0.0,
+    "diameter_T6W50": 0.0
+  },
+  "mean_shap": {
+    "edges_T6W50": -0.024526083938526937,
+    "lsc_T6W50": 0.0,
+    "density_T6W50": 0.0,
+    "diameter_T6W50": 0.0
+  },
+  "regressor": "QuantileRegressor",
+  "n_subjects": 252,
+  "n_features": 4
+}

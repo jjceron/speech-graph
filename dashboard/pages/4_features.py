@@ -5,7 +5,7 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from utils.loader import list_completed, get_targets, load_rfe_ranking, load_selected_features, load_best_report
+from utils.loader import list_completed, get_windows, get_experiments, get_targets, load_rfe_ranking, load_selected_features, load_best_report
 from utils.plots import rfe_ranking_chart
 from utils.sidebar import render_sidebar
 
@@ -23,11 +23,9 @@ tab_rfe, tab_shap = st.tabs(["RFE", "SHAP Analysis"])
 with tab_rfe:
     col_w, col_e, col_t = st.columns(3)
     with col_w:
-        windows = sorted(set(w for w, _ in completed))
-        window = st.selectbox("Window", windows, index=0, key="feat_w")
+        window = st.selectbox("Window", get_windows(), index=0, key="feat_w")
     with col_e:
-        exps = [e for w, e in completed if w == window]
-        experiment = st.selectbox("Experiment", exps, index=0, key="feat_e")
+        experiment = st.selectbox("Experiment", [e for e in get_experiments() if get_targets(window=window, experiment=e)], index=0, key="feat_e")
     with col_t:
         target = st.selectbox("Target", get_targets(), index=0, key="feat_t")
 
@@ -80,11 +78,9 @@ with tab_rfe:
 with tab_shap:
     col_sw, col_se, col_st = st.columns(3)
     with col_sw:
-        shap_windows = sorted(set(w for w, _ in completed))
-        sw = st.selectbox("Window", shap_windows, index=0, key="shap_w")
+        sw = st.selectbox("Window", get_windows(), index=0, key="shap_w")
     with col_se:
-        shap_exps = [e for w, e in completed if w == sw]
-        se = st.selectbox("Experiment", shap_exps, index=0, key="shap_e")
+        se = st.selectbox("Experiment", [e for e in get_experiments() if get_targets(window=sw, experiment=e)], index=0, key="shap_e")
     with col_st:
         stg = st.selectbox("Target", get_targets(), index=0, key="shap_t")
 
@@ -131,33 +127,62 @@ with tab_shap:
     feat_data = []
     for col in shap_val_cols:
         vals = shap_df[col].values
+        abs_vals = np.abs(vals)
         mean_v = float(vals.mean())
-        lo = float(np.percentile(vals, 25))
-        hi = float(np.percentile(vals, 75))
-        feat_data.append((col, mean_v, lo, hi))
+        mean_abs = float(abs_vals.mean())
+        lo_s = float(np.percentile(vals, 25))
+        hi_s = float(np.percentile(vals, 75))
+        lo_a = float(np.percentile(abs_vals, 25))
+        hi_a = float(np.percentile(abs_vals, 75))
+        feat_data.append((col, mean_v, mean_abs, lo_s, hi_s, lo_a, hi_a))
 
-    feat_data.sort(key=lambda x: abs(x[1]), reverse=True)
+    feat_data.sort(key=lambda x: x[2], reverse=True)
 
-    all_zero = all(abs(x[1]) < 1e-12 for x in feat_data)
+    all_zero = all(x[2] < 1e-12 for x in feat_data)
     if all_zero:
         st.warning("All SHAP values are zero — the model collapsed to constant prediction (degenerate).")
         st.stop()
 
     feat_names = [x[0] for x in feat_data]
-    means = [x[1] for x in feat_data]
-    err_lo = [x[1] - x[2] for x in feat_data]
-    err_hi = [x[3] - x[1] for x in feat_data]
-    colors = ["#d62728" if m < 0 else "#2ca02c" for m in means]
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=means[::-1],
+    # --- Chart 1: Ranking by Magnitude ---
+    means_abs = [x[2] for x in feat_data]
+    err_lo_a = [x[2] - x[5] for x in feat_data]
+    err_hi_a = [x[6] - x[2] for x in feat_data]
+
+    fig1 = go.Figure()
+    fig1.add_trace(go.Bar(
+        x=means_abs[::-1],
+        y=feat_names[::-1],
+        orientation="h",
+        marker_color="#2ca02c",
+        error_x=dict(
+            type="data", symmetric=False,
+            array=err_hi_a[::-1], arrayminus=err_lo_a[::-1],
+            visible=True, thickness=1, width=3,
+        ),
+    ))
+    fig1.update_layout(
+        title="SHAP Feature Importance — Ranking by Magnitude",
+        xaxis_title="Mean |SHAP|",
+        template="plotly_white",
+        height=max(450, len(feat_names) * 40),
+    )
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # --- Chart 2: Direction ---
+    means_s = [x[1] for x in feat_data]
+    colors = ["#d62728" if m < 0 else "#2ca02c" for m in means_s]
+
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(
+        x=means_s[::-1],
         y=feat_names[::-1],
         orientation="h",
         marker_color=colors[::-1],
     ))
-    fig.update_layout(
-        title="SHAP Feature Importance",
+    fig2.update_layout(
+        title="Mean Signed SHAP Contribution — Direction",
         xaxis_title="Mean SHAP contribution (→ higher prediction)",
         template="plotly_white",
         height=max(450, len(feat_names) * 40),
@@ -167,7 +192,8 @@ with tab_shap:
             "line": {"color": "gray", "width": 1, "dash": "dot"},
         }],
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True)
+    st.caption("⬇ Sorted by mean |SHAP| descending — highest importance first")
 
     # --- Beeswarm ---
     feat_values_path = shap_dir / "shap_feature_values.csv"
@@ -178,20 +204,27 @@ with tab_shap:
         rng = np.random.RandomState(42)
         for i, feat in enumerate(feat_names):
             sv = shap_df[feat].values
-            fv = feat_vals_df[feat].values
+            fv = feat_vals_df[feat].values.astype(float)
+            fmin, fmax = fv.min(), fv.max()
+            fv_norm = (fv - fmin) / (fmax - fmin) if fmax > fmin else np.zeros_like(fv)
             yj = rng.uniform(-0.2, 0.2, len(sv))
             bf.add_trace(go.Scatter(
                 x=sv,
                 y=[nf - 1 - i + y for y in yj],
                 mode="markers",
                 marker=dict(
-                    size=4, color=fv,
+                    size=4, color=fv_norm,
                     colorscale="RdYlBu_r",
+                    cmin=0, cmax=1,
                     showscale=i == 0,
-                    colorbar=dict(title="Feature<br>value", len=0.8) if i == 0 else None,
+                    colorbar=dict(
+                        title="Feature value",
+                        tickvals=[0, 1], ticktext=["Low", "High"],
+                    ) if i == 0 else None,
                 ),
                 name=feat,
-                hovertemplate=f"<b>{feat}</b><br>SHAP: %{{x:.4f}}<br>Value: %{{marker.color:.4f}}<extra></extra>",
+                customdata=fv,
+                hovertemplate=f"<b>{feat}</b><br>SHAP: %{{x:.4f}}<br>Value: %{{customdata:.4f}}<extra></extra>",
             ))
         bf.update_layout(
             title="SHAP value distribution by subject",
@@ -209,6 +242,7 @@ with tab_shap:
         st.plotly_chart(bf, use_container_width=True)
 
     display_df = shap_df[["subject"] + shap_val_cols + ["y_true", "y_pred"]].copy()
+    display_df["subject"] = display_df["subject"].apply(lambda s: s.split("-")[-1])
     for col in shap_val_cols:
         display_df[col] = display_df[col].map(lambda x: f"{x:.4f}")
     display_df["y_true"] = display_df["y_true"].map(lambda x: f"{x:.1f}")

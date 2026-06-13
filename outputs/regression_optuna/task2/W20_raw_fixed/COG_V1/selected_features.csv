@@ -1,5 +1,4 @@
 feature
-nodes_T2W20
 edges_T2W20
-l2_T2W20
-lcc_T2W20
+diameter_T2W20
+asp_T2W20

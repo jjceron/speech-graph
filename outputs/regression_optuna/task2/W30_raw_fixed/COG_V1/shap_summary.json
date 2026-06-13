@@ -1,17 +1,15 @@
 {
   "mean_abs_shap": {
-    "edges_T2W30": 0.10048212222587721,
-    "density_T2W30": 0.0,
+    "edges_T2W30": 0.10048212222587746,
     "diameter_T2W30": 0.0,
     "asp_T2W30": 0.0
   },
   "mean_shap": {
-    "edges_T2W30": -0.022808750919157867,
-    "density_T2W30": 0.0,
+    "edges_T2W30": -0.022808750919157485,
     "diameter_T2W30": 0.0,
     "asp_T2W30": 0.0
   },
   "regressor": "QuantileRegressor",
   "n_subjects": 230,
-  "n_features": 4
+  "n_features": 3
 }
