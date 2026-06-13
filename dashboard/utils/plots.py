@@ -358,6 +358,8 @@ def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
 
 def model_selection_bar(df: pd.DataFrame) -> go.Figure:
     dfp = df.dropna(subset=["value", "params_regressor"]).copy()
+    if "state" in dfp.columns:
+        dfp = dfp[dfp["state"] == "COMPLETE"]
     if len(dfp) == 0:
         return go.Figure()
 
@@ -418,7 +420,9 @@ def model_selection_bar(df: pd.DataFrame) -> go.Figure:
 
 
 def plot_objective_by_regressor(df: pd.DataFrame) -> go.Figure:
-    dfp = df.dropna(subset=["value", "params_regressor"])
+    dfp = df.dropna(subset=["value", "params_regressor"]).copy()
+    if "state" in dfp.columns:
+        dfp = dfp[dfp["state"] == "COMPLETE"]
     reg_order = dfp.groupby("params_regressor")["value"].median().sort_values().index.tolist()
     fig = go.Figure()
     for i, reg in enumerate(reg_order):
