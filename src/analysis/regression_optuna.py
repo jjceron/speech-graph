@@ -50,6 +50,7 @@ from sklearn.metrics import (
     median_absolute_error,
     r2_score,
 )
+from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -58,11 +59,9 @@ from sklearn.tree import DecisionTreeRegressor
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+ALL_TARGETS = ["MOT", "COG", "MOT_V4", "COG_V1"]
+
 from src.analysis import experiment_config as expcfg
-from src.analysis.linear_regression_rcv import (
-    ALL_TARGETS,
-    generate_mmcv_splits,
-)
 
 try:
     from sklearn.metrics import d2_absolute_error_score
@@ -97,10 +96,15 @@ ALL_REGRESSORS = [
 
 DEFAULT_REGRESSORS = [
     "LinearRegression",
+    "Ridge",
     "ElasticNet",
     "QuantileRegressor",
+    "SVR",
     "RandomForestRegressor",
     "ExtraTreesRegressor",
+    "BaggingRegressor",
+    "StackingRegressor",
+    "GaussianProcessRegressor",
     "KNeighborsRegressor",
     "DecisionTreeRegressor",
     "XGBRegressor",
@@ -254,15 +258,15 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
 
     elif name == "Ridge":
         reg = Ridge(
-            alpha=trial.suggest_float("ridge_alpha", 1e-3, 100.0, log=True),
+            alpha=trial.suggest_float("ridge_alpha", 1e-1, 1),
             solver=trial.suggest_categorical("ridge_solver", ["auto", "svd", "lsqr", "sparse_cg"]),
             random_state=random_state,
         )
 
     elif name == "ElasticNet":
         reg = ElasticNet(
-            alpha=trial.suggest_float("elastic_alpha", 1e-4, 10.0, log=True),
-            l1_ratio=trial.suggest_float("elastic_l1_ratio", 0.0, 1.0),
+            alpha=trial.suggest_float("elastic_alpha", 1e-1, 1),
+            l1_ratio=trial.suggest_categorical("elastic_l1_ratio", [0, 0.5, 1]),
             random_state=random_state,
             max_iter=20000,
         )
@@ -270,7 +274,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
     elif name == "QuantileRegressor":
         reg = QuantileRegressor(
             quantile=0.5,
-            alpha=trial.suggest_float("quantile_alpha", 1e-4, 10.0, log=True),
+            alpha=trial.suggest_float("quantile_alpha", 1e-1, 1),
             solver="highs",
         )
 
@@ -278,7 +282,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
         kernel = trial.suggest_categorical("svr_kernel", ["linear", "rbf", "poly"])
         reg = SVR(
             C=trial.suggest_float("svr_C", 1e-3, 100.0, log=True),
-            epsilon=trial.suggest_float("svr_epsilon", 1e-3, 10.0, log=True),
+            epsilon=trial.suggest_float("svr_epsilon", 1e-3, 100.0, log=True),
             kernel=kernel,
             degree=trial.suggest_int("svr_degree", 2, 5) if kernel == "poly" else 3,
             gamma=trial.suggest_categorical("svr_gamma", ["scale", "auto"]),
@@ -287,11 +291,9 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
 
     elif name == "RandomForestRegressor":
         reg = RandomForestRegressor(
-            n_estimators=trial.suggest_int("rf_n_estimators", 50, 500),
-            max_depth=trial.suggest_int("rf_max_depth", 2, 20),
-            min_samples_split=trial.suggest_int("rf_min_samples_split", 2, 12),
-            min_samples_leaf=trial.suggest_int("rf_min_samples_leaf", 1, 5),
-            max_features=trial.suggest_categorical("rf_max_features", ["sqrt", "log2", None]),
+            n_estimators=trial.suggest_int("rf_n_estimators", 10, 200),
+            max_depth=trial.suggest_int("rf_max_depth", 2, 8),
+            min_samples_split=trial.suggest_int("rf_min_samples_split", 2, 8),
             random_state=random_state,
             n_jobs=1,
         )
@@ -300,38 +302,35 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
         reg = ExtraTreesRegressor(
             n_estimators=trial.suggest_int("et_n_estimators", 50, 500),
             max_depth=trial.suggest_int("et_max_depth", 2, 20),
-            min_samples_split=trial.suggest_int("et_min_samples_split", 2, 12),
-            min_samples_leaf=trial.suggest_int("et_min_samples_leaf", 1, 5),
-            max_features=trial.suggest_categorical("et_max_features", ["sqrt", "log2", None]),
-            criterion="squared_error",
+            min_samples_split=trial.suggest_int("et_min_samples_split", 2, 8),
+            criterion="friedman_mse",
             random_state=random_state,
             n_jobs=1,
         )
 
     elif name == "BaggingRegressor":
         reg = BaggingRegressor(
-            n_estimators=trial.suggest_int("bag_n_estimators", 20, 300),
-            max_samples=trial.suggest_float("bag_max_samples", 0.5, 1.0),
-            max_features=trial.suggest_float("bag_max_features", 0.5, 1.0),
+            n_estimators=trial.suggest_int("bag_n_estimators", 50, 500),
             random_state=random_state,
             n_jobs=1,
         )
 
     elif name == "StackingRegressor":
         final_name = trial.suggest_categorical(
-            "stack_final_estimator", ["Ridge", "RandomForestRegressor", "ExtraTreesRegressor"]
+            "stack_final_estimator", ["Ridge", "RandomForestRegressor", "ExtraTreesRegressor", "LinearRegression"]
         )
         if final_name == "Ridge":
             final_estimator = Ridge(random_state=random_state)
         elif final_name == "RandomForestRegressor":
             final_estimator = RandomForestRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
-        else:
+        elif final_name == "ExtraTreesRegressor":
             final_estimator = ExtraTreesRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
+        else:
+            final_estimator = LinearRegression()
         reg = StackingRegressor(
             estimators=[("ridge", Ridge(random_state=random_state)), ("svr", SVR(kernel="linear"))],
             final_estimator=final_estimator,
-            cv=5,
-            n_jobs=1,
+            cv=None,
         )
 
     elif name == "GaussianProcessRegressor":
@@ -351,7 +350,6 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
         reg = DecisionTreeRegressor(
             max_depth=trial.suggest_int("dt_max_depth", 2, 20),
             min_samples_split=trial.suggest_int("dt_min_samples_split", 2, 20),
-            min_samples_leaf=trial.suggest_int("dt_min_samples_leaf", 1, 5),
             random_state=random_state,
         )
 
@@ -362,11 +360,11 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             n_estimators=trial.suggest_int("xgb_n_estimators", 50, 500),
             max_depth=trial.suggest_int("xgb_max_depth", 2, 10),
             learning_rate=trial.suggest_float("xgb_learning_rate", 1e-3, 0.3, log=True),
-            subsample=trial.suggest_float("xgb_subsample", 0.5, 1.0),
-            colsample_bytree=trial.suggest_float("xgb_colsample_bytree", 0.5, 1.0),
+            subsample=trial.suggest_float("xgb_subsample", 0.5, 1.0, step=0.1),
+            colsample_bytree=trial.suggest_float("xgb_colsample_bytree", 0.5, 1.0, step=0.1),
             reg_alpha=trial.suggest_float("xgb_reg_alpha", 1e-8, 10.0, log=True),
             reg_lambda=trial.suggest_float("xgb_reg_lambda", 1e-8, 10.0, log=True),
-            booster=trial.suggest_categorical("xgb_booster", ["gbtree", "gblinear"]),
+            booster=trial.suggest_categorical("xgb_booster", ["gbtree", "dart", "gblinear"]),
             objective="reg:squarederror",
             random_state=random_state,
             n_jobs=1,
@@ -849,6 +847,65 @@ def encode_covariates(df: pd.DataFrame, covar_cols: list[str] | None) -> pd.Data
     return out
 
 
+def generate_mmcv_splits(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_splits: int = 400,
+    train_size: float = 0.7,
+    val_size: float = 0.2,
+    test_size: float = 0.1,
+) -> tuple[list[tuple[np.ndarray, np.ndarray, np.ndarray]], pd.DataFrame]:
+    """Generate stratified MMCV splits (70/20/10) with full coverage tracking.
+
+    Returns (splits, splits_df) where splits is a list of (train, val, test)
+    index tuples and splits_df is a DataFrame with columns:
+    COMBINATION, INDEX, COD, SET.
+    """
+    n_samples = len(X)
+    y_qcut = pd.qcut(y, q=5, labels=False, duplicates="drop")
+
+    splits = []
+    results = []
+    seen_test: set[int] = set()
+    seen_val: set[int] = set()
+    split_no = 0
+
+    while split_no < n_splits or len(seen_test) < n_samples or len(seen_val) < n_samples:
+        rng_seed = np.random.randint(0, 10**6)
+
+        sss_outer = StratifiedShuffleSplit(n_splits=1, test_size=test_size, random_state=rng_seed)
+        train_val_idx, test_idx = next(sss_outer.split(X, y_qcut))
+
+        train_val_y = y_qcut.iloc[train_val_idx]
+        train_val_idx_arr = np.array(train_val_idx)
+
+        sss_inner = StratifiedShuffleSplit(
+            n_splits=1, test_size=val_size / (train_size + val_size), random_state=rng_seed
+        )
+        train_idx, val_idx = next(sss_inner.split(train_val_idx_arr, train_val_y))
+
+        train_idx = train_val_idx_arr[train_idx]
+        val_idx = train_val_idx_arr[val_idx]
+
+        seen_test.update(test_idx)
+        seen_val.update(val_idx)
+
+        splits.append((train_idx, val_idx, test_idx))
+
+        cods = X.index.to_numpy()
+        for idx in train_idx:
+            results.append([split_no, idx, cods[idx], "TRAIN"])
+        for idx in val_idx:
+            results.append([split_no, idx, cods[idx], "VALIDATION"])
+        for idx in test_idx:
+            results.append([split_no, idx, cods[idx], "TEST"])
+
+        split_no += 1
+
+    splits_df = pd.DataFrame(results, columns=["COMBINATION", "INDEX", "COD", "SET"])
+    return splits, splits_df
+
+
 def load_per_window_matrix(
     task: int,
     window: str,
@@ -993,8 +1050,7 @@ def run_one_target(
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Generating %d MMCV splits…", n_iter)
-    splits = generate_mmcv_splits(X, y, n_splits=n_iter, random_state=seed)
-    splits_df = split_assignments(X, splits)
+    splits, splits_df = generate_mmcv_splits(X, y, n_splits=n_iter)
     logger.info("MMCV splits generated (%d train/val/test triples)", len(splits))
 
     train_idx = splits[0][0] if rfe_mode == "fixed" else None
@@ -1015,7 +1071,7 @@ def run_one_target(
 
     db_path = output_dir / f"optuna_trials_{experiment_name}.db"
     study = optuna.create_study(
-        sampler=optuna.samplers.RandomSampler(seed=seed),
+        sampler=optuna.samplers.TPESampler(seed=seed),
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=pruner_startup_trials,
             n_warmup_steps=pruner_warmup_steps,
