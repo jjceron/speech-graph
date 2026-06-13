@@ -199,28 +199,32 @@ with tab_shap:
     feat_values_path = shap_dir / "shap_feature_values.csv"
     if feat_values_path.exists():
         feat_vals_df = pd.read_csv(feat_values_path)
-        global_max = max(abs(feat_vals_df[col]).max() for col in shap_val_cols)
         bf = go.Figure()
         nf = len(feat_names)
         rng = np.random.RandomState(42)
         for i, feat in enumerate(feat_names):
             sv = shap_df[feat].values
-            fv = feat_vals_df[feat].values
+            fv = feat_vals_df[feat].values.astype(float)
+            fmin, fmax = fv.min(), fv.max()
+            fv_norm = (fv - fmin) / (fmax - fmin) if fmax > fmin else np.zeros_like(fv)
             yj = rng.uniform(-0.2, 0.2, len(sv))
             bf.add_trace(go.Scatter(
                 x=sv,
                 y=[nf - 1 - i + y for y in yj],
                 mode="markers",
                 marker=dict(
-                    size=4, color=fv,
+                    size=4, color=fv_norm,
                     colorscale="RdYlBu_r",
-                    cmin=-global_max,
-                    cmax=global_max,
+                    cmin=0, cmax=1,
                     showscale=i == 0,
-                    colorbar=dict(title="Feature<br>value", len=0.8) if i == 0 else None,
+                    colorbar=dict(
+                        title="Feature value<br>within each feature", len=0.8,
+                        tickvals=[0, 1], ticktext=["Low", "High"],
+                    ) if i == 0 else None,
                 ),
                 name=feat,
-                hovertemplate=f"<b>{feat}</b><br>SHAP: %{{x:.4f}}<br>Value: %{{marker.color:.4f}}<extra></extra>",
+                customdata=fv,
+                hovertemplate=f"<b>{feat}</b><br>SHAP: %{{x:.4f}}<br>Value: %{{customdata:.4f}}<extra></extra>",
             ))
         bf.update_layout(
             title="SHAP value distribution by subject",
