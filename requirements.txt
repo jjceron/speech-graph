@@ -9,3 +9,7 @@ stanza
 nltk
 transformers
 torch
+pingouin>=0.5
+statsmodels>=0.14
+streamlit>=1.28
+plotly>=5.18
