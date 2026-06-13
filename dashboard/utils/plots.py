@@ -351,36 +351,53 @@ def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
 
 
 def model_selection_bar(df: pd.DataFrame) -> go.Figure:
-    grp = df.groupby("params_regressor").agg(
+    dfp = df.dropna(subset=["value", "params_regressor"]).copy()
+    if len(dfp) == 0:
+        return go.Figure()
+
+    grp = dfp.groupby("params_regressor").agg(
         trials=("value", "count"),
+        best_mae=("value", "min"),
         mean_mae=("value", "mean"),
         mean_nf=("params_rfe_n_features", "mean"),
     ).reset_index().sort_values("trials", ascending=True)
+
+    global_best = dfp["value"].min()
+    best_reg = grp.loc[(grp["best_mae"] - global_best).abs().idxmin(), "params_regressor"]
+
+    bar_colors = grp["mean_mae"]
+    line_widths = [3 if r == best_reg else 0.8 for r in grp["params_regressor"]]
+    line_colors = ["#222" if r == best_reg else "rgba(0,0,0,0.3)" for r in grp["params_regressor"]]
+
+    text_template = [
+        f"<b>{r}</b><br>Trials: {int(t)}<br>Best MAE: {b:.4f}<br>Mean MAE: {m:.4f}<br>Avg N Features: {n:.1f}{'<br><b>◀ BEST</b>' if r == best_reg else ''}<extra></extra>"
+        for r, t, b, m, n in zip(grp["params_regressor"], grp["trials"], grp["best_mae"], grp["mean_mae"], grp["mean_nf"])
+    ]
 
     fig = go.Figure(go.Bar(
         y=grp["params_regressor"],
         x=grp["trials"],
         orientation="h",
         marker=dict(
-            color=grp["mean_mae"],
+            color=bar_colors,
             colorscale="RdYlGn_r",
             showscale=True,
             colorbar=dict(title="Mean MAE"),
-            line=dict(width=0.8, color="rgba(0,0,0,0.3)"),
+            line=dict(width=line_widths, color=line_colors),
         ),
         text=grp["trials"],
         textposition="outside",
-        hovertemplate=(
-            "<b>%{y}</b><br>"
-            "Trials: %{x}<br>"
-            "Mean MAE: %{marker.color:.4f}<br>"
-            "Avg N Features: %{customdata:.1f}<extra></extra>"
+        textfont=dict(
+            size=12,
+            color=["#222" if r == best_reg else "#333" for r in grp["params_regressor"]],
+            weight=["bold" if r == best_reg else "normal" for r in grp["params_regressor"]],
         ),
-        customdata=grp["mean_nf"],
+        hovertemplate=text_template,
+        customdata=grp[["best_mae", "mean_mae", "mean_nf"]].to_numpy(),
     ))
     fig.update_layout(
-        title="Regressor Selection Frequency (300 trials)",
-        xaxis_title="Trials",
+        title="Completed Trials per Regressor",
+        xaxis_title="Completed Trials",
         yaxis_title="",
         template="plotly_white",
         height=400,
