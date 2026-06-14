@@ -96,17 +96,13 @@ ALL_REGRESSORS = [
 
 DEFAULT_REGRESSORS = [
     "LinearRegression",
-    "Ridge",
     "ElasticNet",
     "QuantileRegressor",
-    "SVR",
     "RandomForestRegressor",
     "ExtraTreesRegressor",
     "BaggingRegressor",
     "StackingRegressor",
-    "GaussianProcessRegressor",
     "KNeighborsRegressor",
-    "DecisionTreeRegressor",
     "XGBRegressor",
 ]
 
