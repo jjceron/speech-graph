@@ -100,8 +100,6 @@ DEFAULT_REGRESSORS = [
     "QuantileRegressor",
     "RandomForestRegressor",
     "ExtraTreesRegressor",
-    "BaggingRegressor",
-    "StackingRegressor",
     "KNeighborsRegressor",
     "XGBRegressor",
 ]
