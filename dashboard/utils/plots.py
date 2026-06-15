@@ -373,7 +373,7 @@ def model_selection_bar(df: pd.DataFrame) -> go.Figure:
     global_best = dfp["value"].min()
     best_reg = grp.loc[(grp["best_mae"] - global_best).abs().idxmin(), "params_regressor"]
 
-    bar_colors = grp["mean_mae"]
+    bar_colors = grp["best_mae"]
     line_widths = [3 if r == best_reg else 0.8 for r in grp["params_regressor"]]
     line_colors = ["#222" if r == best_reg else "rgba(0,0,0,0.3)" for r in grp["params_regressor"]]
 
@@ -390,7 +390,7 @@ def model_selection_bar(df: pd.DataFrame) -> go.Figure:
             color=bar_colors,
             colorscale="RdYlGn_r",
             showscale=True,
-            colorbar=dict(title="Mean MAE"),
+            colorbar=dict(title="MAE Val"),
             line=dict(width=line_widths, color=line_colors),
         ),
         text=grp["trials"],
