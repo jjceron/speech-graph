@@ -16,6 +16,7 @@ from stats_dashboard.utils.correlation import (
     build_correlation_table,
     flatten_df_for_display,
     get_graph_features_for_network,
+    resolve_column_name,
     style_table_html,
     export_to_excel,
 )
@@ -237,6 +238,16 @@ with tab_corr:
 
     file_labels = [f["label"] for f in file_infos]
 
+    graph_feat_cols = get_graph_features_for_network(network_type, task_label)
+
+    zero_var_features = set()
+    for gf in graph_feat_cols:
+        for finfo in file_infos:
+            actual_col = resolve_column_name(gf, finfo["df"], network_type)
+            if actual_col is not None and actual_col in finfo["df"].columns:
+                if finfo["df"][actual_col].var() < 1e-12:
+                    zero_var_features.add(gf)
+
     with st.spinner("Computing correlations..."):
         corr_df = build_correlation_table(
             file_infos, metadata_df, network_type, task_label
@@ -265,6 +276,7 @@ with tab_corr:
             display_df, corr_df, file_labels,
             f"{task_label} - {network_type}.xlsx",
             correction_info,
+            zero_var_features=zero_var_features,
         )
         st.download_button(
             label="📥 Print table",
@@ -274,7 +286,10 @@ with tab_corr:
             use_container_width=True,
         )
 
-    html_table = style_table_html(display_df, corr_df, file_labels, correction_info)
+    html_table = style_table_html(
+        display_df, corr_df, file_labels, correction_info,
+        zero_var_features=zero_var_features,
+    )
     st.markdown(html_table, unsafe_allow_html=True)
 
     with st.expander("📖 Notes"):
@@ -286,4 +301,6 @@ with tab_corr:
 - Empty cells: |rho| < 0.1 or constant variable.
 - Correlations computed as Spearman (simple and partial, controlling for School year).
 - Corrections applied per group: (Impulsivity measure × File).
+- **Filas en gris itálico**: variables con varianza cero; no se calcularon correlaciones
+  y no se incluyeron en la corrección Bonferroni/FDR.
 """)
