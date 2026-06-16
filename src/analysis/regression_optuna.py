@@ -4,7 +4,7 @@ The model is selected only with validation metrics. Test metrics are computed
 once for the best validation trial and saved as the final report.
 
 Usage:
-    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment raw --rfe fixed --targets all --optimize mae --n-trials 300 --n-iter 400 
+    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment raw --rfe fixed --targets all --optimize mae --n-trials 300 --n-iter 400 --optimize-splits 200
 """
 
 from __future__ import annotations
@@ -153,6 +153,33 @@ class TrialProgressCallback:
             _format_duration(elapsed),
             _format_duration(remaining),
         )
+
+
+class EarlyStoppingCallback:
+    """Stops the study when best objective does not improve for `patience` trials."""
+    def __init__(self, patience: int = 75, min_improvement: float = 1e-4) -> None:
+        self.patience = patience
+        self.min_improvement = min_improvement
+        self._best_value: float | None = None
+        self._trials_without_improvement = 0
+
+    def __call__(self, study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        if trial.number == 0:
+            self._best_value = study.best_value
+            self._trials_without_improvement = 0
+            return
+        improvement = self._best_value - study.best_value if study.direction == optuna.study.StudyDirection.MINIMIZE else study.best_value - self._best_value
+        if improvement > self.min_improvement:
+            self._best_value = study.best_value
+            self._trials_without_improvement = 0
+        else:
+            self._trials_without_improvement += 1
+        if self._trials_without_improvement >= self.patience:
+            logger.info(
+                "Early stopping after %d trials without improvement | best: %.6f (trial %d)",
+                self.patience, study.best_value, study.best_trial.number,
+            )
+            study.stop()
 
 
 def _format_duration(seconds: float) -> str:
@@ -1111,7 +1138,7 @@ def run_one_target(
     study.optimize(
         obj_func,
         n_trials=n_trials,
-        callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=50)],
+        callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=50), EarlyStoppingCallback(patience=75, min_improvement=1e-4)],
         catch=(ValueError, FloatingPointError, np.linalg.LinAlgError, TrialTimeout),
         show_progress_bar=True,
     )
@@ -1180,8 +1207,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-rfe-features", type=int, default=100)
     parser.add_argument("--fast", action="store_true",
                         help="Modo rápido: reduce splits en optimización")
-    parser.add_argument("--optimize-splits", type=int, default=None,
-                        help="Splits usados durante optimización (default: n_iter; con --fast: n_iter//4, min 50)")
+    parser.add_argument("--optimize-splits", type=int, default=200,
+                        help="Splits usados durante optimización (default: 200; con --fast: n_iter//4, min 50)")
     parser.add_argument("--pruner-startup-trials", type=int, default=100)
     parser.add_argument("--pruner-warmup-steps", type=int, default=15)
     parser.add_argument("--metrics-dir", default="data/processed/metrics")
@@ -1199,8 +1226,7 @@ def main() -> None:
     covar_cols = [item.strip() for item in args.covar.split(",") if item.strip()] if args.covar else None
 
     if args.fast:
-        if args.optimize_splits is None:
-            args.optimize_splits = max(50, args.n_iter // 4)
+        args.optimize_splits = max(50, args.n_iter // 4)
 
     output_root = Path(args.output)
     setup_logging(log_dir=output_root / "logs")

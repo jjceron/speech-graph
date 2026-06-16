@@ -7,7 +7,7 @@ from typing import Sequence
 import networkx as nx
 import numpy as np
 
-from .builder import adjacency_matrix, edge_counts, parallel_edges, split_by_boundaries
+from .builder import adjacency_matrix, edge_counts, split_by_boundaries
 
 METRICS = [
     "wc", "nodes", "edges", "re", "pe", "l1", "l2", "l3",
@@ -57,7 +57,6 @@ def compute_metrics(
     ec = edge_counts(segments)
     edge_total = int(sum(ec.values()))
     repeated_edges = int(sum(count - 1 for count in ec.values() if count > 1))
-    pe_raw = parallel_edges(ec)
 
     graph = nx.DiGraph()
     graph.add_nodes_from(nodes)
@@ -68,7 +67,8 @@ def compute_metrics(
     lsc = int(max((len(c) for c in nx.strongly_connected_components(graph)), default=0)) if node_count else 0
     atd = float(2.0 * edge_total / node_count) if node_count else 0.0
 
-    unique_undirected_non_self = len({frozenset((s, t)) for s, t in ec if s != t})
+    unique_pairs = {frozenset((s, t)) for s, t in ec if s != t}
+    unique_undirected_non_self = len(unique_pairs)
     density = float(unique_undirected_non_self / (node_count * (node_count - 1) / 2)) if node_count > 1 else 0.0
 
     diameter = float("nan")
@@ -83,13 +83,14 @@ def compute_metrics(
             cc_val = float(nx.average_clustering(component))
 
     adj = adjacency_matrix(ec, nodes)
-    no_self = adj.copy()
-    if node_count:
-        np.fill_diagonal(no_self, 0)
     l1 = int(np.trace(adj)) if node_count else 0
-    pe = int(np.trace(no_self @ no_self) / 2) if node_count else 0
-    l2 = int(pe_raw) if node_count else 0
-    l3 = int(np.trace(no_self @ no_self @ no_self) / 3) if node_count else 0
+    pe = int(edge_total - l1 - unique_undirected_non_self) if node_count else 0
+
+    adj_dir = (adj > 0).astype(int)
+    np.fill_diagonal(adj_dir, 0)
+    adj_dir2 = adj_dir @ adj_dir
+    l2 = int(np.trace(adj_dir2) // 2) if node_count else 0
+    l3 = int(np.trace(adj_dir2 @ adj_dir) // 3) if node_count else 0
 
     return {
         "wc": int(wc),
