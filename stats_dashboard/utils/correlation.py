@@ -221,6 +221,7 @@ def style_table_html(
     df_raw: pd.DataFrame,
     file_labels: list[str],
     correction_info: dict,
+    zero_var_features: set[str] = frozenset(),
 ) -> str:
     html_parts = []
 
@@ -235,45 +236,131 @@ def style_table_html(
             f"</div>"
         )
 
+    n_files = len(file_labels)
+    n_rows = len(df_display)
+
+    imp_vals = df_display[("Impulsivity measures", "")].tolist()
+    row_groups = []
+    prev = None
+    start = 0
+    for i, v in enumerate(imp_vals):
+        if v != prev:
+            if prev is not None:
+                row_groups.append({"imp": prev, "start": start, "end": i - 1})
+            start = i
+            prev = v
+    if prev is not None:
+        row_groups.append({"imp": prev, "start": start, "end": n_rows - 1})
+
+    def _get_row_group(row_idx):
+        for rg in row_groups:
+            if rg["start"] <= row_idx <= rg["end"]:
+                return rg
+        return None
+
+    col_groups = []
+    for i in range(n_files):
+        col_groups.append({"first": 2 + 2 * i, "last": 3 + 2 * i})
+    offset = 2 + 2 * n_files
+    for i in range(n_files):
+        col_groups.append({"first": offset + 2 * i, "last": offset + 2 * i + 1})
+
+    last_data_col = offset + 2 * n_files - 1
+
+    def _col_borders(col_idx):
+        left = ""
+        right = ""
+        for cg in col_groups:
+            if col_idx == cg["first"]:
+                left = "border-left:3px solid black;"
+            if col_idx == cg["last"]:
+                right = "border-right:3px solid black;"
+        return left, right
+
+    thick = "3px solid black"
+
     html_parts.append("<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse; font-size:0.85em;'>")
 
-    header_rows = []
     header1 = ["<th colspan='2' style='background:#e0e0e0;'>Variables</th>"]
     header2 = ["<th style='background:#f5f5f5;'>Impulsivity measures</th>", "<th style='background:#f5f5f5;'>Graph features</th>"]
 
-    for label in file_labels:
-        header1.append(f"<th colspan='2' style='background:#d0e8f0; text-align:center;'>{label}</th>")
-        header2.append(f"<th style='background:#e8f4f8;'>rho</th><th style='background:#e8f4f8;'>p-value</th>")
+    for i, label in enumerate(file_labels):
+        col_start = 2 + 2 * i
+        l, r = _col_borders(col_start)
+        extra = l + r
+        header1.append(f"<th colspan='2' style='background:#d0e8f0; text-align:center;{extra}'>{label}</th>")
+        for j in range(2):
+            c = col_start + j
+            l2, r2 = _col_borders(c)
+            name = "rho" if j == 0 else "p-value"
+            extra2 = l2 + r2 + "border-top:" + thick + ";"
+            header2.append(f"<th style='background:#e8f4f8;{extra2}'>{name}</th>")
 
-    for label in file_labels:
-        header1.append(f"<th colspan='2' style='background:#d0f0d0; text-align:center;'>{label} - Sy</th>")
-        header2.append(f"<th style='background:#e8f8e8;'>rho</th><th style='background:#e8f8e8;'>p-value</th>")
+    for i, label in enumerate(file_labels):
+        col_start = offset + 2 * i
+        l, r = _col_borders(col_start)
+        extra = l + r
+        header1.append(f"<th colspan='2' style='background:#d0f0d0; text-align:center;{extra}'>{label} - Sy</th>")
+        for j in range(2):
+            c = col_start + j
+            l2, r2 = _col_borders(c)
+            name = "rho" if j == 0 else "p-value"
+            extra2 = l2 + r2 + "border-top:" + thick + ";"
+            header2.append(f"<th style='background:#e8f8e8;{extra2}'>{name}</th>")
 
     html_parts.append("<thead><tr>" + "".join(header1) + "</tr><tr>" + "".join(header2) + "</tr></thead>")
     html_parts.append("<tbody>")
 
-    for idx in df_display.index:
-        html_parts.append("<tr>")
-        html_parts.append(f"<td style='font-weight:bold;'>{df_display.iloc[idx][('Impulsivity measures', '')]}</td>")
-        html_parts.append(f"<td>{df_display.iloc[idx][('Graph features', '')]}</td>")
+    gray_data = "color:#c0c0c0;"
+    has_zero_var_features = bool(zero_var_features)
 
-        for label in file_labels:
+    for idx in df_display.index:
+        row_idx = df_display.index.get_loc(idx)
+        rg = _get_row_group(row_idx)
+
+        gf_name = str(df_display.iloc[idx][("Graph features", "")])
+        is_zv = gf_name in zero_var_features
+
+        border_top = f"border-top:{thick};" if rg and row_idx == rg["start"] else ""
+        border_bot = f"border-bottom:{thick};" if rg and row_idx == rg["end"] else ""
+
+        def _cell_style(col_idx, extra=""):
+            l, r = _col_borders(col_idx)
+            rg_left = "border-left:" + thick + ";" if col_idx == 0 else ""
+            rg_right = "border-right:" + thick + ";" if col_idx == last_data_col else ""
+            return border_top + border_bot + rg_left + rg_right + l + r + extra
+
+        gf_style = _cell_style(1)
+        if is_zv:
+            gf_style += "color:#a0a0a0;font-style:italic;"
+        data_extra = gray_data if is_zv else ""
+
+        html_parts.append("<tr>")
+        html_parts.append(
+            f"<td style='{_cell_style(0)}font-weight:bold;'>"
+            f"{df_display.iloc[idx][('Impulsivity measures', '')]}</td>"
+        )
+        html_parts.append(f"<td style='{gf_style}'>{gf_name}</td>")
+
+        for col_offset, label in enumerate(file_labels):
+            c = 2 + 2 * col_offset
             rho_s = df_display.iloc[idx][(label, "rho")]
             p_s = df_display.iloc[idx][(label, "p-value")]
-            td_rho_s = f"<td>{rho_s:.4f}</td>" if pd.notna(rho_s) else "<td></td>"
-            td_p_s = f"<td>{p_s:.4f}</td>" if pd.notna(p_s) else "<td></td>"
+            td_rho_s = f"<td style='{_cell_style(c)}{data_extra}'>{rho_s:.4f}</td>" if pd.notna(rho_s) else f"<td style='{_cell_style(c)}{data_extra}'></td>"
+            td_p_s = f"<td style='{_cell_style(c + 1)}{data_extra}'>{p_s:.4f}</td>" if pd.notna(p_s) else f"<td style='{_cell_style(c + 1)}{data_extra}'></td>"
             html_parts.append(td_rho_s)
             html_parts.append(td_p_s)
 
-        for label in file_labels:
+        for col_offset, label in enumerate(file_labels):
+            c = offset + 2 * col_offset
             rho_p = df_display.iloc[idx][(f"{label} - Sy", "rho")]
             p_p = df_display.iloc[idx][(f"{label} - Sy", "p-value")]
 
             if pd.notna(rho_p):
                 color_style = "color:green; font-weight:bold;" if abs(rho_p) >= 0.1 else ""
-                td_rho_p = f"<td style='{color_style}'>{rho_p:.4f}</td>"
+                td_rho_p = f"<td style='{_cell_style(c)}{data_extra}{color_style}'>{rho_p:.4f}</td>"
             else:
-                td_rho_p = "<td></td>"
+                td_rho_p = f"<td style='{_cell_style(c)}{data_extra}'></td>"
             html_parts.append(td_rho_p)
 
             if pd.notna(p_p):
@@ -294,16 +381,23 @@ def style_table_html(
                 if p_p > 0.05:
                     style += "color:gray;"
 
-                td_p_p = f"<td style='{style}'>{p_p:.4f}</td>"
+                td_p_p = f"<td style='{_cell_style(c + 1)}{data_extra}{style}'>{p_p:.4f}</td>"
                 if fdr_pass:
                     td_p_p = td_p_p.replace("</td>", "*</td>")
             else:
-                td_p_p = "<td></td>"
+                td_p_p = f"<td style='{_cell_style(c + 1)}{data_extra}'></td>"
             html_parts.append(td_p_p)
 
         html_parts.append("</tr>")
 
     html_parts.append("</tbody></table>")
+    if has_zero_var_features:
+        html_parts.append(
+            "<div style='margin-top:8px; font-size:0.85em; color:#a0a0a0; font-style:italic;'>"
+            "Las filas en gris itálico corresponden a variables con varianza cero; "
+            "no se calcularon correlaciones y no se incluyeron en la corrección Bonferroni/FDR."
+            "</div>"
+        )
     return "\n".join(html_parts)
 
 
@@ -313,6 +407,7 @@ def export_to_excel(
     file_labels: list[str],
     filename: str,
     correction_info: dict,
+    zero_var_features: set[str] = frozenset(),
 ) -> bytes:
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -323,12 +418,61 @@ def export_to_excel(
     ws = wb.active
     ws.title = "Correlations"
 
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
+    thin_side = Side(style="thin")
+    thick_side = Side(style="thick")
+    thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+
+    n_files = len(file_labels)
+    n_rows = len(df_display)
+
+    imp_vals = df_display[("Impulsivity measures", "")].tolist()
+    row_groups = []
+    prev = None
+    start = 0
+    for i, v in enumerate(imp_vals):
+        if v != prev:
+            if prev is not None:
+                row_groups.append({"imp": prev, "start": start, "end": i - 1})
+            start = i
+            prev = v
+    if prev is not None:
+        row_groups.append({"imp": prev, "start": start, "end": n_rows - 1})
+
+    def _get_row_group(row_idx):
+        for rg in row_groups:
+            if rg["start"] <= row_idx <= rg["end"]:
+                return rg
+        return None
+
+    col_groups = []
+    for i in range(n_files):
+        col_groups.append({"first": 3 + 2 * i, "last": 4 + 2 * i})
+    offset = 3 + 2 * n_files
+    for i in range(n_files):
+        col_groups.append({"first": offset + 2 * i, "last": offset + 2 * i + 1})
+    last_data_col = offset + 2 * n_files - 1
+
+    def _cell_border(row_idx, col_idx):
+        top, bottom, left, right = thin_side, thin_side, thin_side, thin_side
+        rg = _get_row_group(row_idx)
+        if rg:
+            if row_idx == rg["start"]:
+                top = thick_side
+            if row_idx == rg["end"]:
+                bottom = thick_side
+            if col_idx == 1:
+                left = thick_side
+            if col_idx == last_data_col:
+                right = thick_side
+        for cg in col_groups:
+            if col_idx == cg["first"]:
+                left = thick_side
+            if col_idx == cg["last"]:
+                right = thick_side
+        return Border(left=left, right=right, top=top, bottom=bottom)
+
+    def _set_border(cell, row_idx, col_idx):
+        cell.border = _cell_border(row_idx, col_idx)
 
     header_fill_1 = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
     header_fill_2 = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
@@ -365,28 +509,51 @@ def export_to_excel(
     ws.cell(row=2, column=col + 1).border = thin_border
     col += 2
 
-    for label in file_labels:
-        ws.cell(row=2, column=col, value="rho").fill = simple_fill_2
-        ws.cell(row=2, column=col + 1, value="p-value").fill = simple_fill_2
-        ws.cell(row=2, column=col).border = thin_border
-        ws.cell(row=2, column=col + 1).border = thin_border
+    def _header_border(col_idx):
+        top, bottom, left, right = thick_side, thin_side, thin_side, thin_side
+        for cg in col_groups:
+            if col_idx == cg["first"]:
+                left = thick_side
+            if col_idx == cg["last"]:
+                right = thick_side
+        return Border(left=left, right=right, top=top, bottom=bottom)
+
+    for i, label in enumerate(file_labels):
+        cg_cols = [3 + 2 * i, 4 + 2 * i]
+        for c in cg_cols:
+            cell = ws.cell(row=2, column=c, value=("rho" if c == cg_cols[0] else "p-value"))
+            cell.fill = simple_fill_2
+            cell.border = _header_border(c)
         col += 2
 
-    for label in file_labels:
-        ws.cell(row=2, column=col, value="rho").fill = partial_fill_2
-        ws.cell(row=2, column=col + 1, value="p-value").fill = partial_fill_2
-        ws.cell(row=2, column=col).border = thin_border
-        ws.cell(row=2, column=col + 1).border = thin_border
+    for i, label in enumerate(file_labels):
+        cg_cols = [offset + 2 * i, offset + 2 * i + 1]
+        for c in cg_cols:
+            cell = ws.cell(row=2, column=c, value=("rho" if c == cg_cols[0] else "p-value"))
+            cell.fill = partial_fill_2
+            cell.border = _header_border(c)
         col += 2
+
+    gray_excel_font = Font(color="C0C0C0")
+    gray_italic_font = Font(color="A0A0A0", italic=True)
+    has_zero_var_features = bool(zero_var_features)
 
     for row_idx in range(len(df_display)):
         excel_row = row_idx + 3
         imp_val = df_display.iloc[row_idx][("Impulsivity measures", "")]
         gf_val = df_display.iloc[row_idx][("Graph features", "")]
-        ws.cell(row=excel_row, column=1, value=imp_val).font = bold_font
-        ws.cell(row=excel_row, column=2, value=gf_val)
-        ws.cell(row=excel_row, column=1).border = thin_border
-        ws.cell(row=excel_row, column=2).border = thin_border
+        is_zv = has_zero_var_features and gf_val in zero_var_features
+
+        c1 = ws.cell(row=excel_row, column=1, value=imp_val)
+        _set_border(c1, row_idx, 1)
+        c2 = ws.cell(row=excel_row, column=2, value=gf_val)
+        _set_border(c2, row_idx, 2)
+
+        if is_zv:
+            c1.font = Font(bold=True, color="A0A0A0")
+            c2.font = gray_italic_font
+        else:
+            c1.font = bold_font
 
         col = 3
         for label in file_labels:
@@ -396,14 +563,18 @@ def export_to_excel(
                 cell = ws.cell(row=excel_row, column=col, value=round(rho_s, 4))
             else:
                 cell = ws.cell(row=excel_row, column=col, value="")
-            cell.border = thin_border
+            _set_border(cell, row_idx, col)
+            if is_zv:
+                cell.font = gray_excel_font
             col += 1
 
             if pd.notna(p_s):
                 cell = ws.cell(row=excel_row, column=col, value=round(p_s, 4))
             else:
                 cell = ws.cell(row=excel_row, column=col, value="")
-            cell.border = thin_border
+            _set_border(cell, row_idx, col)
+            if is_zv:
+                cell.font = gray_excel_font
             col += 1
 
         for label in file_labels:
@@ -412,33 +583,38 @@ def export_to_excel(
 
             if pd.notna(rho_p):
                 cell = ws.cell(row=excel_row, column=col, value=round(rho_p, 4))
-                if abs(rho_p) >= 0.1:
+                if abs(rho_p) >= 0.1 and not is_zv:
                     cell.font = green_font
             else:
                 cell = ws.cell(row=excel_row, column=col, value="")
-            cell.border = thin_border
+            _set_border(cell, row_idx, col)
+            if is_zv:
+                cell.font = gray_excel_font
             col += 1
 
             if pd.notna(p_p):
                 cell = ws.cell(row=excel_row, column=col, value=round(p_p, 4))
-                if p_p > 0.05:
+                if p_p > 0.05 and not is_zv:
                     cell.font = gray_font
-                imp = df_raw.iloc[row_idx]["Impulsivity measures"]
-                label_key = f"{imp}_{label}"
-                fdr_pass = False
-                if label_key in correction_info:
-                    p_bonf_key = f"{label}_bonferroni"
-                    fdr_key = f"{label}_fdr_pass"
-                    if fdr_key in df_raw.columns and df_raw.iloc[row_idx][fdr_key]:
-                        fdr_pass = True
-                    if p_bonf_key in df_raw.columns and pd.notna(df_raw.iloc[row_idx].get(p_bonf_key, None)):
-                        if df_raw.iloc[row_idx][p_bonf_key] < 0.05:
-                            cell.font = Font(bold=True)
-                if fdr_pass:
-                    cell.value = f"{p_p:.4f}*"
+                if not is_zv:
+                    imp = df_raw.iloc[row_idx]["Impulsivity measures"]
+                    label_key = f"{imp}_{label}"
+                    fdr_pass = False
+                    if label_key in correction_info:
+                        p_bonf_key = f"{label}_bonferroni"
+                        fdr_key = f"{label}_fdr_pass"
+                        if fdr_key in df_raw.columns and df_raw.iloc[row_idx][fdr_key]:
+                            fdr_pass = True
+                        if p_bonf_key in df_raw.columns and pd.notna(df_raw.iloc[row_idx].get(p_bonf_key, None)):
+                            if df_raw.iloc[row_idx][p_bonf_key] < 0.05:
+                                cell.font = Font(bold=True)
+                    if fdr_pass:
+                        cell.value = f"{p_p:.4f}*"
             else:
                 cell = ws.cell(row=excel_row, column=col, value="")
-            cell.border = thin_border
+            _set_border(cell, row_idx, col)
+            if is_zv:
+                cell.font = gray_excel_font
             col += 1
 
     for col_idx in range(1, col):
