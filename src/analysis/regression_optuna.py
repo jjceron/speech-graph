@@ -54,7 +54,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import LinearSVR, SVR
+from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -96,11 +96,17 @@ ALL_REGRESSORS = [
 
 DEFAULT_REGRESSORS = [
     "LinearRegression",
+    "Ridge",
     "ElasticNet",
     "QuantileRegressor",
+    "SVR",
     "RandomForestRegressor",
     "ExtraTreesRegressor",
+    "BaggingRegressor",
+    "StackingRegressor",
+    "GaussianProcessRegressor",
     "KNeighborsRegressor",
+    "DecisionTreeRegressor",
     "XGBRegressor",
 ]
 
@@ -164,7 +170,7 @@ class EarlyStoppingCallback:
         self._trials_without_improvement = 0
 
     def __call__(self, study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
-        if trial.number == 0:
+        if trial.number == 0 or study.best_value is None or self._best_value is None:
             self._best_value = study.best_value
             self._trials_without_improvement = 0
             return
@@ -324,7 +330,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             n_estimators=trial.suggest_int("et_n_estimators", 50, 500),
             max_depth=trial.suggest_int("et_max_depth", 2, 20),
             min_samples_split=trial.suggest_int("et_min_samples_split", 2, 8),
-            criterion="squared_error",
+            criterion="friedman_mse",
             random_state=random_state,
             n_jobs=1,
         )
@@ -414,25 +420,35 @@ def get_rfe_estimator(
     if regressor_name not in incompatible and not is_svr_non_linear:
         return clone(final_regressor), {"mode": "original", "type": regressor_name}
 
-    proxy = trial.suggest_categorical("rfe_proxy_type", ["ExtraTrees", "LinearSVR"])
+    proxy = trial.suggest_categorical("rfe_proxy_type", ["ExtraTrees", "LinearSVC"])
     if proxy == "ExtraTrees":
+        rfe_et_n_est = trial.suggest_int("rfe_proxy_et_n_estimators", 20, 100, step=10)
+        rfe_et_depth = trial.suggest_int("rfe_proxy_et_max_depth", 3, 10)
+        rfe_et_min_samples = trial.suggest_int("rfe_proxy_et_min_samples_split", 2, 8)
         estimator = ExtraTreesRegressor(
-            n_estimators=trial.suggest_int("rfe_proxy_et_n_estimators", 20, 80, step=10),
-            max_depth=trial.suggest_int("rfe_proxy_et_max_depth", 2, 12),
-            min_samples_split=trial.suggest_int("rfe_proxy_et_min_samples_split", 2, 12),
-            min_samples_leaf=trial.suggest_int("rfe_proxy_et_min_samples_leaf", 1, 5),
-            criterion="squared_error",
+            n_estimators=rfe_et_n_est,
+            max_depth=rfe_et_depth,
+            min_samples_split=rfe_et_min_samples,
+            criterion="friedman_mse",
             random_state=random_state,
             n_jobs=1,
         )
+        rfe_params = {
+            "mode": "proxy", "type": "ExtraTrees",
+            "n_estimators": rfe_et_n_est,
+            "max_depth": rfe_et_depth,
+            "min_samples_split": rfe_et_min_samples,
+        }
     else:
-        estimator = LinearSVR(
-            C=trial.suggest_float("rfe_proxy_lsvr_C", 1e-3, 10.0, log=True),
-            epsilon=trial.suggest_float("rfe_proxy_lsvr_epsilon", 1e-4, 1.0, log=True),
-            random_state=random_state,
-            max_iter=30000,
-        )
-    return estimator, {"mode": "proxy", "type": proxy}
+        rfe_svc_C = trial.suggest_float("rfe_proxy_svc_C", 1e-3, 10.0, log=True)
+        rfe_svr_epsilon = trial.suggest_float("svr_epsilon", 1e-3, 100, log=True)
+        estimator = SVR(C=rfe_svc_C, kernel="linear", epsilon=rfe_svr_epsilon)
+        rfe_params = {
+            "mode": "proxy", "type": "LinearSVC",
+            "C": rfe_svc_C,
+            "epsilon": rfe_svr_epsilon,
+        }
+    return estimator, rfe_params
 
 
 def fit_global_rfe(
@@ -445,12 +461,11 @@ def fit_global_rfe(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Fit imputation, optional scaling and RFE before MMCV."""
     n_candidates = X.shape[1]
-    if n_candidates < 1:
-        raise optuna.TrialPruned("No candidate features available")
+    if n_candidates < 3:
+        raise optuna.TrialPruned("Need at least 3 candidate features for RFE")
 
-    upper = min(n_candidates, max_rfe_features or n_candidates)
-    lower = 1 if upper == 1 else 2
-    n_features = trial.suggest_int("rfe_n_features", lower, upper)
+    upper = min(n_candidates - 1, max_rfe_features or n_candidates - 1)
+    n_features = trial.suggest_int("rfe_n_features", 2, upper)
 
     imputer = SimpleImputer(strategy="mean")
     X_proc = imputer.fit_transform(X)
@@ -460,8 +475,7 @@ def fit_global_rfe(
         scaler = StandardScaler()
         X_proc = scaler.fit_transform(X_proc)
 
-    step = max(1, n_candidates // 6)
-    selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step)
+    selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=1)
     selector.fit(X_proc, as_1d(y))
 
     selected_features = X.columns[selector.support_].tolist()
@@ -573,7 +587,7 @@ def objective_regression(
 
     trial.set_user_attr("regressor_final", metadata["regressor"])
     trial.set_user_attr("use_scaler_final", metadata["use_scaler"])
-    trial.set_user_attr("rfe_estimator", metadata["rfe_estimator"])
+    trial.set_user_attr("rfe_clf", metadata["rfe_estimator"])
     trial.set_user_attr("rfe_n_features", metadata["rfe_n_features"])
     trial.set_user_attr("rfe_selected_features", metadata["rfe_selected_features"])
 
@@ -585,8 +599,8 @@ def objective_regression(
         val_pred = model.predict(X_model.iloc[val_idx])
         validation_rows.append(calculate_metrics(y.iloc[val_idx], val_pred))
 
-        partial = float(pd.DataFrame(validation_rows)[optimize_metric].mean())
-        trial.report(metric_to_objective(partial, optimize_metric), step)
+        partial = float(pd.DataFrame(validation_rows)["d2mae"].mean())
+        trial.report(partial, step)
 
         if trial.should_prune():
             trial.set_user_attr("termination_reason", "pruned")
@@ -627,9 +641,10 @@ def objective_regression_split_rfe(
     regressor, is_svr_non_linear = get_regressor(trial, regressor_name, random_state)
 
     n_candidates = X.shape[1]
-    upper = min(n_candidates, max_rfe_features or n_candidates)
-    lower = 1 if upper == 1 else 2
-    n_features = trial.suggest_int("rfe_n_features", lower, upper)
+    if n_candidates < 3:
+        raise optuna.TrialPruned("Need at least 3 candidate features for RFE")
+    upper = min(n_candidates - 1, max_rfe_features or n_candidates - 1)
+    n_features = trial.suggest_int("rfe_n_features", 2, upper)
 
     trial.set_user_attr("regressor_final", regressor_name)
     trial.set_user_attr("use_scaler_final", use_scaler)
@@ -667,8 +682,8 @@ def objective_regression_split_rfe(
         val_pred = as_1d(model.predict(X_va_sel))
         validation_rows.append(calculate_metrics(y_val, val_pred))
 
-        partial = float(pd.DataFrame(validation_rows)[optimize_metric].mean())
-        trial.report(metric_to_objective(partial, optimize_metric), step)
+        partial = float(pd.DataFrame(validation_rows)["d2mae"].mean())
+        trial.report(partial, step)
 
         if trial.should_prune():
             trial.set_user_attr("termination_reason", "pruned")
@@ -784,8 +799,7 @@ def evaluate_fixed_trial_split_rfe(
         rfe_estimator, _ = get_rfe_estimator(
             fixed_trial, regressor_name, regressor, is_svr_non_linear, random_state
         )
-        step_size = max(1, n_candidates // 6)
-        selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=step_size)
+        selector = RFE(estimator=rfe_estimator, n_features_to_select=n_features, step=1)
         selector.fit(X_tr, y_train)
 
         rankings_list.append(pd.Series(selector.ranking_, index=X.columns))
@@ -1092,7 +1106,7 @@ def run_one_target(
 
     db_path = output_dir / f"optuna_trials_{experiment_name}.db"
     study = optuna.create_study(
-        sampler=optuna.samplers.RandomSampler(seed=seed),
+        sampler=optuna.samplers.TPESampler(seed=seed),
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=pruner_startup_trials,
             n_warmup_steps=pruner_warmup_steps,
