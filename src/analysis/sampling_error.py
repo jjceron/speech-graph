@@ -188,7 +188,7 @@ def main() -> None:
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Loading data: T{args.task} W{args.window} {args.experiment} → {args.target}")
+    print(f"Loading data: T{args.task} W{args.window} {args.experiment} -> {args.target}")
     X, y = load_per_window_matrix(
         task=args.task,
         window=args.window,
