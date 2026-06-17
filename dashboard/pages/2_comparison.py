@@ -126,7 +126,13 @@ with tab_single:
             mlab = "R²"
             t_v = f"{ts.get('r2_mean_test',0):.4f} [{ts.get('r2_ci_lower_test',0):.4f}, {ts.get('r2_ci_upper_test',0):.4f}]"
             v_v = f"{vs.get('r2_mean_val',0):.4f} [{vs.get('r2_ci_lower_val',0):.4f}, {vs.get('r2_ci_upper_val',0):.4f}]"
-        st.info(f"**Model:** {bp.get('regressor','?')} | **Features:** {len(feat)} | **{mlab} test:** {t_v} | **{mlab} val:** {v_v}")
+        target_vals = preds["y_true"]
+        target_std = float(target_vals.std())
+        target_mae = float(preds["y_pred"].sub(preds["y_true"]).abs().mean())
+        mae_ratio = target_mae / target_std if target_std > 0 else 0
+        st.info(f"**Model:** {bp.get('regressor','?')} | **Features:** {len(feat)} | "
+                f"**{mlab} test:** {t_v} | **{mlab} val:** {v_v} | "
+                f"**σ_target:** {target_std:.3f} | **MAE/σ:** {mae_ratio:.3f}")
 
     # --- Target vs Predicted — Test | Validation (side by side) ---
     col_test, col_val = st.columns(2)
@@ -168,16 +174,37 @@ with tab_single:
         default_subj = subj_list[0]
         highlight_subj = st.session_state.get("comp_highlight_subj", default_subj)
         subj_val = float(subj_means[highlight_subj])
+        overall_mean = float(subj_means.mean())
+        overall_std = float(sub_yt.std())
 
         # --- Horizontal boxplot (above) ---
+        mae_val = float((preds["y_pred"] - preds["y_true"]).abs().mean())
         fig_box = go.Figure()
         fig_box.add_trace(go.Box(
             x=sub_yt.values, orientation="h",
             name=bt_target, boxmean="sd",
             marker_color="#9467bd",
         ))
+        fig_box.add_vline(
+            x=overall_mean, line_dash="dash", line_color="red", line_width=2,
+            annotation_text=f"μ={overall_mean:.2f}",
+            annotation_position="top",
+        )
+        fig_box.add_vrect(
+            x0=overall_mean - overall_std, x1=overall_mean + overall_std,
+            fillcolor="orange", opacity=0.08, layer="below",
+            annotation_text=f"±1σ = {overall_std:.2f}",
+            annotation_position="top left",
+            annotation_font_size=11,
+        )
+        fig_box.add_vline(
+            x=overall_mean + mae_val, line_dash="dot", line_color="green", line_width=1.5,
+            annotation_text=f"MAE→ μ+MAE={overall_mean+mae_val:.2f}",
+            annotation_position="bottom",
+            annotation_font_size=10,
+        )
         fig_box.update_layout(
-            title=f"{bt_target} variance",
+            title=f"{bt_target} — σ={overall_std:.3f}, MAE/σ={mae_val/overall_std:.3f}" if overall_std > 0 else bt_target,
             template="plotly_white",
             height=300,
             margin=dict(t=30, b=10),
@@ -191,11 +218,17 @@ with tab_single:
             marker_color="#1f77b4", opacity=0.7, name="Subjects",
         ))
 
-        overall_mean = float(subj_means.mean())
         fig_dist.add_vline(
             x=overall_mean, line_dash="dash", line_color="red", line_width=2,
-            annotation_text=f"Mean = {overall_mean:.2f}",
+            annotation_text=f"μ = {overall_mean:.2f}",
             annotation_position="top right",
+        )
+        fig_dist.add_vrect(
+            x0=overall_mean - overall_std, x1=overall_mean + overall_std,
+            fillcolor="orange", opacity=0.08, layer="below",
+            annotation_text=f"±1σ ({overall_std:.2f})",
+            annotation_position="top left",
+            annotation_font_size=11,
         )
         fig_dist.add_vline(
             x=subj_val, line_dash="dash", line_color="green", line_width=2,
@@ -204,7 +237,7 @@ with tab_single:
         )
 
         fig_dist.update_layout(
-            title="Target Variable Distribution by Subject",
+            title=f"Target Distribution — μ={overall_mean:.2f} σ={overall_std:.3f}",
             xaxis_title=f"{bt_target} score",
             yaxis_title="Number of subjects",
             template="plotly_white",
