@@ -1,4 +1,7 @@
-"""Graph metric computation for speech transcripts."""
+"""Graph metric computation for speech transcripts.
+
+Matches Java SpeechGraphs.jar logic exactly.
+"""
 
 from __future__ import annotations
 
@@ -32,15 +35,6 @@ def compute_metrics(
     tokens_or_segments: Sequence[str] | Sequence[Sequence[str]],
     segment_boundaries: list[bool] | None = None,
 ) -> dict[str, float]:
-    """Compute all graph metrics for a token sequence.
-
-    Args:
-        tokens_or_segments: Flat list of tokens or list of segments.
-        segment_boundaries: Optional boundary flags for splitting flat tokens.
-
-    Returns:
-        Dict with 15 metric values.
-    """
     if segment_boundaries is not None:
         tokens = list(tokens_or_segments) if not tokens_or_segments or isinstance(tokens_or_segments[0], str) else [t for seg in tokens_or_segments for t in seg]
         segments = split_by_boundaries(tokens, segment_boundaries)
@@ -61,26 +55,41 @@ def compute_metrics(
     graph = nx.DiGraph()
     graph.add_nodes_from(nodes)
     graph.add_edges_from(ec.keys())
-    undirected = graph.to_undirected()
-
-    lcc = int(max((len(c) for c in nx.connected_components(undirected)), default=0)) if node_count else 0
     lsc = int(max((len(c) for c in nx.strongly_connected_components(graph)), default=0)) if node_count else 0
     atd = float(2.0 * edge_total / node_count) if node_count else 0.0
 
+    # --- Java's removeSelfLoops equivalent ---
+    # Remove self-loops, keep one edge per undirected pair (matches Java's post-removal state)
     unique_pairs = {frozenset((s, t)) for s, t in ec if s != t}
     unique_undirected_non_self = len(unique_pairs)
     density = float(unique_undirected_non_self / (node_count * (node_count - 1) / 2)) if node_count > 1 else 0.0
 
+    # Undirected graph from post-removal edges (Java's und/und2)
+    und = nx.Graph()
+    und.add_nodes_from(nodes)
+    for pair in unique_pairs:
+        und.add_edge(*pair)
+
+    # LCC: Java's WeakComponentClusterer on modified undirected graph
+    if node_count > 0 and und.number_of_edges() > 0:
+        components = list(nx.connected_components(und))
+        lcc = int(max(len(c) for c in components))
+        largest = max(components, key=len)
+    else:
+        lcc = 0
+        largest = set()
+
+    # Diameter, ASP: Java's DistanceStatistics / UnweightedShortestPath on LCC
     diameter = float("nan")
     asp = float("nan")
-    cc_val = float("nan")
-    if node_count > 1 and undirected.number_of_edges() > 0:
-        largest = max(nx.connected_components(undirected), key=len)
-        component = undirected.subgraph(largest).copy()
+    if len(largest) > 1:
+        component = und.subgraph(largest).copy()
         if component.number_of_nodes() > 1:
             diameter = float(nx.diameter(component))
             asp = float(nx.average_shortest_path_length(component))
-            cc_val = float(nx.average_clustering(component))
+
+    # CC: Java's Metrics.clusteringCoefficients on ALL vertices (und2)
+    cc_val = float(nx.average_clustering(und)) if node_count > 0 and und.number_of_edges() > 0 else float("nan")
 
     adj = adjacency_matrix(ec, nodes)
     l1 = int(np.trace(adj)) if node_count else 0
