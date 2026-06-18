@@ -24,7 +24,7 @@ from src.preprocessing.loaders import load_transcript_txt
 from src.preprocessing.tokenizer import tokenize_segments
 from src.graphs.metrics import compute_metrics, METRICS
 from src.graphs.windowing import sliding_windows
-from src.analysis.random_graph import generate_random_graphs, compute_z_scores
+from src.analysis.random_graph import generate_random_graphs_jar, compute_z_scores
 
 
 TASK_ACTIVITIES = {
@@ -90,7 +90,7 @@ def process_single_subject(
         original = compute_metrics(window_tokens, segment_boundaries=boundaries)
         original["wc"] = len(window_tokens)
 
-        random_list = generate_random_graphs(
+        random_list = generate_random_graphs_jar(
             window_tokens, boundaries, n_random=n_random, seed=seed
         )
 

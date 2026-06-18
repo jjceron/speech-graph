@@ -1,10 +1,12 @@
-"""Random graph generation by shuffling tokens within segments."""
+"""Random graph generation — token shuffle (original) and edge rewiring (JAR-compatible)."""
 
 from __future__ import annotations
 
 import random
+from collections import Counter
 
-from src.graphs.metrics import compute_metrics, METRICS
+from src.graphs.builder import edge_counts, split_by_boundaries
+from src.graphs.metrics import compute_metrics, compute_metrics_from_counts, METRICS
 
 
 def shuffle_within_segments(
@@ -96,6 +98,72 @@ def compute_z_scores(
         z_score = 0.0 if std < 1e-10 else (base - mean) / std
         z[f"z_{m}"] = max(-10.0, min(10.0, z_score))
     return z
+
+
+def edge_rewire(
+    nodes: list[str],
+    edge_total: int,
+    seed: int = 42,
+) -> Counter:
+    """JAR-style edge rewiring: same N, same E, random node pairs.
+
+    Each of the *edge_total* edges is replaced by a random directed pair
+    ``(nodes[a], nodes[b])`` where *a* and *b* are uniformly drawn from
+    ``[0, N)`` (matching Java's ``rand.nextInt(N) + 1`` 1-indexed logic).
+
+    Args:
+        nodes: Ordered list of unique node labels.
+        edge_total: Number of edges to generate.
+        seed: Random seed.
+
+    Returns:
+        Edge count dict for the rewired graph.
+    """
+    rng = random.Random(seed)
+    n = len(nodes)
+    new_ec: Counter = Counter()
+    for _ in range(edge_total):
+        src = nodes[rng.randint(0, n - 1)]
+        tgt = nodes[rng.randint(0, n - 1)]
+        new_ec[(src, tgt)] += 1
+    return new_ec
+
+
+def generate_random_graphs_jar(
+    tokens: list[str],
+    boundaries: list[bool],
+    n_random: int = 100,
+    seed: int = 42,
+    metrics: list[str] | None = None,
+) -> list[dict[str, float]]:
+    """Generate random graphs via JAR-style edge rewiring.
+
+    Preserves the original node set and total edge count; randomly rewires
+    each edge to a uniformly random directed pair of nodes (self-loops
+    allowed), matching ``SpeechGraphs.jar``.
+
+    Args:
+        tokens: Flat list of tokens.
+        boundaries: Boundary flags (True = segment break before token).
+        n_random: Number of random graphs.
+        seed: Random seed (incremented per graph).
+        metrics: Which metrics to return (default: all).
+
+    Returns:
+        List of metric dicts, one per random graph.
+    """
+    if metrics is None:
+        metrics = METRICS[:]
+    segments = split_by_boundaries(tokens, boundaries)
+    nodes = list(dict.fromkeys(tokens))
+    ec = edge_counts(segments)
+    edge_total = int(sum(ec.values()))
+    results: list[dict[str, float]] = []
+    for i in range(n_random):
+        new_ec = edge_rewire(nodes, edge_total, seed=seed + i)
+        m = compute_metrics_from_counts(nodes, new_ec, wc=len(tokens))
+        results.append({k: m[k] for k in metrics if k in m})
+    return results
 
 
 def _is_finite(v: float) -> bool:
