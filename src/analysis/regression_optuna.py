@@ -1261,7 +1261,10 @@ def main() -> None:
     if args.fast:
         logger.info("Fast mode: ON (excluye Bagging, Stacking, GPR)")
 
+    t_total_start = time.time()
+
     for target in targets:
+        t_target_start = time.time()
         logger.info("-" * 60)
         logger.info("Loading data for target=%s", target)
         X, y = load_per_window_matrix(
@@ -1300,8 +1303,15 @@ def main() -> None:
             optimize_splits=args.optimize_splits,
         )
 
+        elapsed_target = time.time() - t_target_start
+        logger.info(
+            "Target=%s completed in %.1f s (%.1f min)",
+            target, elapsed_target, elapsed_target / 60,
+        )
+
+    elapsed_total = time.time() - t_total_start
     logger.info("=" * 60)
-    logger.info("ALL TARGETS COMPLETE")
+    logger.info("ALL TARGETS COMPLETE | Total: %.1f s (%.1f min)", elapsed_total, elapsed_total / 60)
     logger.info("=" * 60)
 
 
