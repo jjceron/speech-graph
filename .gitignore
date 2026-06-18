@@ -44,3 +44,4 @@ outputs/regression_optuna/logs/
 .opencode/
 
 
+data/processed/tasks/
