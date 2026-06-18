@@ -57,7 +57,7 @@ def split_by_boundaries(tokens: list[str], boundaries: list[bool]) -> list[list[
     segments: list[list[str]] = []
     current: list[str] = []
     for i, token in enumerate(tokens):
-        if i > 0 and boundaries[i]:
+        if i > 0 and boundaries[i] != boundaries[i - 1]:
             if current:
                 segments.append(current)
             current = []
