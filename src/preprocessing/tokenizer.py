@@ -30,7 +30,9 @@ def clean_text(
         6. Strip non-alphanumeric characters
         7. Restore placeholders
     """
-    value = normalize_annotations_text(text) if normalize else str(text or "")
+    value = str(text or "")
+    value = re.sub(r"<\s*(.*?)\s*>", r"\n\1\n", value)
+    value = normalize_annotations_text(value) if normalize else value
     value = re.sub(r"\bspk_?\d*\s*:\s*", " ", value, flags=re.IGNORECASE)
     value = value.replace("[[EE]]", f" {_GRAPH_PLACEHOLDER} ")
     value = value.replace(BREAK_TOKEN, f" {_BREAK_PLACEHOLDER} ")
@@ -67,6 +69,9 @@ def tokenize_segments(
 
     segments: list[list[str]] = []
     for part in cleaned.split(BREAK_TOKEN):
+        part = part.strip()
+        if len(part) <= 1:
+            continue
         tokens = [m.group(0) for m in _WORD_RE.finditer(part)]
         if tokens:
             segments.append(tokens)

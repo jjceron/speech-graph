@@ -8,7 +8,7 @@ from typing import Iterable
 # --- Label sets ---
 
 GRAPH_TOKEN_LABELS: set[str] = {"EE"}
-BREAK_LABELS: set[str] = {"PAUSA", "DP", "DI"}
+BREAK_LABELS: set[str] = {"PAUSA", "DP", "DI", "D1"}
 DROP_LABELS: set[str] = {"ES", "IF", "PS", "PNC", "IM", "SIN_RESPUESTA", "SIN_PREGUNTA"}
 BREAK_TOKEN: str = "__TRANSCRIPT_BREAK__"
 
