@@ -1152,7 +1152,7 @@ def run_one_target(
     study.optimize(
         obj_func,
         n_trials=n_trials,
-        callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=50), EarlyStoppingCallback(patience=75, min_improvement=1e-4)],
+        callbacks=[TrialProgressCallback(n_trials=n_trials, report_every=50)],
         catch=(ValueError, FloatingPointError, np.linalg.LinAlgError, TrialTimeout),
         show_progress_bar=True,
     )
