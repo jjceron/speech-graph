@@ -2,7 +2,7 @@
 
 Usage:
     py -m src1.pipeline.speechgraph --task 2 --windows 10,20,30,40
-    py -m src1.pipeline.speechgraph --task 6 --windows 30,40,50,150,200
+    py -m src1.pipeline.speechgraph --task 6 --windows 30,40,50,150,160,170,180,190,200
     py -m src1.pipeline.speechgraph --task 7 --windows 20,30,40,50
 """
 
@@ -28,6 +28,8 @@ from src.graphs.windowing import sliding_windows
 
 TASK_ACTIVITIES = {
     2: "Actividad2",
+    4: "Actividad4",
+    5: "Actividad5",
     6: "Actividad6",
     7: "Actividad7",
 }
@@ -49,7 +51,24 @@ def load_metadata(metadata_path: str | Path) -> pd.DataFrame:
 
 
 def get_subject_code(filename: str) -> str:
-    """Extract subject code from transcript filename."""
+    """
+    Extract the subject code from a transcript filename.
+
+    Removes the file extension and strips the trailing
+    'CorrEtiq' suffix when it appears in any of the supported
+    formats: '_CorrEtiq', '-CorrEtiq', or ' CorrEtiq'.
+
+    Args:
+        filename: Name or path of the transcript file.
+
+    Returns:
+        The extracted subject code without extension or
+        correction label suffix.
+
+    Examples:
+        >>> get_subject_code("CSO-15-10B-YVBUAN-CorrEtiq.txt")
+        'CSO-15-10B-YVBUAN'
+    """
     name = Path(filename).stem
     for suffix in ("_CorrEtiq", "-CorrEtiq", " CorrEtiq"):
         if name.endswith(suffix):
@@ -66,17 +85,32 @@ def process_single_subject(
     step: int,
     include_speakers: tuple[str, ...] = ("spk_1",),
     task: int | None = None,
-    clean_func: str = "clean_text",
-    pos_filter: bool = False,
+    clean_func: str = "clean_text", ### Tipo de limpieza "clean_text": No agresiva, "clean_text_all": Agresiva
+    pos_filter: bool = False, ### Activa filtrado POS tag
     pos_lang: str = "es",
+    bool_lowercase: bool = False, ### Activa lowercase --> No hacer siempre depende del preprocesamiento. Por ejemplo, mantener en POS filter
 ) -> tuple[list[dict], list[list[str]], list[str]] | None:
     
     """Process one subject for one activity and one window size.
 
     Returns (window_rows, segments, flat_tokens), or None if not found.
     """
-    spk_first_only = task is not None and task in {6, 7}
-    activities = load_transcript_txt(transcript_path, include_speakers=include_speakers, spk_first_only=spk_first_only)
+    spk_first_only = task is not None and task in {4, 6, 7} ### Tomar solo la primera intervención del spk para listado de tareas en específico
+    ### La siguiente función está en loaders.py
+    activities = load_transcript_txt(transcript_path, include_speakers=include_speakers,
+                                     spk_first_only=spk_first_only)
+    ### activities es una lista de dicts que tienen la forma
+    # [
+    #     {
+    #         "name": act.name,
+    #         "start_time": act.start_time,
+    #         "end_time": act.end_time,
+    #         "text": act.text(), ### Conserva los signos de puntuación, interrogación y exclamación
+    #     }
+    #     for act in transcript.activities
+    #     if act.text()
+    # ]
+
     act = None
     for a in activities:
         if a["name"] == activity_name:
@@ -90,17 +124,31 @@ def process_single_subject(
         return None
 
     segments, segment_map = tokenize_segments(
-        text, return_segment_map=True, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,
-    )
+        text, lowercase=bool_lowercase, return_segment_map=True, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,)
+    ### Tokenize cleaned transcript text into structured segments separated by BREAK_TOKEN.
+    # text: 'hola mundo BREAK_TOKEN buenos días'
+    # segments:
+    # [["hola", "mundo"], ["buenos", "días"]]
+    # segment_map:
+    # [0, 0, 1, 1]
+
     flat_tokens = [t for seg in segments for t in seg]
+    # flat_tokens:
+    # ["hola", "mundo",  "buenos", "días"]
     if not flat_tokens:
         return None
 
     window_rows = []
-    for window_tokens, start, end, boundaries in sliding_windows(
-        flat_tokens, window_size, step, allow_short=False, segment_boundaries=segment_map
-    ):
-        m = compute_metrics(window_tokens, segment_boundaries=boundaries)
+    for window_tokens, start, end, boundaries in sliding_windows(flat_tokens, window_size,
+                                                                 step, allow_short=False, segment_boundaries=segment_map):
+        ### Generate sliding windows over a sequence of tokens.
+        # [(
+        #     ["a", "b", "c", "d"],
+        #     0,
+        #     4,
+        #     [False, False, True, False]
+        # )]
+        m = compute_metrics(window_tokens, segment_boundaries=boundaries) ######## <----- VOY ACA
         m["wc"] = len(window_tokens)
         window_rows.append(m)
 
@@ -112,7 +160,7 @@ def process_single_subject(
 OUTPUT_COLUMNS = [
     "file", "wc", "nodes", "edges", "re", "pe", "l1", "l2", "l3",
     "lcc", "lsc", "atd", "density", "diameter", "asp", "cc",
-]
+    ]
 
 
 def save_results(
@@ -191,10 +239,11 @@ def run_pipeline(
     metadata_path: str | Path = "data/raw/metadata.xlsx",
     output_dir: str | Path = "data/processed/metrics",
     include_speakers: tuple[str, ...] = ("spk_1",),
-    save_processed_text: bool = False,
+    save_processed_text: bool = True, ### Argumento para guardar o no el texto preprocesado -> Importante mantenerlo True para evluar calidad de preprocesamiento
     clean_func: str = "clean_text",
     pos_filter: bool = False,
     pos_lang: str = "es",
+    bool_lowercase:bool = True,
 ) -> None:
     """Run the full pipeline for a task and list of window sizes."""
     activity_name = TASK_ACTIVITIES.get(task)
@@ -222,10 +271,14 @@ def run_pipeline(
         step0 = resolve_step(step, windows[0])
         for filename in transcript_files:
             subject_code = get_subject_code(filename)
-            if subject_code not in subject_codes:
-                continue
+            if subject_code not in subject_codes: ### Garantizar que código de sujeto tenga metadatos
+                continue 
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, windows[0], step0, include_speakers, task=task, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang)
+            ### La siguiente función procesa un transcript para una actividad y ventana.
+            ### Carga transcript, tokeniza, genera ventanas deslizantes, computa métricas.
+            result = process_single_subject(filepath, activity_name, windows[0], step0, include_speakers,
+                                            task=task, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,
+                                            bool_lowercase=bool_lowercase) ############## VOY ACA
             if result is not None:
                 _, segments, _ = result
                 save_activity_text(segments, task, subject_code)
@@ -245,7 +298,9 @@ def run_pipeline(
                 continue
 
             filepath = os.path.join(transcripts_dir, filename)
-            result = process_single_subject(filepath, activity_name, window_size, resolved, include_speakers, task=task, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang)
+            result = process_single_subject(filepath, activity_name, window_size, resolved, include_speakers,
+                                            task=task, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,
+                                            bool_lowercase=bool_lowercase)
             if result is None:
                 continue
 
@@ -279,8 +334,8 @@ def parse_args() -> argparse.Namespace:
         prog="python -m src1.pipeline.speechgraph",
     )
     parser.add_argument(
-        "--task", type=int, required=True, choices=[2, 6, 7],
-        help="Activity number to process (2, 6, or 7)",
+        "--task", type=int, required=True, choices=[2, 4, 5, 6, 7],
+        help="Activity number to process (2, 4, 5, 6, or 7)",
     )
     parser.add_argument(
         "--windows", type=str, required=True,
@@ -322,6 +377,10 @@ def parse_args() -> argparse.Namespace:
         "--pos-lang", default="es",
         help="Language for stanza POS tagging (default: es)",
     )
+    parser.add_argument(
+        "--bool-lowercase", action="store_true",
+        help="Apply normalization to lowercase (True, False)",
+    )
     return parser.parse_args()
 
 
@@ -338,10 +397,11 @@ def main() -> None:
         metadata_path=args.metadata,
         output_dir=args.output_dir,
         include_speakers=speakers,
-        save_processed_text=args.save_processed_text,
+        save_processed_text=args.save_processed_text, ### Argumento para guardar o no el texto preprocesado -> Importante mantenerlo True para evluar calidad de preprocesamiento
         clean_func=args.clean_func,
         pos_filter=args.pos_filter,
         pos_lang=args.pos_lang,
+        bool_lowercase=args.bool_lowercase ### Activa lowercase --> No hacer siempre depende del preprocesamiento. Por ejemplo, mantener en POS filter
     )
 
 

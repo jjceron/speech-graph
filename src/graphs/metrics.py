@@ -15,7 +15,7 @@ from .builder import adjacency_matrix, edge_counts, split_by_boundaries
 METRICS = [
     "wc", "nodes", "edges", "re", "pe", "l1", "l2", "l3",
     "lcc", "lsc", "atd", "density", "diameter", "asp", "cc",
-]
+    ]
 
 
 def _as_segments(tokens_or_segments: Sequence[str] | Sequence[Sequence[str]]) -> list[list[str]]:
