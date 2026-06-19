@@ -84,14 +84,14 @@ def process_single_subject(
         return None
 
     z_rows = []
-    for window_tokens, start, end, boundaries in sliding_windows(
-        flat_tokens, window_size, step, allow_short=False, segment_boundaries=segment_map
+    for window_tokens, start, end, _ in sliding_windows(
+        flat_tokens, window_size, step, allow_short=False
     ):
-        original = compute_metrics(window_tokens, segment_boundaries=boundaries)
+        original = compute_metrics(window_tokens)
         original["wc"] = len(window_tokens)
 
         random_list = generate_random_graphs_jar(
-            window_tokens, boundaries, n_random=n_random, seed=seed
+            window_tokens, [False] * len(window_tokens), n_random=n_random, seed=seed
         )
 
         zs = compute_z_scores(original, random_list)

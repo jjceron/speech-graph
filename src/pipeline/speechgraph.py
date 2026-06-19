@@ -91,10 +91,10 @@ def process_single_subject(
         return None
 
     window_rows = []
-    for window_tokens, start, end, boundaries in sliding_windows(
-        flat_tokens, window_size, step, allow_short=False, segment_boundaries=segment_map
+    for window_tokens, start, end, _ in sliding_windows(
+        flat_tokens, window_size, step, allow_short=False
     ):
-        m = compute_metrics(window_tokens, segment_boundaries=boundaries)
+        m = compute_metrics(window_tokens)
         m["wc"] = len(window_tokens)
         window_rows.append(m)
 

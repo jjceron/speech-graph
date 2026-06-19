@@ -57,7 +57,9 @@ def compute_metrics_from_counts(
     graph.add_nodes_from(nodes)
     graph.add_edges_from(ec.keys())
     lsc = int(max((len(c) for c in nx.strongly_connected_components(graph)), default=0))
-    atd = float(2.0 * edge_total / node_count)
+
+    adj = adjacency_matrix(ec, nodes)
+    atd = float(np.mean(adj.sum(axis=0) + adj.sum(axis=1)))
 
     # --- Java's removeSelfLoops equivalent ---
     # Remove self-loops, keep one edge per undirected pair (matches Java's post-removal state)
@@ -92,7 +94,6 @@ def compute_metrics_from_counts(
     # CC: Java's Metrics.clusteringCoefficients on ALL vertices (und2)
     cc_val = float(nx.average_clustering(und)) if und.number_of_edges() > 0 else float("nan")
 
-    adj = adjacency_matrix(ec, nodes)
     l1 = int(np.trace(adj))
     pe = int(edge_total - l1 - unique_undirected_non_self)
 

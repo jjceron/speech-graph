@@ -142,10 +142,10 @@ def inspect_subject(
     else:
         for w in windows:
             window_rows = []
-            for window_tokens, start, end, boundaries in sliding_windows(
-                flat_tokens, w, step, allow_short=False, segment_boundaries=segment_map
+            for window_tokens, start, end, _ in sliding_windows(
+                flat_tokens, w, step, allow_short=False
             ):
-                m = compute_metrics(window_tokens, segment_boundaries=boundaries)
+                m = compute_metrics(window_tokens)
                 m["wc"] = len(window_tokens)
                 window_rows.append(m)
 
