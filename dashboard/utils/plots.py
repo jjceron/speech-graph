@@ -227,11 +227,7 @@ def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
     df["_sort"] = (~df["selected"]).astype(int)
     df = df.sort_values(["_sort", "ranking", "feature"])
 
-<<<<<<< HEAD
-    colors = ["#2ca02c" if s else "#d9534f" for s in df["selected"]]
-=======
     colors = ["#2ca02c" if s else "#aaaaaa" for s in df["selected"]]
->>>>>>> 40f90a1 (Update)
     n_sel = df["selected"].sum()
     max_name_len = df["feature"].str.len().max()
 
@@ -258,34 +254,6 @@ def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
 
 
 def optimization_history(df: pd.DataFrame) -> go.Figure:
-<<<<<<< HEAD
-    df = df.dropna(subset=["value"]).copy()
-    if "state" in df.columns:
-        df = df[df["state"] == "COMPLETE"]
-    df = df.sort_values("number")
-    best = df["value"].cummin()
-
-    y_lower = best.iloc[-1] * 0.90
-    first_val = df["value"].iloc[0]
-    q90 = df["value"].quantile(0.90)
-    y_upper = min(first_val, q90) * 1.05
-
-    fig = go.Figure()
-    for reg in sorted(df["params_regressor"].unique()):
-        mask = df["params_regressor"] == reg
-        fig.add_trace(go.Scatter(
-            x=df.loc[mask, "number"],
-            y=df.loc[mask, "value"],
-            mode="markers",
-            marker=dict(size=4, opacity=0.5),
-            name=reg,
-            hovertemplate=f"<b>{reg}</b><br>Trial: %{{x}}<br>MAE val: %{{y:.4f}}<extra></extra>",
-        ))
-    fig.add_trace(go.Scatter(
-        x=df["number"], y=best, mode="lines",
-        line=dict(color="red", width=2), name="Best so far",
-    ))
-=======
     df = df.dropna(subset=["value"]).sort_values("number")
     best = df["value"].cummin()
     fig = go.Figure()
@@ -307,148 +275,17 @@ def optimization_history(df: pd.DataFrame) -> go.Figure:
             name="Best so far",
         )
     )
->>>>>>> 40f90a1 (Update)
     fig.update_layout(
         title="Optuna Optimization History",
         xaxis_title="Trial",
         yaxis_title="Objective (MAE validation)",
         template="plotly_white",
-<<<<<<< HEAD
-        height=450,
-        hovermode="x unified",
-    )
-    fig.update_yaxes(range=[y_lower, y_upper])
-    return fig
-
-
-def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
-    dfp = df.dropna(subset=["value", "params_regressor"]).copy()
-    if "state" in dfp.columns:
-        dfp = dfp[dfp["state"] == "COMPLETE"]
-    if len(dfp) == 0:
-        return go.Figure()
-
-    best_val = dfp["value"].min()
-
-    fig = go.Figure()
-    for i, reg in enumerate(sorted(dfp["params_regressor"].unique())):
-        vals = np.sort(dfp[dfp["params_regressor"] == reg]["value"].values)
-        ecdf = np.arange(1, len(vals) + 1) / len(vals)
-        c = px.colors.qualitative.Plotly[i % len(px.colors.qualitative.Plotly)]
-        fig.add_trace(go.Scatter(
-            x=vals, y=ecdf, mode="lines",
-            name=reg, line=dict(width=2.5, color=c),
-            fill="tozeroy",
-            fillcolor=f"rgba({int(c[1:3], 16)},{int(c[3:5], 16)},{int(c[5:7], 16)},0.15)",
-            hovertemplate=(
-                f"<b>{reg}</b><br>"
-                "MAE: %{x:.4f}<br>"
-                "Frac ≤ threshold: %{y:.0%}<extra></extra>"
-            ),
-        ))
-        med = float(np.median(vals))
-        fig.add_trace(go.Scatter(
-            x=[med], y=[0.5], mode="markers",
-            marker=dict(size=11, symbol="diamond", color=c,
-                        line=dict(width=1.5, color="black")),
-            showlegend=False,
-            hovertemplate=(
-                f"<b>{reg}</b><br>"
-                f"Median MAE: {med:.4f}<extra></extra>"
-            ),
-        ))
-
-    data_range = dfp["value"].max() - best_val
-    x_range = [dfp["value"].max() + data_range * 0.05, best_val - data_range * 0.18]
-
-    fig.add_vline(x=best_val, line_dash="dash", line_color="red", line_width=1.5)
-    fig.add_annotation(
-        x=best_val, y=0.97,
-        text=f"Best: {best_val:.4f}",
-        showarrow=True, arrowhead=1, arrowsize=1.2,
-        ax=40, ay=-30,
-        font=dict(size=13, color="red"),
-        bgcolor="rgba(255,255,255,0.85)",
-        bordercolor="red",
-        borderwidth=1.5,
-    )
-
-    fig.update_xaxes(range=x_range, autorange=False)
-    fig.update_yaxes(tickformat=".0%")
-    fig.update_layout(
-        title="Trials Achieving Threshold (ECDF per Regressor)",
-        xaxis_title="Objective (MAE val) — worse → better",
-        yaxis_title="Trials ≤ threshold (%)",
-        template="plotly_white", height=450,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-=======
         height=400,
->>>>>>> 40f90a1 (Update)
     )
     return fig
 
 
 def model_selection_bar(df: pd.DataFrame) -> go.Figure:
-<<<<<<< HEAD
-    dfp = df.dropna(subset=["value", "params_regressor"]).copy()
-    if "state" in dfp.columns:
-        dfp = dfp[dfp["state"] == "COMPLETE"]
-    if len(dfp) == 0:
-        return go.Figure()
-
-    grp = dfp.groupby("params_regressor").agg(
-        trials=("value", "count"),
-        best_mae=("value", "min"),
-        mean_mae=("value", "mean"),
-        mean_nf=("params_rfe_n_features", "mean"),
-    ).reset_index().sort_values("trials", ascending=True)
-
-    global_best = dfp["value"].min()
-    best_reg = grp.loc[(grp["best_mae"] - global_best).abs().idxmin(), "params_regressor"]
-
-    bar_colors = grp["best_mae"]
-    line_widths = [3 if r == best_reg else 0.8 for r in grp["params_regressor"]]
-    line_colors = ["#222" if r == best_reg else "rgba(0,0,0,0.3)" for r in grp["params_regressor"]]
-
-    text_template = [
-        f"<b>{r}</b><br>Trials: {int(t)}<br>Best MAE: {b:.4f}<br>Mean MAE: {m:.4f}<br>Avg N Features: {n:.1f}{'<br><b>◀ BEST</b>' if r == best_reg else ''}<extra></extra>"
-        for r, t, b, m, n in zip(grp["params_regressor"], grp["trials"], grp["best_mae"], grp["mean_mae"], grp["mean_nf"])
-    ]
-
-    fig = go.Figure(go.Bar(
-        y=grp["params_regressor"],
-        x=grp["trials"],
-        orientation="h",
-        marker=dict(
-            color=bar_colors,
-            colorscale="RdYlGn_r",
-            showscale=True,
-            colorbar=dict(title="MAE Val"),
-            line=dict(width=line_widths, color=line_colors),
-        ),
-        text=grp["trials"],
-        textposition="outside",
-        textfont=dict(
-            size=12,
-            color=["#222" if r == best_reg else "#333" for r in grp["params_regressor"]],
-            weight=["bold" if r == best_reg else "normal" for r in grp["params_regressor"]],
-        ),
-        hovertemplate=text_template,
-        customdata=grp[["best_mae", "mean_mae", "mean_nf"]].to_numpy(),
-    ))
-    ticktexts = [
-        f"<b>{r}</b>" if r == best_reg else r
-        for r in grp["params_regressor"]
-    ]
-    fig.update_yaxes(ticktext=ticktexts, tickvals=grp["params_regressor"])
-    fig.update_layout(
-        title="Completed Trials per Regressor",
-        xaxis_title="Completed Trials",
-        yaxis_title="",
-        template="plotly_white",
-        height=400,
-        margin=dict(l=160),
-=======
     counts = df["params_regressor"].value_counts()
     fig = go.Figure()
     fig.add_trace(
@@ -466,210 +303,10 @@ def model_selection_bar(df: pd.DataFrame) -> go.Figure:
         yaxis_title="Trials",
         template="plotly_white",
         height=400,
->>>>>>> 40f90a1 (Update)
     )
     return fig
 
 
-<<<<<<< HEAD
-def plot_objective_by_regressor(df: pd.DataFrame) -> go.Figure:
-    dfp = df.dropna(subset=["value", "params_regressor"]).copy()
-    if "state" in dfp.columns:
-        dfp = dfp[dfp["state"] == "COMPLETE"]
-    reg_order = dfp.groupby("params_regressor")["value"].median().sort_values().index.tolist()
-    fig = go.Figure()
-    for i, reg in enumerate(reg_order):
-        vals = dfp[dfp["params_regressor"] == reg]["value"]
-        fig.add_trace(go.Box(
-            y=vals, name=reg, boxmean="sd",
-            marker_color=px.colors.qualitative.Plotly[i % len(px.colors.qualitative.Plotly)],
-            width=0.5,
-        ))
-    fig.update_layout(
-        title="Objective Distribution per Regressor",
-        yaxis_title="Objective (MAE val)",
-        template="plotly_white", height=400,
-    )
-    return fig
-
-
-def plot_parameter_importance(df: pd.DataFrame, height: int | None = None) -> go.Figure:
-    dfp = df.dropna(subset=["value"])
-    param_cols = [c for c in dfp.columns
-                  if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
-    importances = []
-    for col in param_cols:
-        sub = dfp[[col, "value"]].dropna()
-        if len(sub) < 10 or sub[col].nunique() < 3:
-            continue
-        try:
-            corr = sub["value"].corr(sub[col].astype(float))
-        except (ValueError, TypeError):
-            continue
-        if not np.isfinite(corr):
-            continue
-        importances.append((col.replace("params_", ""), corr))
-
-    importances.sort(key=lambda x: abs(x[1]), reverse=True)
-    labels = [x[0] for x in importances]
-    corrs = [x[1] for x in importances]
-    colors = ["#d62728" if c > 0 else "#2ca02c" for c in corrs]
-
-    fig = go.Figure(go.Bar(
-        x=corrs, y=labels, orientation="h",
-        marker_color=colors,
-        text=[f"{c:.3f}" for c in corrs],
-        textposition="outside",
-    ))
-    fig.update_layout(
-        title="Parameter Importance (Spearman ρ with objective)",
-        xaxis_title="Correlation with MAE val",
-        template="plotly_white",
-        height=height if height is not None else max(250, len(labels) * 35),
-        margin=dict(l=160),
-    )
-    fig.add_vline(x=0, line_dash="dot", line_color="gray")
-    return fig
-
-
-def plot_regressor_nfeatures_heatmap(df: pd.DataFrame, metric: str = "mae") -> go.Figure:
-    if metric == "mae":
-        value_col = "value"
-        aggfunc = "min"
-        ascending = True
-        colorscale = "RdYlGn_r"
-        label = "Best MAE"
-        title = "Best MAE by Regressor × N Features"
-    else:
-        value_col = "user_attrs_r2_mean_val"
-        aggfunc = "max"
-        ascending = False
-        colorscale = "RdYlGn"
-        label = "Best R²"
-        title = "Best R² by Regressor × N Features"
-
-    dfp = df.dropna(subset=[value_col, "params_regressor", "params_rfe_n_features"]).copy()
-    if "state" in dfp.columns:
-        dfp = dfp[dfp["state"] == "COMPLETE"]
-    if len(dfp) == 0:
-        return go.Figure()
-    dfp["params_rfe_n_features"] = dfp["params_rfe_n_features"].astype(int)
-
-    pivot_best = dfp.pivot_table(
-        index="params_regressor", columns="params_rfe_n_features",
-        values=value_col, aggfunc=aggfunc,
-    )
-    pivot_cnt = dfp.pivot_table(
-        index="params_regressor", columns="params_rfe_n_features",
-        values=value_col, aggfunc="count",
-    )
-
-    row_order = dfp.groupby("params_regressor")[value_col].agg(aggfunc).sort_values(ascending=ascending).index.tolist()
-    pivot_best = pivot_best.reindex(row_order)
-    pivot_cnt = pivot_cnt.reindex(row_order)
-
-    zmin = pivot_best.min().min()
-    zmax = pivot_best.max().max()
-    best_val = pivot_best.min().min() if ascending else pivot_best.max().max()
-    best_pos = None
-
-    hover = []
-    texts = []
-    for i in range(len(pivot_best.index)):
-        row_h = []
-        row_t = []
-        for j in range(len(pivot_best.columns)):
-            v = pivot_best.iloc[i, j]
-            c = pivot_cnt.iloc[i, j]
-            if pd.isna(v):
-                row_h.append(f"<b>{pivot_best.index[i]}</b><br>N={int(pivot_best.columns[j])}<br>No trials")
-                row_t.append("")
-            else:
-                is_best = (ascending and v == best_val) or (not ascending and v == best_val)
-                row_t.append(f"{v:.4f}")
-                row_h.append(
-                    f"<b>{pivot_best.index[i]}</b><br>"
-                    f"N={int(pivot_best.columns[j])}<br>"
-                    f"{label}: {v:.4f}<br>"
-                    f"Trials: {int(c)}"
-                    f"{'<br><b>◀ BEST</b>' if is_best else ''}"
-                )
-                if is_best:
-                    best_pos = (i, j)
-        hover.append(row_h)
-        texts.append(row_t)
-
-    fig = go.Figure(go.Heatmap(
-        z=pivot_best.values,
-        x=[str(int(c)) for c in pivot_best.columns],
-        y=pivot_best.index,
-        colorscale=colorscale,
-        zmin=zmin, zmax=zmax,
-        text=texts, texttemplate="%{text}", textfont=dict(size=11),
-        hovertext=hover, hovertemplate="%{hovertext}<extra></extra>",
-        colorbar=dict(title=label, thickness=15),
-        xgap=2, ygap=2,
-    ))
-
-    if best_pos:
-        fig.add_shape(
-            type="rect",
-            x0=best_pos[1] - 0.5, x1=best_pos[1] + 0.5,
-            y0=best_pos[0] - 0.5, y1=best_pos[0] + 0.5,
-            xref="x", yref="y",
-            line=dict(color="#222", width=3.5),
-            fillcolor="rgba(0,0,0,0)",
-            layer="above",
-        )
-
-    fig.update_layout(
-        title=title,
-        xaxis_title="RFE N Features",
-        yaxis_title="",
-        template="plotly_white",
-        height=max(250, len(pivot_best.index) * 45 + 60),
-        margin=dict(l=160),
-    )
-    return fig
-
-
-def plot_regressor_performance_summary(df: pd.DataFrame) -> go.Figure:
-    grp = df.dropna(subset=["value", "params_regressor"]).groupby("params_regressor").agg(
-        trials=("value", "count"),
-        best_mae=("value", "min"),
-        mean_nfeatures=("params_rfe_n_features", "mean"),
-    ).reset_index()
-
-    fig = go.Figure(go.Scatter(
-        x=grp["trials"],
-        y=grp["best_mae"],
-        mode="markers+text",
-        marker=dict(
-            size=grp["mean_nfeatures"].fillna(5) * 3,
-            sizemode="area",
-            sizeref=2 * max(grp["mean_nfeatures"].fillna(5)) / (40 ** 2),
-            color=grp["mean_nfeatures"],
-            colorscale="Viridis",
-            showscale=True,
-            colorbar=dict(title="Avg N Features"),
-            line=dict(width=1, color="black"),
-        ),
-        text=grp["params_regressor"],
-        textposition="top center",
-        hovertemplate=(
-            "<b>%{text}</b><br>"
-            "Trials: %{x}<br>"
-            "Best MAE: %{y:.4f}<br>"
-            "Avg N Features: %{marker.color:.1f}<extra></extra>"
-        ),
-    ))
-    fig.update_layout(
-        title="Regressor Performance Summary",
-        xaxis_title="Trials (frequency)",
-        yaxis_title="Best MAE val (lower is better)",
-        template="plotly_white",
-        height=450,
-=======
 def optuna_parallel_coords(df: pd.DataFrame, params: list[str], top_k: int = 100) -> go.Figure:
     dfp = df.dropna(subset=["value"]).copy()
     if len(dfp) == 0:
@@ -728,7 +365,6 @@ def optuna_parallel_coords(df: pd.DataFrame, params: list[str], top_k: int = 100
     fig.update_layout(
         title=f"Parallel Coordinates — Top {top_k} of {len(df.dropna(subset=['value']))} Trials",
         height=600,
->>>>>>> 40f90a1 (Update)
     )
     return fig
 
