@@ -71,7 +71,34 @@ def inspect_subject(
     transcripts_dir: str = "data/raw/transcripts",
     include_speakers: tuple[str, ...] = ("spk_1",),
     spk_first_only: bool = True,
+    file_path: str | None = None,
 ) -> None:
+    if file_path is not None:
+        text = Path(file_path).read_text(encoding="utf-8")
+        segments, segment_map = tokenize_segments(text, return_segment_map=True)
+        flat_tokens = [t for seg in segments for t in seg]
+        if not flat_tokens:
+            print("Empty tokens")
+            return
+
+        if windows is None:
+            m = compute_metrics(flat_tokens, segment_boundaries=segment_map)
+            print(f"\nFile: {file_path} | Full text ({len(flat_tokens)} tokens)")
+            print_full_text(flat_tokens, m)
+        else:
+            for w in windows:
+                window_rows = []
+                for window_tokens, start, end, boundaries in sliding_windows(
+                    flat_tokens, w, step, allow_short=False, segment_boundaries=segment_map
+                ):
+                    m = compute_metrics(window_tokens, segment_boundaries=boundaries)
+                    m["wc"] = len(window_tokens)
+                    window_rows.append(m)
+
+                print(f"\nFile: {file_path} | Window: {w}")
+                print_windows(window_rows)
+        return
+
     activity_name = TASK_ACTIVITIES.get(task)
     if activity_name is None:
         print(f"Unknown task {task}")
@@ -137,6 +164,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--step", type=int, default=1, help="Step size for sliding windows (default: 1)")
     parser.add_argument("--transcripts-dir", default="data/raw/transcripts",
                         help="Transcripts directory (default: data/raw/transcripts)")
+    parser.add_argument("--file", "-f", default=None,
+                        help="Direct path to a .txt file (bypasses subject/activity lookup)")
     return parser.parse_args()
 
 
@@ -151,6 +180,7 @@ def main() -> None:
         windows=windows,
         step=args.step,
         transcripts_dir=args.transcripts_dir,
+        file_path=args.file,
     )
 
 
