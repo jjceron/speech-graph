@@ -26,8 +26,8 @@ data/**
 !data/
 !data/processed/
 !data/processed/metrics/
-!data/processed/metrics/**/
-!data/processed/metrics/**/*.txt
+data/processed/metrics/**/
+data/processed/metrics/**/*.txt
 
 #### Output files
 !outputs/
