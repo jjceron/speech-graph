@@ -1,46 +1,33 @@
-# Python environment
-.venv/
+# Block everything by default
+*
 
-# Python generated files
+# Allowed directories
+!src/
+!src/**
+!scripts/
+!scripts/**
+!.devcontainer/
+!.devcontainer/**
+!dashboard/
+!dashboard/**
+
+# Allowed files
+!README.md
+!requirements*.txt
+!.gitignore
+
+# Python environment
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Environment variables and secrets
-.env
-.env.*
+.venv/
+.env*
 !.env.example
 
-# Documentation
-docs/
-
-# Temp
-temp/
-
-
-#### Data files
-data/**
-!data/
-!data/processed/
-!data/processed/metrics/
-!data/processed/metrics/**/
-!data/processed/metrics/**/*.txt
-
-#### Output files
-outputs/
-logs/
-
-#### OS and editor files
+# Editor / OS
+.vscode/
+.idea/
+.opencode/
 .DS_Store
 Thumbs.db
-.vscode/
-.idea/temp/
-*.db
 tmp/
-.opencode/
-
-
-data/processed/tasks/
+*.db
