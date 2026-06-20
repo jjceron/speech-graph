@@ -30,8 +30,8 @@ data/**
 !data/processed/metrics/**/*.txt
 
 #### Output files
-!outputs/
-!outputs/**
+outputs/
+logs/
 
 #### OS and editor files
 .DS_Store
@@ -40,7 +40,6 @@ Thumbs.db
 .idea/temp/
 *.db
 tmp/
-outputs/regression_optuna/logs/
 .opencode/
 
 
