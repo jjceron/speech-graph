@@ -98,7 +98,7 @@ DEFAULT_REGRESSORS = [
     "LinearRegression",
     "Ridge",
     "ElasticNet",
-    "QuantileRegressor",
+    # "QuantileRegressor",
     "SVR",
     "RandomForestRegressor",
     "ExtraTreesRegressor",
