@@ -4,7 +4,7 @@ The model is selected only with validation metrics. Test metrics are computed
 once for the best validation trial and saved as the final report.
 
 Usage:
-    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment raw --rfe fixed --targets all --optimize mae --n-trials 300 --n-iter 400 --optimize-splits 200
+    py -m src.analysis.regression_optuna --task 2 --window 10 --experiment raw --rfe fixed --targets all --optimize mae --n-trials 300 --n-iter 400 --optimize-splits 400
 """
 
 from __future__ import annotations
@@ -1221,7 +1221,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-rfe-features", type=int, default=100)
     parser.add_argument("--fast", action="store_true",
                         help="Modo rápido: reduce splits en optimización")
-    parser.add_argument("--optimize-splits", type=int, default=200,
+    parser.add_argument("--optimize-splits", type=int, default=400,
                         help="Splits usados durante optimización (default: 200; con --fast: n_iter//4, min 50)")
     parser.add_argument("--pruner-startup-trials", type=int, default=100)
     parser.add_argument("--pruner-warmup-steps", type=int, default=15)
