@@ -61,7 +61,8 @@ def tokenize_segments(
 
     Returns:
         If return_segment_map=False: list of segments (each a list of tokens)
-        If return_segment_map=True:  (segments, segment_map)
+        If return_segment_map=True:  (segments, segment_ids) where segment_ids[i]
+            is the segment index for token i.
     """
     cleaned = clean_text(text, lowercase=lowercase, normalize=normalize)
     if not cleaned:
@@ -79,10 +80,10 @@ def tokenize_segments(
     if not return_segment_map:
         return segments
 
-    segment_map: list[int] = []
+    segment_ids: list[int] = []
     for seg_idx, segment in enumerate(segments):
-        segment_map.extend([seg_idx] * len(segment))
-    return segments, segment_map
+        segment_ids.extend([seg_idx] * len(segment))
+    return segments, segment_ids
 
 
 def tokenize(

@@ -85,16 +85,16 @@ def process_single_subject(
     if not text.strip():
         return None
 
-    segments, segment_map = tokenize_segments(text, return_segment_map=True)
+    segments, segment_boundaries = tokenize_segments(text, return_segment_map=True)
     flat_tokens = [t for seg in segments for t in seg]
     if not flat_tokens:
         return None
 
     window_rows = []
-    for window_tokens, start, end, _ in sliding_windows(
-        flat_tokens, window_size, step, allow_short=False
+    for window_tokens, start, end, boundaries in sliding_windows(
+        flat_tokens, window_size, step, allow_short=False, segment_boundaries=segment_boundaries
     ):
-        m = compute_metrics(window_tokens)
+        m = compute_metrics(window_tokens, segment_boundaries=boundaries)
         m["wc"] = len(window_tokens)
         window_rows.append(m)
 

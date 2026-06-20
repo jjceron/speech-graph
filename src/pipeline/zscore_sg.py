@@ -78,20 +78,20 @@ def process_single_subject(
     if not text.strip():
         return None
 
-    segments, segment_map = tokenize_segments(text, return_segment_map=True)
+    segments, segment_boundaries = tokenize_segments(text, return_segment_map=True)
     flat_tokens = [t for seg in segments for t in seg]
     if not flat_tokens:
         return None
 
     z_rows = []
-    for window_tokens, start, end, _ in sliding_windows(
-        flat_tokens, window_size, step, allow_short=False
+    for window_tokens, start, end, boundaries in sliding_windows(
+        flat_tokens, window_size, step, allow_short=False, segment_boundaries=segment_boundaries
     ):
-        original = compute_metrics(window_tokens)
+        original = compute_metrics(window_tokens, segment_boundaries=boundaries)
         original["wc"] = len(window_tokens)
 
         random_list = generate_random_graphs_jar(
-            window_tokens, [False] * len(window_tokens), n_random=n_random, seed=seed
+            window_tokens, boundaries, n_random=n_random, seed=seed
         )
 
         zs = compute_z_scores(original, random_list)

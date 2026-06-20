@@ -82,7 +82,8 @@ def inspect_subject(
             return
 
         if windows is None:
-            m = compute_metrics(flat_tokens, segment_boundaries=segment_map)
+            seg_bool = [False] + [segment_map[i] != segment_map[i-1] for i in range(1, len(segment_map))]
+            m = compute_metrics(flat_tokens, segment_boundaries=seg_bool)
             print(f"\nFile: {file_path} | Full text ({len(flat_tokens)} tokens)")
             print_full_text(flat_tokens, m)
         else:
@@ -136,16 +137,17 @@ def inspect_subject(
         return
 
     if windows is None:
-        m = compute_metrics(flat_tokens, segment_boundaries=segment_map)
+        seg_bool = [False] + [segment_map[i] != segment_map[i-1] for i in range(1, len(segment_map))]
+        m = compute_metrics(flat_tokens, segment_boundaries=seg_bool)
         print(f"\nSubject: {subject_code} | Task: {task} | Full text ({len(flat_tokens)} tokens)")
         print_full_text(flat_tokens, m)
     else:
         for w in windows:
             window_rows = []
-            for window_tokens, start, end, _ in sliding_windows(
-                flat_tokens, w, step, allow_short=False
+            for window_tokens, start, end, boundaries in sliding_windows(
+                flat_tokens, w, step, allow_short=False, segment_boundaries=segment_map
             ):
-                m = compute_metrics(window_tokens)
+                m = compute_metrics(window_tokens, segment_boundaries=boundaries)
                 m["wc"] = len(window_tokens)
                 window_rows.append(m)
 
