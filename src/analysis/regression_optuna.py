@@ -330,7 +330,7 @@ def get_regressor(trial: optuna.trial.BaseTrial, name: str, random_state: int):
             n_estimators=trial.suggest_int("et_n_estimators", 50, 500),
             max_depth=trial.suggest_int("et_max_depth", 2, 20),
             min_samples_split=trial.suggest_int("et_min_samples_split", 2, 8),
-            criterion="friedman_mse",
+            criterion="squared_error",
             random_state=random_state,
             n_jobs=1,
         )
@@ -429,7 +429,7 @@ def get_rfe_estimator(
             n_estimators=rfe_et_n_est,
             max_depth=rfe_et_depth,
             min_samples_split=rfe_et_min_samples,
-            criterion="friedman_mse",
+            criterion="squared_error",
             random_state=random_state,
             n_jobs=1,
         )
