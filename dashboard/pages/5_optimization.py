@@ -104,7 +104,7 @@ with tab2:
                     "Metric": metric,
                     "Mean": f"{ts.get(f'{key}_mean_test', '?'):.4f}",
                     "CI 95%": f"[{ts.get(f'{key}_ci_lower_test', '?'):.4f}, {ts.get(f'{key}_ci_upper_test', '?'):.4f}]",
-                } for metric, key in [("MAE", "mae"), ("RMSE", "rmse"), ("R²", "r2"), ("rho", "rho")]]
+                } for metric, key in [("MAE", "mae"), ("D2MAE", "d2mae"), ("RMSE", "rmse"), ("R²", "r2"), ("rho", "rho")]]
                 st.dataframe(pd.DataFrame(test_rows), use_container_width=True, hide_index=True)
 
 with tab3:

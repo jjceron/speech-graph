@@ -48,29 +48,34 @@ col4.metric("R² > 0", f"{r2_pos}/{len(r2_vals)}")
 
 st.markdown("---")
 
+col_view, col_set, col_metric = st.columns(3)
+with col_view:
+    view_mode = st.radio("View", ["Top 5", "All Results"], horizontal=True)
+with col_set:
+    set_mode = st.radio("Set", ["val", "test"], horizontal=True, key="set_mode")
+with col_metric:
+    sort_metric = st.selectbox("Sort by", ["MAE", "R²"], index=0)
+
+suffix = set_mode
+
 rows = []
 for (w, e, t), r in reports.items():
-    ts = r.get("test_summary", {})
+    s = r.get("{}_summary".format("validation" if suffix == "val" else "test"), {})
     bp = r.get("best_params", {})
     feat = r.get("selected_features", [])
     rows.append({
-        "sort_key": ts.get("r2_mean_test", 0),
-        "sort_key_mae": ts.get("mae_mean_test", 999),
+        "sort_key": s.get("r2_mean_{}".format(suffix), 0),
+        "sort_key_mae": s.get("mae_mean_{}".format(suffix), 999),
         "Window": f"W{w}",
         "Experiment": e,
         "Target": t,
-        "R² [IC 95%]": f"{ts.get('r2_mean_test', 0):.4f} [{ts.get('r2_ci_lower_test', 0):.4f}, {ts.get('r2_ci_upper_test', 0):.4f}]",
-        "MAE [IC 95%]": f"{ts.get('mae_mean_test', 0):.3f} [{ts.get('mae_ci_lower_test', 0):.3f}, {ts.get('mae_ci_upper_test', 0):.3f}]",
-        "% R²<0": f"{ts.get('r2_below_zero_test', 0) * 100:.1f}%",
+        "R² [IC 95%]": f"{s.get(f'r2_mean_{suffix}', 0):.4f} [{s.get(f'r2_ci_lower_{suffix}', 0):.4f}, {s.get(f'r2_ci_upper_{suffix}', 0):.4f}]",
+        "MAE [IC 95%]": f"{s.get(f'mae_mean_{suffix}', 0):.3f} [{s.get(f'mae_ci_lower_{suffix}', 0):.3f}, {s.get(f'mae_ci_upper_{suffix}', 0):.3f}]",
+        "D2MAE [IC 95%]": f"{s.get(f'd2mae_mean_{suffix}', 0):.4f} [{s.get(f'd2mae_ci_lower_{suffix}', 0):.4f}, {s.get(f'd2mae_ci_upper_{suffix}', 0):.4f}]",
+        "% R²<0": f"{s.get(f'r2_below_zero_{suffix}', 0) * 100:.1f}%",
         "Model": bp.get("regressor", "?"),
         "Features": ", ".join(feat) if feat else "-",
     })
-
-col_view, col_metric = st.columns(2)
-with col_view:
-    view_mode = st.radio("View", ["Top 5", "All Results"], horizontal=True)
-with col_metric:
-    sort_metric = st.selectbox("Sort by", ["MAE", "R²"], index=0)
 
 if rows:
     df = pd.DataFrame(rows)

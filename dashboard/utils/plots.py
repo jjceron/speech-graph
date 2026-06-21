@@ -242,8 +242,9 @@ def rfe_ranking_chart(df: pd.DataFrame) -> go.Figure:
         xaxis_title="Ranking",
         yaxis_title="Feature",
         template="plotly_white",
-        height=max(300, 25 * len(df)),
-        margin=dict(l=max(100, 9 * max_name_len + 10)),
+        height=max(350, 28 * len(df) + 30),
+        margin=dict(l=max(130, 10 * max_name_len + 40), r=20, t=40, b=40),
+        yaxis=dict(tickfont=dict(size=11)),
         shapes=[{
             "type": "line", "x0": 0.5, "y0": n_sel - 0.5,
             "x1": df["ranking"].max() + 1, "y1": n_sel - 0.5,
