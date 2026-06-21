@@ -431,29 +431,32 @@ def plot_objective_by_regressor(df: pd.DataFrame) -> go.Figure:
     for i, reg in enumerate(reg_order):
         vals = dfp[dfp["params_regressor"] == reg]["value"]
         fig.add_trace(go.Box(
-            y=vals, name=reg, boxmean="sd",
+            y=vals, name=reg, legendgroup=reg, boxmean="sd",
+            boxpoints="outliers",
             marker_color=px.colors.qualitative.Plotly[i % len(px.colors.qualitative.Plotly)],
             width=0.5,
         ))
     fig.update_layout(
         title="Objective Distribution per Regressor",
         yaxis_title="Objective (MAE val)",
+        yaxis=dict(autorange=True),
         template="plotly_white", height=400,
     )
     return fig
 
 
-def plot_parameter_importance(df: pd.DataFrame, height: int | None = None) -> go.Figure:
+def plot_parameter_importance(df: pd.DataFrame, height: int | None = None, param_cols: list | None = None) -> go.Figure:
     dfp = df.dropna(subset=["value"])
-    param_cols = [c for c in dfp.columns
-                  if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
+    if param_cols is None:
+        param_cols = [c for c in dfp.columns
+                      if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
     importances = []
     for col in param_cols:
         sub = dfp[[col, "value"]].dropna()
-        if len(sub) < 10 or sub[col].nunique() < 3:
+        if len(sub) < 3 or sub[col].nunique() < 3:
             continue
         try:
-            corr = sub["value"].corr(sub[col].astype(float))
+            corr = sub["value"].corr(sub[col].astype(float), method="spearman")
         except (ValueError, TypeError):
             continue
         if not np.isfinite(corr):
@@ -473,7 +476,7 @@ def plot_parameter_importance(df: pd.DataFrame, height: int | None = None) -> go
     ))
     fig.update_layout(
         title="Parameter Importance (Spearman ρ with objective)",
-        xaxis_title="Correlation with MAE val",
+        xaxis_title="Spearman ρ with MAE val  (← better | worse →)",
         template="plotly_white",
         height=height if height is not None else max(250, len(labels) * 35),
         margin=dict(l=160),
