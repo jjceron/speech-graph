@@ -37,6 +37,7 @@ TASK_ACTIVITIES = {
 DEFAULT_WINDOWS = {
     2: [10, 20, 30, 40],
     6: [30, 40, 50, 150, 160, 170, 180, 190, 200],
+    6: [30, 40, 50, 150, 160, 170, 180, 190, 200],
     7: [20, 30, 40, 50],
 }
 
@@ -169,11 +170,13 @@ def save_results(
     window_size: int,
     output_dir: str | Path,
     suffix: str = "",
+    suffix: str = "",
 ) -> None:
     """Save params_table, mean (per-subject across windows), and median files."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    tag = f"T{task_num}W{window_size}{suffix}"
     tag = f"T{task_num}W{window_size}{suffix}"
 
     df = pd.DataFrame(rows)
@@ -319,7 +322,14 @@ def run_pipeline(
             if pos_filter:
                 suffix_parts.append("pos")
             suffix = "_" + "_".join(suffix_parts) if suffix_parts else ""
+            suffix_parts = []
+            if clean_func == "clean_text_all":
+                suffix_parts.append("all")
+            if pos_filter:
+                suffix_parts.append("pos")
+            suffix = "_" + "_".join(suffix_parts) if suffix_parts else ""
             out_dir = os.path.join(output_dir, f"Task{task}")
+            save_results(rows, task, window_size, out_dir, suffix=suffix)
             save_results(rows, task, window_size, out_dir, suffix=suffix)
         else:
             print(f"  No data for W{window_size}")

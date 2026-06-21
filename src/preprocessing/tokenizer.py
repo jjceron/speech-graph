@@ -221,6 +221,9 @@ def tokenize_segments(
     clean_func: str = "clean_text",
     pos_filter: bool = False,
     pos_lang: str = "es",
+    clean_func: str = "clean_text",
+    pos_filter: bool = False,
+    pos_lang: str = "es",
 ) -> list[list[str]] | tuple[list[list[str]], list[int]]:
     """
     Tokenize cleaned transcript text into structured segments separated by BREAK_TOKEN.
@@ -285,6 +288,7 @@ def tokenize_segments(
 
     segments: list[list[str]] = []
     segment_map: list[int] = []
+    segment_map: list[int] = []
     for part in cleaned.split(BREAK_TOKEN):
         part = part.strip()
         if len(part) <= 1:
@@ -294,9 +298,16 @@ def tokenize_segments(
             continue
         if pos_filter:
             tokens = filter_pos(tokens, lang=pos_lang)
+        if not tokens:
+            continue
+        if pos_filter:
+            tokens = filter_pos(tokens, lang=pos_lang)
         if tokens:
             seg_idx = len(segments)
+            seg_idx = len(segments)
             segments.append(tokens)
+            if return_segment_map:
+                segment_map.extend([seg_idx] * len(tokens))
             if return_segment_map:
                 segment_map.extend([seg_idx] * len(tokens))
 

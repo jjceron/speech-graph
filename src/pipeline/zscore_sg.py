@@ -6,6 +6,7 @@ Usage:
     py -m src.pipeline.zscore_sg --task 2 --windows 10,20,30,40 --n_random 100
     py -m src.pipeline.zscore_sg --task 7 --windows 20,30,40,50 --n_random 100
     py -m src.pipeline.zscore_sg --task 6 --windows 30,40,50,150,160,170,180,190,200 --n_random 100
+    py -m src.pipeline.zscore_sg --task 6 --windows 30,40,50,150,160,170,180,190,200 --n_random 100
 """
 
 from __future__ import annotations
@@ -66,6 +67,9 @@ def process_single_subject(
     clean_func: str = "clean_text",
     pos_filter: bool = False,
     pos_lang: str = "es",
+    clean_func: str = "clean_text",
+    pos_filter: bool = False,
+    pos_lang: str = "es",
 ) -> list[dict] | None:
     spk_first_only = task is not None and task in {6, 7}
     activities = load_transcript_txt(transcript_path, include_speakers=include_speakers, spk_first_only=spk_first_only)
@@ -81,6 +85,9 @@ def process_single_subject(
     if not text.strip():
         return None
 
+    segments, segment_map = tokenize_segments(
+        text, return_segment_map=True, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,
+    )
     segments, segment_map = tokenize_segments(
         text, return_segment_map=True, clean_func=clean_func, pos_filter=pos_filter, pos_lang=pos_lang,
     )
@@ -112,10 +119,12 @@ def save_results(
     window_size: int,
     output_dir: str | Path,
     suffix: str = "",
+    suffix: str = "",
 ) -> None:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    tag = f"T{task_num}W{window_size}{suffix}"
     tag = f"T{task_num}W{window_size}{suffix}"
 
     df = pd.DataFrame(rows)
@@ -161,6 +170,9 @@ def run_pipeline(
     metadata_path: str | Path = "data/raw/metadata.xlsx",
     output_dir: str | Path = "data/processed/metrics",
     include_speakers: tuple[str, ...] = ("spk_1",),
+    clean_func: str = "clean_text",
+    pos_filter: bool = False,
+    pos_lang: str = "es",
     clean_func: str = "clean_text",
     pos_filter: bool = False,
     pos_lang: str = "es",
@@ -210,6 +222,12 @@ def run_pipeline(
         print(f"  Processed: {processed} subjects, {len(rows)} windows")
 
         if rows:
+            suffix_parts = []
+            if clean_func == "clean_text_all":
+                suffix_parts.append("all")
+            if pos_filter:
+                suffix_parts.append("pos")
+            suffix = "_" + "_".join(suffix_parts) if suffix_parts else ""
             suffix_parts = []
             if clean_func == "clean_text_all":
                 suffix_parts.append("all")
@@ -278,6 +296,18 @@ def parse_args() -> argparse.Namespace:
         "--pos-lang", default="es",
         help="Language for stanza POS tagging (default: es)",
     )
+    parser.add_argument(
+        "--clean-func", default="clean_text", choices=["clean_text", "clean_text_all"],
+        help="Cleaning function to use (default: clean_text)",
+    )
+    parser.add_argument(
+        "--pos-filter", action="store_true",
+        help="Apply POS tag filtering via stanza",
+    )
+    parser.add_argument(
+        "--pos-lang", default="es",
+        help="Language for stanza POS tagging (default: es)",
+    )
     return parser.parse_args()
 
 
@@ -296,6 +326,9 @@ def main() -> None:
         metadata_path=args.metadata,
         output_dir=args.output_dir,
         include_speakers=speakers,
+        clean_func=args.clean_func,
+        pos_filter=args.pos_filter,
+        pos_lang=args.pos_lang,
         clean_func=args.clean_func,
         pos_filter=args.pos_filter,
         pos_lang=args.pos_lang,

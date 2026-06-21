@@ -622,6 +622,7 @@ def objective_regression(
     validation_summary = summarize_metric_rows(validation_rows, "val")
     for key, value in validation_summary.items():
         trial.set_user_attr(key, value)
+    trial.set_user_attr("trial_time_seconds", time.time() - start)
     trial.set_user_attr("termination_reason", "completed")
 
     return metric_to_objective(validation_summary[f"{optimize_metric}_mean_val"], optimize_metric)
