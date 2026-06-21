@@ -309,7 +309,7 @@ def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
         c = px.colors.qualitative.Plotly[i % len(px.colors.qualitative.Plotly)]
         fig.add_trace(go.Scatter(
             x=vals, y=ecdf, mode="lines",
-            name=reg, line=dict(width=2.5, color=c),
+            name=reg, legendgroup=reg, line=dict(width=2.5, color=c),
             fill="tozeroy",
             fillcolor=f"rgba({int(c[1:3], 16)},{int(c[3:5], 16)},{int(c[5:7], 16)},0.15)",
             hovertemplate=(
@@ -323,6 +323,7 @@ def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
             x=[med], y=[0.5], mode="markers",
             marker=dict(size=11, symbol="diamond", color=c,
                         line=dict(width=1.5, color="black")),
+            legendgroup=reg,
             showlegend=False,
             hovertemplate=(
                 f"<b>{reg}</b><br>"
@@ -351,8 +352,9 @@ def plot_optimization_ecdf(df: pd.DataFrame) -> go.Figure:
         title="Trials Achieving Threshold (ECDF per Regressor)",
         xaxis_title="Objective (MAE val) — worse → better",
         yaxis_title="Trials ≤ threshold (%)",
+        margin=dict(t=95),
         template="plotly_white", height=450,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(orientation="h", yanchor="bottom", y=0.925, xanchor="right", x=1),
     )
     return fig
 
