@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "nodes_T6W40": 5.791585450954628,
+    "lcc_T6W40": 6.484608054740709
+  },
+  "mean_shap": {
+    "nodes_T6W40": 0.2590388191573912,
+    "lcc_T6W40": -0.1746460330559377
+  },
+  "regressor": "Ridge",
+  "n_subjects": 252,
+  "n_features": 2
+}

@@ -1,0 +1,13 @@
+{
+  "mean_abs_shap": {
+    "nodes_T6W50": 7.636327354012823,
+    "lcc_T6W50": 8.337547222545915
+  },
+  "mean_shap": {
+    "nodes_T6W50": 0.2900697795453015,
+    "lcc_T6W50": -0.19632562012955093
+  },
+  "regressor": "LinearRegression",
+  "n_subjects": 252,
+  "n_features": 2
+}
