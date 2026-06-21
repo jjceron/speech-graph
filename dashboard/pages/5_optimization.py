@@ -1,3 +1,5 @@
+import json
+import ast
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -108,27 +110,81 @@ with tab2:
                 st.dataframe(pd.DataFrame(test_rows), use_container_width=True, hide_index=True)
 
 with tab3:
-    param_cols = [c for c in trials.columns if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
-    n_imp = sum(1 for c in param_cols if trials[c].dropna().nunique() >= 3 and trials[c].notna().sum() >= 10)
+    completed_trials = trials[trials.get("state", "COMPLETE") == "COMPLETE"] if "state" in trials.columns else trials
+    reg_list = sorted(completed_trials["params_regressor"].dropna().unique())
+
+    param_mode = st.radio("Trials parameters view", ["Best Model", "All", "Per Model"], horizontal=True, key="param_mode")
+    selected_reg = None
+    if param_mode == "Per Model":
+        selected_reg = st.selectbox("Select regressor", list(reg_list), key="per_model_select")
+
+    all_param_cols = [c for c in trials.columns if c.startswith("params_") and c not in ("params_regressor", "params_use_scaler")]
+
+    if param_mode == "All":
+        imp_df = trials
+    elif param_mode == "Per Model":
+        imp_df = completed_trials[completed_trials["params_regressor"] == selected_reg]
+    else:
+        best_reg = report.get("best_params", {}).get("regressor", "") if report else ""
+        imp_df = completed_trials[completed_trials["params_regressor"] == best_reg]
+
+    if param_mode != "Per Model":
+        display_report = report
+    else:
+        reg_trials = completed_trials[completed_trials["params_regressor"] == selected_reg]
+        if len(reg_trials) > 0:
+            best_row = reg_trials.loc[reg_trials["value"].idxmin()]
+            dr = {"best_params": {}, "selected_features": [], "best_trial_number": int(best_row["number"])}
+            for col in best_row.index:
+                if col.startswith("params_") and col not in ("params_regressor", "params_use_scaler"):
+                    val = best_row[col]
+                    if pd.notna(val):
+                        dr["best_params"][col.replace("params_", "")] = val
+            feat_col = "user_attrs_rfe_selected_features"
+            if feat_col in best_row.index and pd.notna(best_row[feat_col]):
+                feat_str = str(best_row[feat_col])
+                try:
+                    dr["selected_features"] = ast.literal_eval(feat_str) if feat_str.startswith("[") else [feat_str]
+                except (ValueError, SyntaxError):
+                    dr["selected_features"] = [feat_str]
+            display_report = dr
+        else:
+            display_report = report
+
+    if param_mode == "All":
+        param_cols = all_param_cols
+    else:
+        dp_keys = set(display_report.get("best_params", {}).keys())
+        param_cols = [c for c in all_param_cols if c.replace("params_", "") in dp_keys]
+
+    n_imp = sum(1 for c in param_cols if imp_df[c].dropna().nunique() >= 3 and imp_df[c].notna().sum() >= 3)
 
     plot_h = max(250, n_imp * 35)
-    n_table_rows = (len(report.get("best_params", {})) + 1 + len(report.get("selected_features", []))) if report else 0
+    n_table_rows = (len(display_report.get("best_params", {})) - 1 + len(display_report.get("selected_features", []))) if display_report else 0
     table_h = n_table_rows * 36 + 80
     height = min(max(plot_h, table_h, 250), 520)
 
     col_a, col_b = st.columns([2, 3])
     with col_a:
-        if report:
+        if display_report:
             with st.container(height=height):
-                st.subheader("Best Trial Parameters")
-                rows = [{"Parameter": k, "Value": str(v)} for k, v in report.get("best_params", {}).items()]
-                rows.append({"Parameter": "n_features", "Value": str(len(report.get("selected_features", [])))})
+                if param_mode in ("Best Model", "All"):
+                    model = report.get("best_params", {}).get("regressor", "")
+                    label = f"Best Parameters — {model}"
+                else:
+                    label = f"Best Parameters — {selected_reg}"
+                st.subheader(label)
+                params = display_report.get("best_params", {})
+                nums = {k: v for k, v in params.items() if k != "regressor" and not isinstance(v, str)}
+                cats = {k: v for k, v in params.items() if k != "regressor" and isinstance(v, str)}
+                rows = [{"Parameter": k, "Value": str(v)} for k, v in sorted(nums.items())]
+                rows += [{"Parameter": k, "Value": str(v)} for k, v in sorted(cats.items())]
                 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
                 st.subheader("Selected Features")
-                st.dataframe(pd.DataFrame({"Feature": report.get("selected_features", [])}), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame({"Feature": display_report.get("selected_features", [])}), use_container_width=True, hide_index=True)
     with col_b:
-        fig_imp = plot_parameter_importance(trials, height=height)
+        fig_imp = plot_parameter_importance(imp_df, height=height, param_cols=param_cols)
         st.plotly_chart(fig_imp, use_container_width=True, key="imp_t3")
 
     heat_metric = st.radio("Heatmap metric", ["MAE (val)", "R² (val)"], horizontal=True, key="heat_metric")
