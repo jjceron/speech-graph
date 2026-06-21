@@ -105,7 +105,14 @@ def compute_metrics_from_counts(
 
     # Remove self-loops, keep one edge per undirected pair
     unique_pairs = {frozenset((s, t)) for s, t in ec if s != t}
-    unique_undirected_non_self = len(unique_pairs)
+    ## Si se tiene ec =  Counter({
+    #                             ("a", "b"): 2,
+    #                             ("a", "a"): 2,
+    #                             ("b", "a"): 1,
+    #                             ("b", "c"): 1,
+    #                            })
+    ## Se eliminan self-loops y se toma solo conexiones no dirigidas {("a", "b"), ("b", "c")}
+    unique_undirected_non_self = len(unique_pairs) ## Número de edges no dirigidos sin self-loops
     density = float(unique_undirected_non_self / (node_count * (node_count - 1) / 2)) if node_count > 1 else 0.0
 
     # Undirected graph from post-removal edges
@@ -123,7 +130,7 @@ def compute_metrics_from_counts(
         lcc = 0
         largest = set()
 
-    # Diameter, ASP: Java's DistanceStatistics / UnweightedShortestPath on LCC
+    # Diameter, ASP: UnweightedShortestPath on LCC --> No vale la pena considerar nodos NO conectados porque no hay caminos para dichso nodos
     diameter = float("nan")
     asp = float("nan")
     if len(largest) > 1:
@@ -135,16 +142,25 @@ def compute_metrics_from_counts(
     # CC: Java's Metrics.clusteringCoefficients on ALL vertices (und2)
     cc_val = float(nx.average_clustering(und)) if und.number_of_edges() > 0 else float("nan")
 
-    adj = adjacency_matrix(ec, nodes)
-    l1 = int(np.trace(adj))
-    pe = int(edge_total - l1 - unique_undirected_non_self)
+    adj = adjacency_matrix(ec, nodes) ## Contabiliza TODOS los posibles edges, incluyendo múltiples edges entre nodos y direcciones de edges.
     atd = float(np.mean(adj.sum(axis=0)+adj.sum(axis=1)))
+    l1 = int(np.trace(adj))
+
+    ## Si se tiene ec = Counter({
+    #                               ("a", "b"): 2,
+    #                               ("b", "c"): 1,
+    #                               ("b", "d"): 1
+    #                               ("b", "a"): 1
+    #                           })
+    ## Entonces pe = 2 porque SOLO se deben tomar edges repetidos sin mirar dirección (son PARALELOS no REPETIDOS), sin contabilizar self-loops
+    pe = int(edge_total - l1 - unique_undirected_non_self)
 
     adj_dir = (adj > 0).astype(int)
     np.fill_diagonal(adj_dir, 0)
+    ## No mirar self-loops (información de la diagonal), ni múltiples apariciones de edges. Solo UN edge por pares de nodos.
     adj_dir2 = adj_dir @ adj_dir
-    l2 = int(np.trace(adj_dir2) // 2)
-    l3 = int(np.trace(adj_dir2 @ adj_dir) // 3)
+    l2 = int(np.trace(adj_dir2) // 2) ## calcula caminos de longitud 2
+    l3 = int(np.trace(adj_dir2 @ adj_dir) // 3) ## calcula triángulos
 
     return {
         "wc": int(wc),
@@ -187,7 +203,6 @@ def compute_metrics(
     else:
         segments = _as_segments(tokens_or_segments) ## Entra [["a", "b"], ["c", "d"]] | ["a", "b","c", "d"]. Return  [['a', 'b'], ['c', 'd']] | [["a", "b","c", "d"]]
     
-
     wc = sum(len(seg) for seg in segments)
     if wc == 0:
         return _empty()

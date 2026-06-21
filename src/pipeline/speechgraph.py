@@ -148,9 +148,9 @@ def process_single_subject(
         #     4,
         #     [False, False, True, False]
         # )]
-        m = compute_metrics(window_tokens, segment_boundaries=boundaries) ######## <----- VOY ACA
+        m = compute_metrics(window_tokens, segment_boundaries=boundaries) ## Dict con todas las métricas
         m["wc"] = len(window_tokens)
-        window_rows.append(m)
+        window_rows.append(m) ## List de dicts
 
     return window_rows, segments, flat_tokens
 

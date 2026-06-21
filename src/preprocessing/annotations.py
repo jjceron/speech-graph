@@ -182,8 +182,9 @@ def normalize_annotations_text(text: str) -> str:
         return " "
 
     out = _DOUBLE_BRACKET_RE.sub(_replace, raw)
-    out = re.sub(r"<\s*([^>\s]+)\s*>\s*" + re.escape(BREAK_TOKEN),
-                 rf" {BREAK_TOKEN} \1 {BREAK_TOKEN} ",out,) ### Generar BREAK_TOKEN antes de texto asociado (<>) a DI/DP. <caballero> [[DI]] --> __TRANSCRIPT_BREAK__ caballero __TRANSCRIPT_BREAK__
+
+    out = re.sub(r"<\s*([^>]+?)\s*>\s*" + re.escape(BREAK_TOKEN),
+           rf" {BREAK_TOKEN} \1 {BREAK_TOKEN} ", out,) ### Generar BREAK_TOKEN antes de texto asociado (<>) a DI/DP. <caballero> [[DI]] --> __TRANSCRIPT_BREAK__ caballero __TRANSCRIPT_BREAK__
     out = _STANDALONE_TIMESTAMP_RE.sub(" ", out)
     return re.sub(r"\s+", " ", out).strip()
 

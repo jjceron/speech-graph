@@ -55,38 +55,56 @@ def edge_counts(segments: list[list[str]]) -> Counter[tuple[str, str]]:
     return counts
 
 
-def adjacency_matrix(edge_counts: Counter[tuple[str, str]], nodes: list[str]) -> np.ndarray:
-    """Build a square adjacency matrix from edge counts."""
+def adjacency_matrix(
+    edge_counts: Counter[tuple[str, str]],
+    nodes: list[str],
+) -> np.ndarray:
+    """Build a directed adjacency matrix from edge frequency counts.
+
+    Creates a square adjacency matrix where rows represent source nodes
+    and columns represent target nodes. Each cell ``(i, j)`` contains
+    the total number of occurrences of the directed edge
+    ``nodes[i] -> nodes[j]``.
+
+    Example:
+        >>> nodes = ["a", "b", "c"]
+        >>> edge_counts = Counter({
+        ...     ("a", "b"): 2,
+        ...     ("b", "c"): 1,
+        ...     ("c", "a"): 1,
+        ... })
+        >>> adjacency_matrix(edge_counts, nodes)
+        array([
+            [0, 2, 0],
+            [0, 0, 1],
+            [1, 0, 0]
+        ])
+
+    Args:
+        edge_counts:
+            Mapping from directed edge ``(source, target)`` to its
+            occurrence count.
+        nodes:
+            Ordered list of node labels defining the row and column
+            ordering of the resulting matrix.
+
+    Returns:
+        A square NumPy array of shape ``(n, n)``, where ``n`` is the
+        number of nodes. Matrix entries contain edge frequencies rather
+        than binary connectivity values.
+
+    Notes:
+        - Self-loops are stored on the matrix diagonal.
+        - Multiple occurrences of the same edge are accumulated in the
+          corresponding matrix cell.
+        - The matrix represents a directed graph and is therefore not
+          necessarily symmetric.
+    """
     index = {node: i for i, node in enumerate(nodes)}
     matrix = np.zeros((len(nodes), len(nodes)), dtype=int)
     for (source, target), count in edge_counts.items():
         matrix[index[source], index[target]] += int(count)
     return matrix
-
-
-def parallel_edges(edge_counts: Counter[tuple[str, str]]) -> int:
-    """Count parallel edges (pairs with edges in both directions)."""
-    total = 0
-    visited: set[frozenset[str]] = set()
-    for source, target in edge_counts:
-        if source == target:
-            continue
-        pair = frozenset((source, target))
-        if pair in visited:
-            continue
-        total += min(edge_counts.get((source, target), 0), edge_counts.get((target, source), 0))
-        visited.add(pair)
-    return int(total)
-
-
-def build_graph(segments: list[list[str]]) -> nx.DiGraph:
-    """Build a directed graph from token segments."""
-    counts = edge_counts(segments)
-    graph = nx.DiGraph()
-    for (source, target), weight in counts.items():
-        graph.add_edge(source, target, weight=weight)
-    return graph
-
 
 def split_by_boundaries(tokens: list[str],
                         boundaries: list[bool]) -> list[list[str]]:
